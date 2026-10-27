@@ -204,6 +204,7 @@ def to_dict(result: ForecastResult) -> dict:
         "status": _status(result),
         "station": None if stn is None else {
             "id": stn.id, "name": stn.name, "distance_km": round(stn.distance_km, 1)},
+        "station_rejected": result.station_rejected,
         "units": UNITS,
         "days": days,
         "calibration": calibration_rows(result),

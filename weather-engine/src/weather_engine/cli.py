@@ -12,9 +12,12 @@ from .config import DEFAULT_LOCATIONS, Location, resolve_location
 
 def _resolve(args: argparse.Namespace) -> Location:
     try:
-        return resolve_location(args.place, args.lat, args.lon, Path(args.locations))
+        loc = resolve_location(args.place, args.lat, args.lon, Path(args.locations))
     except ValueError as e:
         sys.exit(str(e))
+    if getattr(args, "station", None):
+        loc.station = args.station.upper()
+    return loc
 
 
 def cmd_forecast(args: argparse.Namespace) -> None:
@@ -65,6 +68,7 @@ def main(argv: list[str] | None = None) -> None:
     place_args(p)
     p.add_argument("--html", action="store_true", help="also write an HTML report to reports/")
     p.add_argument("--raw", action="store_true", help="skip calibration (plain model blend)")
+    p.add_argument("--station", help="calibrate against this station (ICAO id, e.g. KDEN) even if it is far away")
     p.set_defaults(func=cmd_forecast)
 
     p = sub.add_parser("stations", help="show nearby stations and how well they match")

@@ -77,3 +77,19 @@ def test_static_blocks_path_traversal(server):
     assert status == 404
     status, _, _ = get(server + "/%2e%2e/server.py")
     assert status == 404
+
+
+def test_far_station_rejected_then_overridden(server):
+    status, _, body = get(server + "/api/forecast?lat=41.5&lon=-104.99&place=Far")
+    data = json.loads(body)
+    assert status == 200 and data["calibrated"] is False and data["station_rejected"] is True
+    station = data["station"]["id"]
+    status, _, body = get(server + f"/api/forecast?lat=41.5&lon=-104.99&place=Far&station={station}")
+    data = json.loads(body)
+    assert data["calibrated"] is True and data["station_rejected"] is False
+    assert data["station"]["id"] == station and data["station"]["distance_km"] > 100
+
+
+def test_bad_station_param(server):
+    status, _, _ = get(server + "/api/forecast?place=Denver&station=../../x")
+    assert status == 400

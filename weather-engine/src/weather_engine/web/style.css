@@ -122,6 +122,8 @@ th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line
 th { color: var(--muted); font-weight: 600; font-size: .8rem; }
 code { font-size: .85em; }
 
+.override { margin-bottom: 12px; background: var(--warn-bg); color: var(--warn-fg); border-color: transparent; }
+.override p { margin: 0 0 10px; }
 .notes { padding-left: 18px; color: var(--warn-fg); font-size: .9rem; }
 .notes:empty { display: none; }
 

@@ -42,7 +42,8 @@ def test_poor_station_match_falls_back_to_raw_blend(fake_api):
     result = run_forecast(loc)
     assert result.stats is None
     assert not result.blend["calibrated"].any()
-    assert any("poor match" in n for n in result.notes)
+    assert result.station_rejected
+    assert any("too far" in n for n in result.notes)
 
 
 def test_failed_model_is_skipped(fake_api, monkeypatch):

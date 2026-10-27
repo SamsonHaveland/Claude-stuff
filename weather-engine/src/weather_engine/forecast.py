@@ -32,6 +32,7 @@ class ForecastResult:
     stats: pd.DataFrame | None = None
     station: observations.Station | None = None
     notes: list[str] = field(default_factory=list)
+    station_rejected: bool = False  # nearest station too far/different to calibrate against
 
 
 def _fetch_raw(loc: Location, models: list[str], notes: list[str]) -> pd.DataFrame:
@@ -121,20 +122,21 @@ def run_forecast(loc: Location, models: list[str] = MODELS, use_calibration: boo
     raw = _fetch_raw(loc, models, notes)
     today = raw.loc[raw["lead"] == 0, "date"].min()
 
-    station, stats = None, None
+    station, stats, rejected = None, None, False
     if use_calibration:
         station = _pick_station(loc, notes)
         if station is not None:
             warnings = station.quality_warnings(loc)
             if warnings and not loc.station:
                 notes.extend(warnings)
-                notes.append("station is a poor match for this location; using uncalibrated blend "
-                             "(set `station:` in locations.yaml to override)")
+                notes.append(f"that is too far to correct against reliably, so this is the uncalibrated "
+                             f"model blend (to use it anyway: `--station {station.id}`, or the button in the web app)")
+                rejected = True
             else:
                 stats = _train(loc, station, models, today, notes)
 
     blended = calibrate.blend(calibrate.apply(raw, stats))
-    result = ForecastResult(loc, issued_at, blended, raw, _rain_prob(loc, notes), stats, station, notes)
+    result = ForecastResult(loc, issued_at, blended, raw, _rain_prob(loc, notes), stats, station, notes, rejected)
     _log(result)
     return result
 

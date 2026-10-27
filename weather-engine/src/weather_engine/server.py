@@ -7,6 +7,7 @@ asks for one.
 from __future__ import annotations
 
 import json
+import re
 import logging
 import mimetypes
 import socket
@@ -39,7 +40,13 @@ def _location_from_query(q: dict[str, list[str]]):
         lon_f = float(lon) if lon else None
     except ValueError:
         raise ValueError("lat and lon must be numbers") from None
-    return resolve_location(one("place"), lat_f, lon_f)
+    loc = resolve_location(one("place"), lat_f, lon_f)
+    station = one("station")
+    if station:
+        if not re.fullmatch(r"[A-Za-z0-9]{3,5}", station):
+            raise ValueError("station must be an ICAO id like KDEN")
+        loc.station = station.upper()
+    return loc
 
 
 def api_forecast(q: dict[str, list[str]]) -> dict:

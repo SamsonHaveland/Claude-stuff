@@ -95,6 +95,19 @@ function renderCalibration(rows) {
     )));
 }
 
+function renderOverride(data) {
+  const box = $("#override");
+  box.hidden = !(data.station_rejected && data.station);
+  if (box.hidden) return;
+  const s = data.station;
+  $("#override-text").textContent =
+    `The nearest weather station, ${s.name} (${s.id}), is ${Math.round(s.distance_km)} km away, so this forecast ` +
+    `isn't corrected for local conditions. Calibrating against it anyway usually still helps in flat, open ` +
+    `areas, but can mislead across mountains, coastlines or big elevation changes.`;
+  $("#override-btn").textContent = `Calibrate against ${s.id} anyway`;
+  $("#override-btn").onclick = () => forecast({ ...lastParams, station: s.id });
+}
+
 function render(data) {
   $("#loc-name").textContent = data.location.name;
   const pill = $("#status");
@@ -110,6 +123,7 @@ function render(data) {
   const issued = new Date(data.issued_at);
   const where = data.station ? ` · checked against ${data.station.name} (${Math.round(data.station.distance_km)} km away)` : "";
   $("#issued").textContent = `Updated ${issued.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}${where}`;
+  renderOverride(data);
   renderDays(data.days);
   renderCalibration(data.calibration);
   $("#notes").replaceChildren(...data.notes.map((n) => el("li", {}, n)));
@@ -120,6 +134,7 @@ function render(data) {
 // --- fetching ---------------------------------------------------------------
 
 let inFlight = null;
+let lastParams = {};
 
 async function forecast(params) {
   inFlight?.abort();
@@ -132,6 +147,7 @@ async function forecast(params) {
     const res = await fetch("api/forecast?" + new URLSearchParams(params), { signal: ctrl.signal });
     const data = await res.json().catch(() => ({ error: `Server error (${res.status})` }));
     if (!res.ok) throw new Error(data.error || `Server error (${res.status})`);
+    lastParams = params;
     render(data);
     if (params.place) remember(params.place);
     const url = new URL(location.href);
