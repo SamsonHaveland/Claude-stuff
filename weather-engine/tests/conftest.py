@@ -148,7 +148,11 @@ def fake_api(monkeypatch, tmp_path):
         params = params or {}
         if "synopticdata" in url:
             assert params["token"] == "test-token"
+            if url.endswith("/networks"):
+                return {"MNET": [{"ID": "141", "SHORTNAME": "CCRFCD"}, {"ID": "1", "SHORTNAME": "ASOS/AWOS"},
+                                 {"ID": "2", "LONGNAME": "Union Pacific Railroad"}]}
             if url.endswith("/metadata"):
+                assert "vars" not in params, "a variable filter hides rain gauges"
                 return {"SUMMARY": {"RESPONSE_CODE": 1}, "STATION": SYNOPTIC_STATIONS}
             if url.endswith("/timeseries"):
                 return synoptic_timeseries(params["stid"], params["start"], params["end"])

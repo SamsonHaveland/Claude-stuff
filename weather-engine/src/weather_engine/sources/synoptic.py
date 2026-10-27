@@ -18,6 +18,7 @@ from .observations import Station, haversine_km
 
 BASE_URL = "https://api.synopticdata.com/v2"
 METADATA_URL = f"{BASE_URL}/stations/metadata"
+NETWORKS_URL = f"{BASE_URL}/networks"
 TIMESERIES_URL = f"{BASE_URL}/stations/timeseries"
 PRECIP_URL = f"{BASE_URL}/stations/precipitation"
 
@@ -70,7 +71,29 @@ def _groups(sensor_vars: dict) -> frozenset:
 
 # --- station search -----------------------------------------------------------
 
-def parse_metadata(payload: dict, loc: Location) -> list[Station]:
+def parse_networks(payload: dict) -> dict[str, str]:
+    """MNET_ID -> readable network name."""
+    out = {}
+    for net in payload.get("MNET", []):
+        name = net.get("SHORTNAME") or net.get("LONGNAME")
+        if net.get("ID") is not None and name:
+            out[str(net["ID"])] = str(name)
+    return out
+
+
+def network_names() -> dict[str, str]:
+    from .. import store  # local import: store imports config only, but keep sources light
+
+    try:
+        df = store.cached_frame("synoptic_networks", 24 * 30, lambda: pd.DataFrame(
+            sorted(parse_networks(http.get_json(NETWORKS_URL, _params())).items()), columns=["id", "name"]))
+        return dict(zip(df["id"].astype(str), df["name"].astype(str)))
+    except Exception:  # names are cosmetic; never fail a forecast over them
+        return {}
+
+
+def parse_metadata(payload: dict, loc: Location, networks: dict[str, str] | None = None) -> list[Station]:
+    networks = networks or {}
     if not _check(payload):
         return []
     stations = []
@@ -90,21 +113,23 @@ def parse_metadata(payload: dict, loc: Location) -> list[Station]:
             elevation=None if elev_ft is None else elev_ft * FT_TO_M,
             distance_km=haversine_km(loc.latitude, loc.longitude, lat, lon),
             source="synoptic",
-            network=str(st.get("SHORTNAME") or st.get("MNET_SHORTNAME") or f"network {st.get('MNET_ID', '?')}"),
+            network=str(st.get("SHORTNAME") or networks.get(str(st.get("MNET_ID")))
+                        or f"network {st.get('MNET_ID', '?')}"),
             variables=groups,
         ))
     return sorted(stations, key=lambda s: s.distance_km)
 
 
-def find_stations(loc: Location, radius_km: float, limit: int = 50) -> list[Station]:
+def find_stations(loc: Location, radius_km: float, limit: int = 100) -> list[Station]:
+    # No variable filter: rain gauges name their sensors many ways (precip_accum_fifteen_minute,
+    # precip_accum_since_local_midnight, ...). Stations without weather sensors are dropped in parsing.
     params = _params(
         radius=f"{loc.latitude:.4f},{loc.longitude:.4f},{radius_km / KM_PER_MILE:.1f}",
         limit=limit,
         status="active",
         sensorvars=1,
-        vars="air_temp,wind_speed,precip_accum,precip_accum_one_hour",
     )
-    return parse_metadata(http.get_json(METADATA_URL, params), loc)
+    return parse_metadata(http.get_json(METADATA_URL, params), loc, network_names())
 
 
 # --- observations -----------------------------------------------------------
@@ -153,7 +178,8 @@ def _to_in(s: pd.Series, unit: str) -> pd.Series:
 def parse_timeseries(payload: dict, tz: str) -> pd.DataFrame:
     """Timeseries -> DataFrame (valid local time, tmpf, wind, gust), mph/°F."""
     if not _check(payload) or not payload.get("STATION"):
-        return pd.DataFrame(columns=["valid", "tmpf", "wind", "gust"])
+        msg = payload.get("SUMMARY", {}).get("RESPONSE_MESSAGE", "no data returned")
+        raise SynopticError(f"no observations ({msg})")
     obs = payload["STATION"][0].get("OBSERVATIONS", {})
     units = payload.get("UNITS", {})
     times = pd.to_datetime(pd.Series(obs.get("date_time", [])), utc=True)
@@ -190,7 +216,8 @@ def daily_from_obs(df: pd.DataFrame) -> pd.DataFrame:
 def parse_daily_precip(payload: dict, start: date) -> pd.Series:
     """Precipitation service in 24-hour intervals starting at local midnight -> inches per date."""
     if not _check(payload) or not payload.get("STATION"):
-        return pd.Series(dtype=float, name="precip")
+        msg = payload.get("SUMMARY", {}).get("RESPONSE_MESSAGE", "no data returned")
+        raise SynopticError(f"no precipitation ({msg})")
     units = payload.get("UNITS", {})
     intervals = payload["STATION"][0].get("OBSERVATIONS", {}).get("precipitation", [])
     values = {}
@@ -210,19 +237,57 @@ def fetch_daily(stid: str, start: date, end: date, tz: str, groups: frozenset) -
     t0, t1 = _utc_bounds(start, end, tz)
     fmt = "%Y%m%d%H%M"
     out = pd.DataFrame(index=pd.Index([start + timedelta(days=i) for i in range((end - start).days + 1)], name="date"))
+    errors = []
     if groups & {"temp", "wind"}:
-        payload = http.get_json(TIMESERIES_URL, _params(
-            stid=stid, start=t0.strftime(fmt), end=t1.strftime(fmt),
-            vars="air_temp,wind_speed,wind_gust", units=UNITS_PARAM,
-        ))
-        out = out.join(daily_from_obs(parse_timeseries(payload, tz)))
+        try:
+            payload = http.get_json(TIMESERIES_URL, _params(
+                stid=stid, start=t0.strftime(fmt), end=t1.strftime(fmt),
+                vars="air_temp,wind_speed,wind_gust", units=UNITS_PARAM,
+            ))
+            out = out.join(daily_from_obs(parse_timeseries(payload, tz)))
+        except Exception as e:
+            errors.append(f"temp/wind: {e}")
     if "precip" in groups:
-        payload = http.get_json(PRECIP_URL, _params(
-            stid=stid, start=t0.strftime(fmt), end=t1.strftime(fmt),
-            pmode="intervals", interval="24", units=UNITS_PARAM,
-        ))
-        out = out.join(parse_daily_precip(payload, start))
+        try:
+            payload = http.get_json(PRECIP_URL, _params(
+                stid=stid, start=t0.strftime(fmt), end=t1.strftime(fmt),
+                pmode="intervals", interval="24", units=UNITS_PARAM,
+            ))
+            out = out.join(parse_daily_precip(payload, start))
+        except Exception as e:
+            errors.append(f"rain: {e}")
+    if errors and len(errors) == len([g for g in (groups & {"temp", "wind"}, groups & {"precip"}) if g]):
+        raise SynopticError("; ".join(errors))
+    out.attrs["errors"] = errors
     for col in ("tmax", "tmin", "precip", "wind", "gust"):
         if col not in out:
             out[col] = float("nan")
     return out[["tmax", "tmin", "precip", "wind", "gust"]]
+
+
+def diagnose(stid: str, start: date, end: date, tz: str) -> list[str]:
+    """Human-readable summary of what Synoptic returns for one station (never prints the token)."""
+    t0, t1 = _utc_bounds(start, end, tz)
+    fmt = "%Y%m%d%H%M"
+    lines = []
+    for label, url, extra in (
+        ("timeseries", TIMESERIES_URL, {"vars": "air_temp,wind_speed,wind_gust"}),
+        ("precipitation", PRECIP_URL, {"pmode": "intervals", "interval": "24"}),
+    ):
+        try:
+            payload = http.get_json(url, _params(stid=stid, start=t0.strftime(fmt), end=t1.strftime(fmt),
+                                                 units=UNITS_PARAM, **extra))
+        except Exception as e:
+            lines.append(f"{label}: request failed: {str(e).replace(synoptic_token() or '-', '***')}")
+            continue
+        summary = payload.get("SUMMARY", {})
+        lines.append(f"{label}: code {summary.get('RESPONSE_CODE')} — {summary.get('RESPONSE_MESSAGE')}")
+        lines.append(f"  units: {payload.get('UNITS')}")
+        for st in payload.get("STATION", [])[:1]:
+            obs = st.get("OBSERVATIONS", {})
+            for key, vals in obs.items():
+                if isinstance(vals, list):
+                    non_null = sum(v is not None for v in vals)
+                    sample = vals[:2] if key == "precipitation" else (vals[0], vals[-1]) if vals else ()
+                    lines.append(f"  {key}: {len(vals)} values, {non_null} non-empty, e.g. {sample}")
+    return lines

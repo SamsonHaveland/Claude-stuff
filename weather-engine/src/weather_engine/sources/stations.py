@@ -48,12 +48,11 @@ def fetch_daily(station: Station, start: date, end: date, tz: str) -> pd.DataFra
             df = observations.fetch_daily(station.id, start, end, tz)
         return df.reset_index()
 
-    return store.cached_frame(f"obs3_{station.source}_{station.id}_{''.join(sorted(station.variables))}_{start}_{end}", 6, fetch).set_index("date")
+    return store.cached_frame(f"obs4_{station.source}_{station.id}_{''.join(sorted(station.variables))}_{start}_{end}", 6, fetch).set_index("date")
 
 
-def _complete_enough(df: pd.DataFrame, group: str) -> bool:
-    cols = VAR_GROUPS[group]
-    return int(df[cols[0]].notna().sum()) >= MIN_TRAIN_SAMPLES
+def _usable_days(df: pd.DataFrame, group: str) -> int:
+    return int(df[VAR_GROUPS[group][0]].notna().sum()) if not df.empty else 0
 
 
 def select(loc: Location, start: date, end: date, forced: str | None = None) -> Selection:
@@ -78,6 +77,7 @@ def select(loc: Location, start: date, end: date, forced: str | None = None) -> 
     sel.nearest = candidates[0]
 
     frames: dict[str, pd.DataFrame] = {}  # station key -> daily obs (fetched once per station)
+    errors: set[str] = set()
     obs = pd.DataFrame()
     for group, cols in VAR_GROUPS.items():
         usable = [s for s in candidates if group in s.variables and (forced or not s.quality_warnings(loc))]
@@ -92,12 +92,17 @@ def select(loc: Location, start: date, end: date, forced: str | None = None) -> 
                     frames[station.key] = fetch_daily(station, start, end, loc.timezone)
                 except Exception as e:
                     sel.notes.append(f"{station.id}: data unavailable ({e})")
+                    errors.add(station.key)
                     frames[station.key] = pd.DataFrame(columns=["tmax", "tmin", "precip", "wind", "gust"])
             df = frames[station.key]
-            if not df.empty and _complete_enough(df, group):
+            days = _usable_days(df, group)
+            if days >= MIN_TRAIN_SAMPLES:
                 obs = obs.join(df[cols], how="outer") if not obs.empty else df[cols].copy()
                 sel.chosen[group] = station
                 break
-            sel.notes.append(f"{station.id} skipped for {GROUP_LABELS[group]}: not enough recent data")
+            if not df.empty or station.key not in errors:
+                sel.notes.append(f"{station.id} skipped for {GROUP_LABELS[group]}: only {days} of "
+                                 f"{(end - start).days + 1} recent days had complete data "
+                                 f"(need {MIN_TRAIN_SAMPLES})")
     sel.obs = obs if sel.chosen else None
     return sel

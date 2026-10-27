@@ -51,6 +51,12 @@ def _fmt(c: dict | None, unit: str = "", ranged: bool = True) -> str:
     return s
 
 
+def attribution(result: ForecastResult) -> str:
+    synoptic = any(s.source == "synoptic" for s in result.stations.values())
+    obs = "Synoptic Data (MesoWest)" if synoptic else "NWS / Iowa Environmental Mesonet"
+    return f"Weather data by Open-Meteo.com (CC BY 4.0); observations via {obs}."
+
+
 def _is_calibrated(result: ForecastResult) -> bool:
     return result.stats is not None and bool(result.stats["mae_cal"].notna().any())
 
@@ -125,7 +131,7 @@ def to_text(result: ForecastResult) -> str:
         lines += [""] + summary
     if result.notes:
         lines += ["", "Notes:"] + [f"  - {n}" for n in result.notes]
-    lines += ["", "Weather data by Open-Meteo.com (CC BY 4.0); observations via NWS / Iowa Environmental Mesonet."]
+    lines += ["", attribution(result)]
     return "\n".join(lines)
 
 
@@ -219,5 +225,5 @@ def to_dict(result: ForecastResult) -> dict:
         "calibration": calibration_rows(result),
         "notes": result.notes,
         "baseline_model": BASELINE_MODEL,
-        "attribution": "Weather data by Open-Meteo.com (CC BY 4.0); observations via NWS / Iowa Environmental Mesonet.",
+        "attribution": attribution(result),
     }

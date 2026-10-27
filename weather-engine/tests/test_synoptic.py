@@ -102,3 +102,30 @@ def test_cli_stations_lists_all_networks(fake_api, token, capsys):
     assert "all networks (Synoptic)" in out
     assert "CCPRM" in out and "precip" in out and "CCRFCD" in out
     assert "47 km away" in out  # KHND flagged as too far
+
+
+def test_network_names_and_diagnostics(fake_api, token, capsys):
+    found = synoptic.find_stations(DENVER, 40)
+    assert {s.id: s.network for s in found}["BORAX"] == "Union Pacific Railroad"
+    from weather_engine.cli import main
+
+    main(["check-station", "NEAR2", "--days", "3", "--tz", "America/Denver"])
+    out = capsys.readouterr().out
+    assert "timeseries: code 1" in out and "air_temp_set_1" in out
+    assert "test-token" not in out
+
+
+def test_station_errors_are_reported(fake_api, token, monkeypatch):
+    from weather_engine import http
+
+    real = http.get_json
+
+    def failing(url, params=None):
+        if url.endswith("/timeseries") and params["stid"] == "NEAR2":
+            return {"SUMMARY": {"RESPONSE_CODE": 2, "RESPONSE_MESSAGE": "No stations found for this request."}}
+        return real(url, params)
+
+    monkeypatch.setattr(http, "get_json", failing)
+    sel = stations.select(DENVER, date(2026, 8, 21), date(2026, 10, 26))
+    assert any("NEAR2: data unavailable" in n and "No stations found" in n for n in sel.notes)
+    assert sel.chosen["precip"].id == "CCPRM"

@@ -50,6 +50,18 @@ def cmd_stations(args: argparse.Namespace) -> None:
         print(f"  {s.id:<10} {s.distance_km:5.1f} km  {elev:>7}  {groups:<16} {s.name} [{s.network}]  [{warn}]")
 
 
+def cmd_check_station(args: argparse.Namespace) -> None:
+    from datetime import date, timedelta
+
+    from .sources import synoptic
+
+    end = date.today() - timedelta(days=1)
+    start = end - timedelta(days=args.days - 1)
+    print(f"What Synoptic returns for {args.station}, {start} to {end} ({args.tz}):")
+    for line in synoptic.diagnose(args.station, start, end, args.tz):
+        print(" ", line)
+
+
 def cmd_verify(args: argparse.Namespace) -> None:
     from . import report
     from .verify import run_verification
@@ -83,6 +95,12 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("stations", help="show nearby stations and how well they match")
     place_args(p)
     p.set_defaults(func=cmd_stations)
+
+    p = sub.add_parser("check-station", help="show what Synoptic returns for one station (diagnostics)")
+    p.add_argument("station", help="station id from `weather-engine stations`, e.g. UP183")
+    p.add_argument("--days", type=int, default=7)
+    p.add_argument("--tz", default="America/Los_Angeles")
+    p.set_defaults(func=cmd_check_station)
 
     p = sub.add_parser("verify", help="score past forecasts against observations")
     p.set_defaults(func=cmd_verify)
