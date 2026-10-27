@@ -1,4 +1,4 @@
-"""Command line: `weather-engine forecast|stations|verify`."""
+"""Command line: `weather-engine forecast|stations|verify|serve`."""
 
 from __future__ import annotations
 
@@ -7,24 +7,14 @@ import logging
 import sys
 from pathlib import Path
 
-from .config import PROJECT_ROOT, Location, load_locations
-
-DEFAULT_LOCATIONS = PROJECT_ROOT / "config" / "locations.yaml"
+from .config import DEFAULT_LOCATIONS, Location, resolve_location
 
 
 def _resolve(args: argparse.Namespace) -> Location:
-    from .sources import openmeteo
-
-    if args.lat is not None and args.lon is not None:
-        return Location(name=args.place or f"{args.lat:.3f},{args.lon:.3f}", latitude=args.lat, longitude=args.lon)
-    if not args.place:
-        sys.exit("Give a place (\"Denver, CO\"), a saved location name, or --lat/--lon.")
-    path = Path(args.locations)
-    if path.exists():
-        saved = load_locations(path)
-        if args.place in saved:
-            return saved[args.place]
-    return openmeteo.geocode(args.place)
+    try:
+        return resolve_location(args.place, args.lat, args.lon, Path(args.locations))
+    except ValueError as e:
+        sys.exit(str(e))
 
 
 def cmd_forecast(args: argparse.Namespace) -> None:
@@ -55,6 +45,12 @@ def cmd_verify(args: argparse.Namespace) -> None:
     print(report.scores_to_text(run_verification()))
 
 
+def cmd_serve(args: argparse.Namespace) -> None:
+    from .server import serve
+
+    serve(args.host, args.port)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="weather-engine", description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -77,6 +73,12 @@ def main(argv: list[str] | None = None) -> None:
 
     p = sub.add_parser("verify", help="score past forecasts against observations")
     p.set_defaults(func=cmd_verify)
+
+    p = sub.add_parser("serve", help="run the web app (forecasts run only when you search)")
+    p.add_argument("--host", default="127.0.0.1",
+                   help="127.0.0.1 = this Mac only; 0.0.0.0 = also phones on your Wi-Fi")
+    p.add_argument("--port", type=int, default=8000)
+    p.set_defaults(func=cmd_serve)
 
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(message)s")

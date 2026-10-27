@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Weather Engine</title>
+  <meta name="description" content="Calibrated 7-day forecasts for temperature, rain and wind">
+  <meta name="theme-color" content="#0b1220" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Weather">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Weather Engine</h1>
+      <form id="search" autocomplete="off">
+        <label class="visually-hidden" for="place">Place</label>
+        <input id="place" name="place" type="search" placeholder="City, ST — e.g. Denver, CO" enterkeyhint="search" required>
+        <button type="submit">Forecast</button>
+      </form>
+      <div class="row">
+        <button id="locate" type="button" class="link">Use my location</button>
+        <div id="recent" class="chips" aria-label="Recent places"></div>
+      </div>
+    </header>
+
+    <section id="loading" hidden>
+      <div class="spinner" aria-hidden="true"></div>
+      <p>Fetching the latest model runs and checking them against local station data…</p>
+      <p class="muted">The first look-up for a new place can take up to 30 seconds.</p>
+    </section>
+
+    <section id="error" class="card error" hidden role="alert"></section>
+
+    <section id="result" hidden>
+      <div class="place-head">
+        <h2 id="loc-name"></h2>
+        <span id="status" class="pill"></span>
+      </div>
+      <p id="issued" class="muted"></p>
+      <ol id="days" class="days"></ol>
+      <p class="muted small">Where the corrected models disagree, the day shows their range for the high — a wider range means less certainty. Rain chance comes from the ECMWF and GFS ensembles.</p>
+
+      <details id="calibration" class="card">
+        <summary>How much calibration helped here</summary>
+        <table>
+          <thead><tr><th>Variable</th><th>Raw models</th><th>Typical error</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="muted small">Errors are measured on the same days used to learn the corrections, so they are slightly optimistic. Run <code>weather-engine verify</code> for the true score.</p>
+      </details>
+
+      <ul id="notes" class="notes"></ul>
+      <p id="attribution" class="muted small"></p>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

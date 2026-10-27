@@ -19,7 +19,21 @@ pip install --upgrade pip      # older pips cannot do editable installs
 pip install -e ".[dev]"
 ```
 
-## Use
+## Web app
+
+```bash
+weather-engine serve
+```
+
+Then open http://localhost:8000. Forecasts run only when you search; nothing runs
+in the background. Stop it with Ctrl+C.
+
+To use it on your phone at home, run `weather-engine serve --host 0.0.0.0`
+and open the address it prints on the phone (same Wi-Fi). In Safari, use
+Share → Add to Home Screen to get an app icon. "Use my location" needs a
+secure (https) connection, so on home Wi-Fi type the place instead.
+
+## Command line
 
 ```bash
 # Forecast any place (US results preferred)

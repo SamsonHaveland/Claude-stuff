@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -14,6 +16,9 @@ CACHE_DIR = DATA_DIR / "cache"
 PROCESSED_DIR = DATA_DIR / "processed"
 FORECAST_LOG = PROCESSED_DIR / "forecast_log.csv"
 
+# The web server handles requests in parallel threads; serialise file writes.
+_write_lock = threading.Lock()
+
 
 def cached_frame(name: str, max_age_hours: float, fetch: Callable[[], pd.DataFrame]) -> pd.DataFrame:
     """Return a cached CSV if fresh, otherwise fetch and cache it."""
@@ -25,14 +30,17 @@ def cached_frame(name: str, max_age_hours: float, fetch: Callable[[], pd.DataFra
         return df
     df = fetch()
     path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(path, index=False)
+    tmp = path.with_suffix(f".{threading.get_ident()}.tmp")
+    df.to_csv(tmp, index=False)
+    os.replace(tmp, path)  # atomic: readers never see a half-written file
     return df
 
 
 def append_log(rows: pd.DataFrame, path: Path | None = None) -> None:
     path = path or FORECAST_LOG
     path.parent.mkdir(parents=True, exist_ok=True)
-    rows.to_csv(path, mode="a", header=not path.exists(), index=False)
+    with _write_lock:
+        rows.to_csv(path, mode="a", header=not path.exists(), index=False)
 
 
 def read_log(path: Path | None = None) -> pd.DataFrame:

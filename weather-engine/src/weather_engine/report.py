@@ -1,4 +1,4 @@
-"""Render a forecast as a terminal table or a standalone HTML page."""
+"""Render a forecast as a terminal table, a standalone HTML page, or JSON for the web app."""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ def _rows(result: ForecastResult) -> list[dict]:
             "rain_prob": None if prob is None or pd.isna(prob) else round(100 * prob),
             "wind": cell("wind"),
             "gust": cell("gust"),
-            "baseline_tmax": base["tmax"].get(d) if "tmax" in base else None,
+            "baseline_tmax": float(base["tmax"][d]) if "tmax" in base and d in base.index and pd.notna(base["tmax"][d]) else None,
         })
     return rows
 
@@ -51,21 +51,23 @@ def _fmt(c: dict | None, unit: str = "", ranged: bool = True) -> str:
     return s
 
 
+def _is_calibrated(result: ForecastResult) -> bool:
+    return result.stats is not None and bool(result.stats["mae_cal"].notna().any())
+
+
 def _status(result: ForecastResult) -> str:
-    if result.stats is None or result.stats["mae_cal"].notna().sum() == 0:
+    if not _is_calibrated(result):
         return "UNCALIBRATED: blend of raw models (no usable local observation history)"
     stn = result.station
     return f"Calibrated against station {stn.id} ({stn.name}, {stn.distance_km:.0f} km away)"
 
 
-def calibration_summary(result: ForecastResult) -> list[str]:
-    """How far off the raw models were at this station, and how much correcting helped."""
-    if result.stats is None:
+def calibration_rows(result: ForecastResult) -> list[dict]:
+    """Per variable: how far off the raw models were here, and how much correcting helped."""
+    if not _is_calibrated(result):
         return []
     s = result.stats.dropna(subset=["mae_cal"])
-    if s.empty:
-        return []
-    lines = [f"Calibration (last {int(s['n'].max())} days at {result.station.id}, all models and lead days):"]
+    rows = []
     for var in [v for v in VARIABLES if v in set(s["var"])]:
         g, unit = s[s["var"] == var], UNITS[var]
         if var == "precip":
@@ -73,9 +75,24 @@ def calibration_summary(result: ForecastResult) -> list[str]:
         else:
             b = g["bias"].mean()
             shift = f"models ran {abs(b):.1f} {unit} too {'high' if b > 0 else 'low'}"
+        rows.append({
+            "var": var, "label": LABELS[var], "unit": unit, "shift": shift, "days": int(g["n"].max()),
+            "error_before": round(float(g["mae_raw"].mean()), 1),
+            "error_after": round(float(g["mae_cal"].mean()), 1),
+        })
+    return rows
+
+
+def calibration_summary(result: ForecastResult) -> list[str]:
+    rows = calibration_rows(result)
+    if not rows:
+        return []
+    days = max(r["days"] for r in rows)
+    lines = [f"Calibration (last {days} days at {result.station.id}, all models and lead days):"]
+    for r in rows:
         lines.append(
-            f"  {LABELS[var]:<6} {shift}; typical error {g['mae_raw'].mean():.1f} → "
-            f"{g['mae_cal'].mean():.1f} {unit} after correction"
+            f"  {r['label']:<6} {r['shift']}; typical error {r['error_before']:.1f} → "
+            f"{r['error_after']:.1f} {r['unit']} after correction"
         )
     lines.append("  (errors measured on the same days used for correction, so slightly optimistic;"
                  " `weather-engine verify` gives the true score)")
@@ -173,3 +190,24 @@ def scores_to_text(scores: pd.DataFrame) -> str:
         t = g.pivot_table(index="lead", columns="source", values="mae").round(2)
         lines.append(t.to_string())
     return "\n".join(lines)
+
+
+def to_dict(result: ForecastResult) -> dict:
+    """JSON-ready forecast for the web app."""
+    loc, stn = result.location, result.station
+    days = [{**r, "date": r["date"].isoformat()} for r in _rows(result)]
+    return {
+        "location": {"name": loc.name, "latitude": loc.latitude, "longitude": loc.longitude,
+                     "timezone": loc.timezone},
+        "issued_at": result.issued_at.isoformat(timespec="seconds"),
+        "calibrated": _is_calibrated(result),
+        "status": _status(result),
+        "station": None if stn is None else {
+            "id": stn.id, "name": stn.name, "distance_km": round(stn.distance_km, 1)},
+        "units": UNITS,
+        "days": days,
+        "calibration": calibration_rows(result),
+        "notes": result.notes,
+        "baseline_model": BASELINE_MODEL,
+        "attribution": "Weather data by Open-Meteo.com (CC BY 4.0); observations via NWS / Iowa Environmental Mesonet.",
+    }

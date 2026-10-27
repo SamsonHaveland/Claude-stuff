@@ -76,7 +76,9 @@ than the inputs change adds cost, not accuracy.
 | `weather_engine/verify.py` | Scoring and baseline comparisons |
 | `weather_engine/forecast.py` | End-to-end pipeline |
 | `weather_engine/report.py` | Terminal and HTML output |
-| `weather_engine/cli.py` | `forecast`, `stations`, `verify` commands |
+| `weather_engine/cli.py` | `forecast`, `stations`, `verify`, `serve` commands |
+| `weather_engine/server.py` | JSON API + static web app |
+| `weather_engine/web/` | Web app (HTML/CSS/JS, PWA manifest, service worker) |
 
 ## Locations
 
@@ -132,9 +134,15 @@ Scores are broken down by location, variable and lead day (day 1 … day 7).
   come from the NWS API and history from the Iowa Environmental Mesonet (both
   US only).
 - **Use:** personal, so the Open-Meteo free tier (non-commercial) is fine.
-- **Output:** a command-line tool plus an optional static HTML report. This is
-  the simplest option for one user and needs no server. The core is a Python
-  package, so an API or dashboard can be added later without a rewrite.
+- **Output:** a command-line tool plus a web app. `weather-engine serve` runs a
+  standard-library HTTP server (`server.py`) with a JSON API (`/api/forecast`,
+  `/api/stations`) and a no-build-step web page (`web/`) that can be added to a
+  phone home screen as an app (PWA). Forecasts are computed only on request;
+  nothing is scheduled. No web framework yet, because a framework's compiled
+  dependencies may lag new Python releases; revisit when deploying.
+- **Roadmap:** local web app → hosted site (needs persistent disk for the
+  cache, an access token, and a cost decision) → app-store app only if the
+  home-screen app proves insufficient.
 - **Training data:** fetched on demand (Open-Meteo Previous Runs, last 67
   days) and cached, so a new location is calibrated on its first run instead
   of after weeks of archiving.
