@@ -48,7 +48,10 @@ function renderRecent() {
 function remember(place) {
   const list = [place, ...storageGet(RECENT_KEY, []).filter((p) => p !== place)].slice(0, 5);
   storageSet(RECENT_KEY, list);
-  renderRecent();
+  $("#summary-btn").addEventListener("click", summarize);
+fetch("api/config").then((r) => r.json()).then((c) => { $("#ai-box").hidden = !c.ai; }).catch(() => {});
+
+renderRecent();
 }
 
 // --- rendering --------------------------------------------------------------
@@ -109,7 +112,30 @@ function renderOverride(data) {
   $("#override-btn").onclick = () => forecast({ ...lastParams, station: s.id });
 }
 
+let lastData = null;
+
+async function summarize() {
+  const btn = $("#summary-btn"), box = $("#summary");
+  btn.disabled = true;
+  box.hidden = false;
+  box.textContent = "Writing a summary…";
+  try {
+    const res = await fetch("api/summary", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(lastData),
+    });
+    const out = await res.json().catch(() => ({ error: `Server error (${res.status})` }));
+    if (!res.ok) throw new Error(out.error || `Server error (${res.status})`);
+    box.replaceChildren(out.summary, el("span", { class: "muted small" }, "Written by Claude from the forecast numbers above."));
+  } catch (err) {
+    box.textContent = `Summary unavailable: ${err.message}`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function render(data) {
+  lastData = data;
+  $("#summary").hidden = true;
   $("#loc-name").textContent = data.location.name;
   const pill = $("#status");
   if (data.calibrated) {
@@ -203,6 +229,9 @@ $("#locate").addEventListener("click", () => {
     { timeout: 15000 },
   );
 });
+
+$("#summary-btn").addEventListener("click", summarize);
+fetch("api/config").then((r) => r.json()).then((c) => { $("#ai-box").hidden = !c.ai; }).catch(() => {});
 
 renderRecent();
 const initial = Object.fromEntries(new URLSearchParams(location.search));

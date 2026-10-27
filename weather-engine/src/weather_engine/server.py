@@ -16,7 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import report
+from . import ai, report
 from .config import resolve_location
 from .forecast import run_forecast
 from .sources import observations
@@ -73,7 +73,17 @@ def _json_default(obj):
     raise TypeError(f"not JSON serialisable: {type(obj).__name__}")
 
 
-ROUTES = {"/api/forecast": api_forecast, "/api/stations": api_stations}
+def api_config(q: dict[str, list[str]]) -> dict:
+    return {"ai": ai.configured()}
+
+
+def api_summary(body: dict) -> dict:
+    return {"summary": ai.summarize(body)}
+
+
+ROUTES = {"/api/forecast": api_forecast, "/api/stations": api_stations, "/api/config": api_config}
+POST_ROUTES = {"/api/summary": api_summary}
+MAX_POST_BYTES = 256_000
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -92,6 +102,27 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:  # upstream service failures etc.
             log.exception("request failed: %s", self.path)
             self._json({"error": f"Forecast failed: {e}"}, HTTPStatus.BAD_GATEWAY)
+
+    def do_POST(self) -> None:  # noqa: N802 (stdlib naming)
+        route = POST_ROUTES.get(urlparse(self.path).path)
+        if route is None:
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            if not 0 < length <= MAX_POST_BYTES:
+                raise ValueError("request body missing or too large")
+            body = json.loads(self.rfile.read(length))
+            if not isinstance(body, dict):
+                raise ValueError("expected a JSON object")
+            self._json(route(body))
+        except ai.AIError as e:
+            self._json({"error": str(e)}, HTTPStatus.SERVICE_UNAVAILABLE)
+        except (ValueError, json.JSONDecodeError) as e:
+            self._json({"error": str(e)}, HTTPStatus.BAD_REQUEST)
+        except Exception as e:
+            log.exception("request failed: %s", self.path)
+            self._json({"error": f"Summary failed: {e}"}, HTTPStatus.BAD_GATEWAY)
 
     def _json(self, payload: dict, status: HTTPStatus = HTTPStatus.OK) -> None:
         body = json.dumps(payload, allow_nan=False, default=_json_default).encode()

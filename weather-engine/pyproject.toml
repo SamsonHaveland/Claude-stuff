@@ -17,6 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+ai = ["anthropic>=2.3"]
 
 [project.scripts]
 weather-engine = "weather_engine.cli:main"

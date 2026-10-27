@@ -16,6 +16,7 @@ CACHE_DIR = DATA_DIR / "cache"
 PROCESSED_DIR = DATA_DIR / "processed"
 FORECAST_LOG = PROCESSED_DIR / "forecast_log.csv"
 ARCHIVE_DIR = PROCESSED_DIR / "obs_archive"
+CALIBRATION_LOG = PROCESSED_DIR / "calibration_latest.csv"
 
 # The web server handles requests in parallel threads; serialise file writes.
 _write_lock = threading.Lock()
@@ -73,3 +74,32 @@ def merge_archive(name: str, new: pd.DataFrame) -> pd.DataFrame:
         merged.rename_axis("date").reset_index().to_csv(tmp, index=False)
         os.replace(tmp, path)
     return merged
+
+
+def save_calibration(location: str, stats: pd.DataFrame) -> None:
+    """Keep the latest calibration stats per location (for `analyze`)."""
+    with _write_lock:
+        old = pd.read_csv(CALIBRATION_LOG) if CALIBRATION_LOG.exists() else pd.DataFrame()
+        if not old.empty:
+            old = old[old["location"] != location]
+        merged = pd.concat([old, stats.assign(location=location)], ignore_index=True)
+        CALIBRATION_LOG.parent.mkdir(parents=True, exist_ok=True)
+        merged.to_csv(CALIBRATION_LOG, index=False)
+
+
+def read_calibration() -> pd.DataFrame:
+    return pd.read_csv(CALIBRATION_LOG) if CALIBRATION_LOG.exists() else pd.DataFrame()
+
+
+def archive_coverage() -> pd.DataFrame:
+    """Per archived station: days with data per variable and the date range."""
+    rows = []
+    for path in sorted(ARCHIVE_DIR.glob("*.csv")):
+        df = pd.read_csv(path)
+        if df.empty or "date" not in df:
+            continue
+        row = {"station": path.stem, "first": df["date"].min(), "last": df["date"].max()}
+        for col in ("tmax", "tmin", "precip", "wind", "gust"):
+            row[f"days_{col}"] = int(df[col].notna().sum()) if col in df else 0
+        rows.append(row)
+    return pd.DataFrame(rows)

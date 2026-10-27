@@ -132,6 +132,8 @@ def run_forecast(loc: Location, models: list[str] = MODELS, use_calibration: boo
                          f"model blend (to use {sel.nearest.id} anyway: `--station {sel.nearest.id}`, "
                          f"or the button in the web app)")
 
+    if stats is not None:
+        store.save_calibration(loc.name, stats)
     blended = calibrate.blend(calibrate.apply(raw, stats))
     result = ForecastResult(loc, issued_at, blended, raw, _rain_prob(loc, notes), stats, station, notes,
                             rejected, chosen, end_hours)

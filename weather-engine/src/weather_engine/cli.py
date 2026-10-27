@@ -1,4 +1,4 @@
-"""Command line: `weather-engine forecast|stations|verify|serve`."""
+"""Command line: `weather-engine forecast|stations|check-station|verify|analyze|serve`."""
 
 from __future__ import annotations
 
@@ -28,6 +28,13 @@ def cmd_forecast(args: argparse.Namespace) -> None:
     print(report.to_text(result))
     if args.html:
         print(f"\nHTML report: {report.to_html(result)}")
+    if args.summary:
+        from . import ai
+
+        try:
+            print("\nSummary (written by Claude from the numbers above):\n" + ai.summarize(report.to_dict(result)))
+        except ai.AIError as e:
+            print(f"\nSummary unavailable: {e}")
 
 
 def cmd_stations(args: argparse.Namespace) -> None:
@@ -72,6 +79,23 @@ def cmd_verify(args: argparse.Namespace) -> None:
     print(report.scores_to_text(run_verification()))
 
 
+def cmd_analyze(args: argparse.Namespace) -> None:
+    from . import ai
+    from .verify import run_verification
+
+    scores = run_verification()
+    if args.show_data:
+        print(ai.build_context(scores))
+        return
+    print("Asking Claude to review verification scores, calibration and station data (about a minute)...")
+    try:
+        text, path = ai.analyze(scores)
+    except ai.AIError as e:
+        sys.exit(str(e))
+    print(text)
+    print(f"\nSaved to {path}")
+
+
 def cmd_serve(args: argparse.Namespace) -> None:
     from .server import serve
 
@@ -93,6 +117,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--html", action="store_true", help="also write an HTML report to reports/")
     p.add_argument("--raw", action="store_true", help="skip calibration (plain model blend)")
     p.add_argument("--station", help="calibrate against this station (ICAO id, e.g. KDEN) even if it is far away")
+    p.add_argument("--summary", action="store_true", help="add a plain-English summary written by Claude (needs API key)")
     p.set_defaults(func=cmd_forecast)
 
     p = sub.add_parser("stations", help="show nearby stations and how well they match")
@@ -107,6 +132,10 @@ def main(argv: list[str] | None = None) -> None:
 
     p = sub.add_parser("verify", help="score past forecasts against observations")
     p.set_defaults(func=cmd_verify)
+
+    p = sub.add_parser("analyze", help="Claude reviews verification, calibration and station data and recommends changes")
+    p.add_argument("--show-data", action="store_true", help="print exactly what would be sent, without calling Claude")
+    p.set_defaults(func=cmd_analyze)
 
     p = sub.add_parser("serve", help="run the web app (forecasts run only when you search)")
     p.add_argument("--host", default="127.0.0.1",

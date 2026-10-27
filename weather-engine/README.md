@@ -33,6 +33,27 @@ and open the address it prints on the phone (same Wi-Fi). In Safari, use
 Share → Add to Home Screen to get an app icon. "Use my location" needs a
 secure (https) connection, so on home Wi-Fi type the place instead.
 
+## Claude features (optional)
+
+Claude writes about numbers the engine has already computed; it never
+produces the forecast numbers itself. Both features run only when you ask,
+and each run costs a few cents.
+
+1. `pip install -e ".[ai]"`
+2. Add `ANTHROPIC_API_KEY=...` to `weather-engine/.env` (git-ignored).
+
+- **Plain-English summary:** the "Plain-English summary" button in the web
+  app, or `weather-engine forecast "Primm, NV" --summary`.
+- **`weather-engine analyze`:** Claude reviews verification scores, the latest
+  calibration and station-archive coverage, then writes a ranked list of
+  recommendations with the evidence and sample sizes behind each. The report is
+  saved in `reports/`. `weather-engine analyze --show-data` prints exactly what
+  would be sent, without calling Claude. Run it after `verify` has a week or
+  two of scored forecasts.
+
+What gets sent to Anthropic: the forecast table, or the verification and
+calibration tables, plus place and station names. No API keys or tokens.
+
 ## Command line
 
 ```bash
