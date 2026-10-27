@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
-from . import calibrate, store
+from . import calibrate, detail, store
 from .config import (
     BASELINE_MODEL,
     ENSEMBLE_MODELS,
@@ -37,10 +37,13 @@ class ForecastResult:
     station_rejected: bool = False  # nearest station too far/different to calibrate against
     stations: dict[str, observations.Station] = field(default_factory=dict)  # group -> station used
     end_hours: dict[str, int] = field(default_factory=dict)  # group -> hour its daily readings end
+    hourly: pd.DataFrame | None = None  # calibrated hour-by-hour detail (see detail.py)
+    sun: pd.DataFrame | None = None  # index date: sunrise, sunset
 
 
-def _fetch_raw(loc: Location, models: list[str], notes: list[str]) -> pd.DataFrame:
-    frames = []
+def _fetch_raw(loc: Location, models: list[str], notes: list[str]) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """(daily long table, per-model hourly detail, sunrise/sunset)."""
+    frames, hourly, sun = [], [], None
     for model in models:
         try:
             daily, meta = openmeteo.fetch_forecast(loc, model)
@@ -55,9 +58,13 @@ def _fetch_raw(loc: Location, models: list[str], notes: list[str]) -> pd.DataFra
         long["lead"] = long["date"].map(lambda d: (d - day0).days)
         long["model"] = model
         frames.append(long.dropna(subset=["value"]))
+        if not meta["hourly"].empty:
+            hourly.append(meta["hourly"].assign(model=model))
+        if sun is None and not meta["sun"].empty:
+            sun = meta["sun"]
     if not frames:
         raise RuntimeError("No model forecasts could be fetched:\n  " + "\n  ".join(notes))
-    return pd.concat(frames, ignore_index=True)
+    return pd.concat(frames, ignore_index=True), (pd.concat(hourly, ignore_index=True) if hourly else pd.DataFrame()), sun
 
 
 def _train(loc: Location, models: list[str], today, notes: list[str]) -> tuple[pd.DataFrame | None, stations.Selection]:
@@ -97,26 +104,31 @@ def _train(loc: Location, models: list[str], today, notes: list[str]) -> tuple[p
     return calibrate.fit(pairs, as_of=end), sel
 
 
-def _rain_prob(loc: Location, notes: list[str]) -> pd.DataFrame:
-    frames = []
+def _rain_prob(loc: Location, notes: list[str]) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """(daily rain probability, hourly ensemble member counts summed over ensembles)."""
+    frames, hourly = [], []
     for model in ENSEMBLE_MODELS:
         try:
-            frames.append(openmeteo.fetch_ensemble_precip(loc, model))
+            daily, hours = openmeteo.fetch_ensemble_precip(loc, model)
+            frames.append(daily)
+            hourly.append(hours)
         except Exception as e:
             notes.append(f"{model} ensemble unavailable ({e})")
     if not frames:
-        return pd.DataFrame(columns=["rain_prob", "n_members"])
+        return pd.DataFrame(columns=["rain_prob", "n_members"]), pd.DataFrame(columns=["n_members", "wet_members"])
+    hourly_sum = pd.concat(hourly).groupby(level=0)[["n_members", "wet_members"]].sum()
     allp = pd.concat(frames)
     # Weight each ensemble by its member count.
     allp["wet_members"] = allp["rain_prob"] * allp["n_members"]
     g = allp.groupby(level=0)[["wet_members", "n_members"]].sum()
-    return pd.DataFrame({"rain_prob": g["wet_members"] / g["n_members"], "n_members": g["n_members"]})
+    daily = pd.DataFrame({"rain_prob": g["wet_members"] / g["n_members"], "n_members": g["n_members"]})
+    return daily, hourly_sum
 
 
 def run_forecast(loc: Location, models: list[str] = MODELS, use_calibration: bool = True) -> ForecastResult:
     notes: list[str] = []
     issued_at = datetime.now(timezone.utc)
-    raw = _fetch_raw(loc, models, notes)
+    raw, per_model_hourly, sun = _fetch_raw(loc, models, notes)
     today = raw.loc[raw["lead"] == 0, "date"].min()
 
     station, stats, rejected, chosen, end_hours = None, None, False, {}, {}
@@ -135,8 +147,13 @@ def run_forecast(loc: Location, models: list[str] = MODELS, use_calibration: boo
     if stats is not None:
         store.save_calibration(loc.name, stats)
     blended = calibrate.blend(calibrate.apply(raw, stats))
-    result = ForecastResult(loc, issued_at, blended, raw, _rain_prob(loc, notes), stats, station, notes,
-                            rejected, chosen, end_hours)
+    rain_daily, rain_hourly = _rain_prob(loc, notes)
+    hourly = None
+    if not per_model_hourly.empty:
+        daily_cal = blended.pivot_table(index="date", columns="var", values="value")
+        hourly = detail.calibrate_hourly(detail.blend_hourly(per_model_hourly), daily_cal, rain_hourly)
+    result = ForecastResult(loc, issued_at, blended, raw, rain_daily, stats, station, notes,
+                            rejected, chosen, end_hours, hourly, sun)
     _log(result)
     return result
 

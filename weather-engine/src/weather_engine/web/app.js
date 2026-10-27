@@ -71,7 +71,7 @@ function renderDays(days) {
     const wind = d.wind ? `Wind ${d.wind.value} mph` : "Wind —";
     const gust = d.gust ? `gusts ${d.gust.value}` : "";
 
-    return el("li", { class: "day" },
+    const row = el("div", { class: "day-row", role: "button", tabindex: "0", "aria-expanded": "false" },
       el("div", { class: "when" }, name, el("small", {}, date)),
       el("div", { class: "temps" },
         el("span", { class: "lo", title: `Low, model range ${fmtRange(d.tmin, "°")}` }, tmin == null ? "—" : `${tmin}°`),
@@ -83,8 +83,71 @@ function renderDays(days) {
         el("span", {}, [wind, gust].filter(Boolean).join(", ")),
         d.tmax && d.tmax.low !== d.tmax.high ? el("span", { class: "range" }, `high ${fmtRange(d.tmax, "°")}`) : null,
       ),
+      d.hours || d.detail ? el("span", { class: "chev" }, "Hour by hour ▾") : null,
     );
+    const li = el("li", { class: "day" }, row);
+    if (d.hours || d.detail) {
+      const panel = dayPanel(d);
+      panel.hidden = true;
+      li.append(panel);
+      const toggle = () => {
+        panel.hidden = !panel.hidden;
+        row.setAttribute("aria-expanded", String(!panel.hidden));
+        row.querySelector(".chev").textContent = panel.hidden ? "Hour by hour ▾" : "Hide hours ▴";
+      };
+      row.addEventListener("click", toggle);
+      row.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+    }
+    return li;
   }));
+}
+
+const KIND_LABEL = { thunderstorms: "T-storms", "freezing rain": "Frz rain", snow: "Snow", rain: "Rain", drizzle: "Drizzle" };
+
+function dayFacts(x) {
+  const facts = [];
+  const kind = x.precip_type || "rain";
+  const Kind = kind[0].toUpperCase() + kind.slice(1);
+  if (x.rain_windows?.length) facts.push([`${Kind} likely ${x.rain_windows.join(", ")}`, kind === "thunderstorms" ? "storm" : "wet"]);
+  if (x.rain_possible?.length) facts.push([`${Kind} possible ${x.rain_possible.join(", ")}`, ""]);
+  if (x.thunder && x.precip_type !== "thunderstorms") facts.push(["Thunder risk", "storm"]);
+  if (x.wind_from) facts.push([`Wind from ${x.wind_from}` + (x.gust_peak_time ? ` · gusts peak ~${x.gust_peak_time}` : ""), ""]);
+  if (x.sky) facts.push([x.sky, ""]);
+  if (x.humidity_min != null) facts.push([`Humidity ${x.humidity_min}–${x.humidity_max}%`, ""]);
+  if (x.feels_min != null) facts.push([`Feels like ${x.feels_min}–${x.feels_max}°`, ""]);
+  if (x.sunrise) facts.push([`Sunrise ${x.sunrise} · Sunset ${x.sunset}`, ""]);
+  return el("ul", { class: "facts" }, ...facts.map(([t, c]) => el("li", { class: c }, t)));
+}
+
+function hoursTable(h) {
+  const rows = h.rows;
+  const cell = (r, text, cls = "") => el("td", { class: cls }, text ?? "—");
+  const line = (label, fn) => el("tr", {}, el("th", { scope: "row" }, label), ...rows.map(fn));
+  return el("div", { class: "hours" }, el("table", {},
+    el("thead", {}, el("tr", {}, el("th", { scope: "row" }, ""), ...rows.map((r) => el("th", { scope: "col" }, r.label)))),
+    el("tbody", {},
+      line("Temp", (r) => cell(r, r.temp == null ? null : `${r.temp}°`)),
+      line("Feels", (r) => cell(r, r.feels == null ? null : `${r.feels}°`)),
+      line("Rain %", (r) => cell(r, r.rain_prob == null ? null : `${r.rain_prob}%`, r.rain_prob >= 40 ? "wet" : "")),
+      line("Rain in", (r) => cell(r, r.precip ? `${r.precip}″` : "0", r.precip >= 0.01 ? "wet" : "")),
+      line("Sky", (r) => cell(r, r.kind ? KIND_LABEL[r.kind] || r.kind : r.sky, r.kind === "thunderstorms" ? "storm" : r.kind ? "wet" : "")),
+      line("Wind", (r) => cell(r, r.wind == null ? null : `${r.wind_from || ""} ${r.wind}`.trim())),
+      line("Gusts", (r) => cell(r, r.gust)),
+      line("Humidity", (r) => cell(r, r.humidity == null ? null : `${r.humidity}%`)),
+    ),
+  ));
+}
+
+function dayPanel(d) {
+  const panel = el("div", { class: "day-panel" });
+  if (d.detail) panel.append(dayFacts(d.detail));
+  if (d.hours) {
+    panel.append(hoursTable(d.hours));
+    panel.append(el("p", { class: "muted small hours-note" },
+      d.hours.step_hours === 1 ? "Hourly. Wind and gusts in mph; scroll sideways for more hours."
+        : "Every 3 hours (rain is the 3-hour total, chance is the highest in the block). Scroll sideways."));
+  }
+  return panel;
 }
 
 function renderCalibration(rows) {

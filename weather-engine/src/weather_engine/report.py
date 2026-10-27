@@ -128,6 +128,11 @@ def to_text(result: ForecastResult) -> str:
             f"{_fmt(r['precip'], '″'):<18}{chance:<8}"
             f"{_fmt(r['wind'], '', False) + ' mph':<14}{_fmt(r['gust'], '', False) + ' mph':<10}"
         )
+    details, _ = _detail(result)
+    if details:
+        lines += ["", "Details:"]
+        for d, info in details.items():
+            lines.append(f"  {d:%a %b %d}: {_detail_line(info)}")
     summary = calibration_summary(result)
     if summary:
         lines += [""] + summary
@@ -204,10 +209,48 @@ def scores_to_text(scores: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
+def _detail(result: ForecastResult) -> tuple[dict, dict]:
+    """(per-date day details, per-date hourly timeline) or empty dicts without hourly data."""
+    if result.hourly is None or result.hourly.empty:
+        return {}, {}
+    from zoneinfo import ZoneInfo
+
+    from . import detail
+
+    now = None
+    if result.location.timezone:
+        now = pd.Timestamp(result.issued_at.astimezone(ZoneInfo(result.location.timezone)).replace(tzinfo=None))
+    return detail.day_details(result.hourly, result.sun), detail.timeline(result.hourly, now)
+
+
+def _detail_line(d: dict) -> str:
+    parts = []
+    kind = d["precip_type"] or "rain"
+    if d["rain_windows"]:
+        parts.append(f"{kind} likely {', '.join(d['rain_windows'])}")
+    if d["rain_possible"]:
+        parts.append(f"{kind} possible {', '.join(d['rain_possible'])}")
+    if d["thunder"] and kind != "thunderstorms":
+        parts.append("thunder risk")
+    if d["wind_from"]:
+        parts.append(f"wind from {d['wind_from']}" + (f", gusts peak ~{d['gust_peak_time']}" if d["gust_peak_time"] else ""))
+    if d["sky"]:
+        parts.append(d["sky"].lower())
+    if d["humidity_min"] is not None:
+        parts.append(f"humidity {d['humidity_min']}–{d['humidity_max']}%")
+    if d["feels_min"] is not None:
+        parts.append(f"feels {d['feels_min']}–{d['feels_max']}°")
+    if d["sunrise"]:
+        parts.append(f"sun {d['sunrise']}–{d['sunset']}")
+    return "; ".join(parts)
+
+
 def to_dict(result: ForecastResult) -> dict:
     """JSON-ready forecast for the web app."""
     loc, stn = result.location, result.station
-    days = [{**r, "date": r["date"].isoformat()} for r in _rows(result)]
+    details, hours = _detail(result)
+    days = [{**r, "date": r["date"].isoformat(), "detail": details.get(r["date"]), "hours": hours.get(r["date"])}
+            for r in _rows(result)]
     return {
         "location": {"name": loc.name, "latitude": loc.latitude, "longitude": loc.longitude,
                      "timezone": loc.timezone},

@@ -93,6 +93,24 @@ nearest one with 20+ days of history wins; if none has that, the nearest with
 To save places for reuse, copy `config/locations.example.yaml` to
 `config/locations.yaml` (that file is git-ignored) and forecast them by name.
 
+### Hour by hour
+
+Tap a day in the web app to see:
+- **The day at a glance:** when rain is likely or possible and what kind
+  (rain, snow, freezing rain, thunderstorms), wind direction and when gusts
+  peak, sky, humidity, "feels like", sunrise and sunset.
+- **A table:** hourly for today and tomorrow, every 3 hours after that. It
+  shows temperature, feels like, rain chance and amount, sky, wind (direction
+  and speed), gusts and humidity.
+
+The command line prints the same day summaries under "Details:".
+
+Hourly temperatures are adjusted so each day's low and high match the
+calibrated low and high. Hourly wind, gusts and rain are scaled to the
+calibrated daily peak and total. "Likely" means a 40%+ chance from the
+ensembles; "possible" means 15–40%. Cloud, humidity, wind direction and
+precipitation type are model averages and aren't calibrated against stations.
+
 ### Reading the output
 
 - **High / Low / Rain:** the blended value. The range in brackets is the

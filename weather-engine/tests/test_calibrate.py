@@ -74,3 +74,12 @@ def test_apply_lead_zero_uses_lead_one_stats_and_never_negative_rain():
                            "ratio": 0.5, "mae_raw": 0.1, "mae_cal": 0.05}])
     raw = pd.DataFrame([{"date": AS_OF, "lead": 0, "model": "a", "var": "precip", "value": 0.4}])
     assert calibrate.apply(raw, stats)["value_cal"].iloc[0] == pytest.approx(0.2)
+
+
+def test_blend_never_puts_gust_below_wind():
+    raw = pd.DataFrame([
+        {"date": AS_OF, "lead": 1, "model": "a", "var": "wind", "value": 15.0},
+        {"date": AS_OF, "lead": 1, "model": "a", "var": "gust", "value": 12.0},
+    ])
+    out = calibrate.blend(calibrate.apply(raw, None)).set_index("var")
+    assert out.loc["gust", "value"] == 15.0

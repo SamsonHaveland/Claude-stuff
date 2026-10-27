@@ -57,9 +57,8 @@ def _text(message) -> str:
 
 
 def _call(system: str, user: str, effort: str, stream: bool = False) -> str:
+    client = _client()  # raises a clear AIError if no key or SDK
     import anthropic
-
-    client = _client()
     kwargs = dict(
         model=MODEL,
         max_tokens=64000 if stream else 16000,
@@ -94,7 +93,7 @@ Rules:
 - 3 to 5 sentences. Lead with what matters most for planning: rain days and chances, notably hot/cold days, windy days.
 - Temperatures are °F, rain is inches, wind and gusts are mph. "rain_prob" is a percent chance from ensemble forecasts.
 - When the low/high range for a day is wide, or the forecast is uncalibrated, say the forecast is less certain. Days 5-7 are inherently less certain than days 1-2.
-- Mention rain amounts only when a day's chance is 30% or more.
+- Mention rain amounts only when a day's chance is 30% or more. Each day's "detail" gives rain timing windows, precipitation type, thunder risk, wind direction and gust peak time; use them when they matter for planning.
 - No greeting, no headings, no bullet points."""
 
 
@@ -104,7 +103,7 @@ def _summary_payload(forecast: dict) -> str:
         "calibrated": forecast.get("calibrated"),
         "status": forecast.get("status"),
         "days": [
-            {k: d.get(k) for k in ("date", "lead", "tmax", "tmin", "precip", "rain_prob", "wind", "gust")}
+            {k: d.get(k) for k in ("date", "lead", "tmax", "tmin", "precip", "rain_prob", "wind", "gust", "detail")}
             for d in forecast.get("days", [])
         ],
         "notes": forecast.get("notes", [])[:10],

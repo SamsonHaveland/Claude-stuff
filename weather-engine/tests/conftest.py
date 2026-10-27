@@ -18,9 +18,33 @@ def hourly_times(start: date, days: int) -> list[str]:
     return [(t0 + timedelta(hours=h)).strftime("%Y-%m-%dT%H:%M") for h in range(24 * days)]
 
 
+def hourly_detail(start: date, days: int, warm_bias: float) -> dict:
+    """Hourly detail block: temperature cycle 45-65 (+bias), afternoon rain with thunder on day 1."""
+    times = hourly_times(start, days)
+    h = np.arange(len(times))
+    hour = h % 24
+    temp = 55 + 10 * np.sin((hour - 9) / 24 * 2 * np.pi) + warm_bias
+    rainy = (h // 24 == 1) & (hour >= 14) & (hour < 18)
+    return {
+        "time": times,
+        "temperature_2m": list(temp),
+        "apparent_temperature": list(temp - 2),
+        "relative_humidity_2m": [30 + 20 * (x < 8) for x in hour],
+        "cloud_cover": [80 if r else 10 for r in rainy],
+        "precipitation": [0.05 if r else 0.0 for r in rainy],
+        "snowfall": [0.0] * len(times),
+        "weather_code": [95 if r else 1 for r in rainy],
+        "cape": [1500 if r else 0 for r in rainy],
+        "wind_speed_10m": [6 + 6 * (12 <= x <= 16) for x in hour],
+        "wind_direction_10m": [315] * len(times),
+        "wind_gusts_10m": [10 + 10 * (x == 15) for x in hour],
+    }
+
+
 def daily_payload(start: date = TODAY, days: int = 8, warm_bias: float = 0.0) -> dict:
     times = [(start + timedelta(days=i)).isoformat() for i in range(days)]
     return {
+        "hourly": hourly_detail(start, days, warm_bias),
         "latitude": 39.74, "longitude": -104.99, "elevation": 1609.0, "timezone": "America/Denver",
         "daily": {
             "time": times,
@@ -29,6 +53,8 @@ def daily_payload(start: date = TODAY, days: int = 8, warm_bias: float = 0.0) ->
             "precipitation_sum": [0.0, 0.2] * (days // 2),
             "wind_speed_10m_max": [12.0] * days,
             "wind_gusts_10m_max": [20.0] * days,
+            "sunrise": [f"{t}T06:12" for t in times],
+            "sunset": [f"{t}T17:45" for t in times],
         },
     }
 

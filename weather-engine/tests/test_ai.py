@@ -39,6 +39,7 @@ class FakeMessages:
 
 @pytest.fixture
 def fake_claude(monkeypatch):
+    pytest.importorskip("anthropic")  # optional [ai] extra
     messages = FakeMessages()
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     monkeypatch.setattr(ai, "_client", lambda: SimpleNamespace(beta=SimpleNamespace(messages=messages)))
@@ -111,3 +112,19 @@ def test_summary_endpoint(fake_api, fake_claude):
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+def test_missing_sdk_is_clear(fake_api, monkeypatch):
+    import builtins
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    real_import = builtins.__import__
+
+    def no_anthropic(name, *a, **k):
+        if name == "anthropic":
+            raise ImportError("no module")
+        return real_import(name, *a, **k)
+
+    monkeypatch.setattr(builtins, "__import__", no_anthropic)
+    with pytest.raises(ai.AIError, match="pip install"):
+        ai.summarize({"days": [{"date": "2026-10-27"}]})

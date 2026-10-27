@@ -101,4 +101,19 @@ def blend(corrected: pd.DataFrame) -> pd.DataFrame:
             "n_models": len(g),
             "calibrated": bool(g["mae_cal"].notna().any()),
         })
-    return pd.DataFrame(rows)
+    out = pd.DataFrame(rows)
+    return _gust_at_least_wind(out)
+
+
+def _gust_at_least_wind(blended: pd.DataFrame) -> pd.DataFrame:
+    """Wind and gusts are corrected separately; a gust can never be below the sustained wind."""
+    if blended.empty or not {"wind", "gust"} <= set(blended["var"]):
+        return blended
+    wind = blended[blended["var"] == "wind"].set_index(["date", "lead"])
+    is_gust = blended["var"] == "gust"
+    keys = pd.MultiIndex.from_frame(blended.loc[is_gust, ["date", "lead"]])
+    for col in ("value", "low", "high"):
+        floor = wind[col].reindex(keys).to_numpy()
+        current = blended.loc[is_gust, col].to_numpy()
+        blended.loc[is_gust, col] = np.where(np.isnan(floor), current, np.fmax(current, floor))
+    return blended

@@ -83,17 +83,59 @@ def parse_daily(payload: dict) -> pd.DataFrame:
     return df.set_index("date")
 
 
+# Hour-by-hour detail (Open-Meteo names -> our column names).
+HOURLY_DETAIL = {
+    "temperature_2m": "temp",
+    "apparent_temperature": "feels",
+    "relative_humidity_2m": "humidity",
+    "cloud_cover": "cloud",
+    "precipitation": "precip",
+    "snowfall": "snow",
+    "weather_code": "code",
+    "cape": "cape",
+    "wind_speed_10m": "wind",
+    "wind_direction_10m": "wind_dir",
+    "wind_gusts_10m": "gust",
+}
+
+
+def parse_hourly(payload: dict) -> pd.DataFrame:
+    """Hourly detail block -> DataFrame (time + HOURLY_DETAIL columns); missing variables are NaN."""
+    hourly = payload.get("hourly") or {}
+    if "time" not in hourly:
+        return pd.DataFrame(columns=["time", *HOURLY_DETAIL.values()])
+    df = pd.DataFrame({"time": pd.to_datetime(hourly["time"])})
+    for src, col in HOURLY_DETAIL.items():
+        df[col] = pd.to_numeric(pd.Series(hourly.get(src, [None] * len(df))), errors="coerce").values
+    return df
+
+
+def parse_sun(payload: dict) -> pd.DataFrame:
+    daily = payload.get("daily") or {}
+    if "sunrise" not in daily:
+        return pd.DataFrame(columns=["sunrise", "sunset"])
+    return pd.DataFrame({
+        "date": pd.to_datetime(daily["time"]).date,
+        "sunrise": pd.to_datetime(pd.Series(daily["sunrise"]), errors="coerce"),
+        "sunset": pd.to_datetime(pd.Series(daily.get("sunset", [None] * len(daily["sunrise"]))), errors="coerce"),
+    }).set_index("date")
+
+
 def fetch_forecast(loc: Location, model: str, days: int = FORECAST_DAYS) -> tuple[pd.DataFrame, dict]:
+    """Daily forecast plus meta; meta["hourly"] and meta["sun"] hold the detail tables."""
     params = {
         "latitude": loc.latitude,
         "longitude": loc.longitude,
-        "daily": ",".join(v[0] for v in VARIABLES.values()),
+        "daily": ",".join([*(v[0] for v in VARIABLES.values()), "sunrise", "sunset"]),
+        "hourly": ",".join(HOURLY_DETAIL),
         "models": model,
         "forecast_days": days,
         **UNIT_PARAMS,
     }
     payload = http.get_json(FORECAST_URL, params)
     meta = {k: payload.get(k) for k in ("timezone", "elevation", "latitude", "longitude")}
+    meta["hourly"] = parse_hourly(payload)
+    meta["sun"] = parse_sun(payload)
     return parse_daily(payload), meta
 
 
@@ -198,7 +240,22 @@ def parse_ensemble_precip(payload: dict, threshold: float = RAIN_THRESHOLD_IN, m
     return out[out["n_members"] > 0]
 
 
-def fetch_ensemble_precip(loc: Location, model: str, days: int = FORECAST_DAYS) -> pd.DataFrame:
+def parse_ensemble_hourly(payload: dict, threshold: float = RAIN_THRESHOLD_IN) -> pd.DataFrame:
+    """Per hour: number of members and how many have rain >= threshold in that hour."""
+    hourly = payload["hourly"]
+    times = pd.to_datetime(hourly["time"])
+    members = {k: pd.to_numeric(pd.Series(v), errors="coerce").values
+               for k, v in hourly.items() if k.startswith("precipitation")}
+    if not members:
+        return pd.DataFrame(columns=["n_members", "wet_members"])
+    frame = pd.DataFrame(members, index=times)
+    out = pd.DataFrame({"n_members": frame.notna().sum(axis=1), "wet_members": (frame >= threshold).sum(axis=1)})
+    out.index.name = "time"
+    return out[out["n_members"] > 0]
+
+
+def fetch_ensemble_precip(loc: Location, model: str, days: int = FORECAST_DAYS) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """(daily rain probability, hourly member counts) from one ensemble."""
     params = {
         "latitude": loc.latitude,
         "longitude": loc.longitude,
@@ -207,4 +264,5 @@ def fetch_ensemble_precip(loc: Location, model: str, days: int = FORECAST_DAYS) 
         "forecast_days": days,
         **UNIT_PARAMS,
     }
-    return parse_ensemble_precip(http.get_json(ENSEMBLE_URL, params))
+    payload = http.get_json(ENSEMBLE_URL, params)
+    return parse_ensemble_precip(payload), parse_ensemble_hourly(payload)
