@@ -38,16 +38,19 @@ def cmd_stations(args: argparse.Namespace) -> None:
     if loc.elevation is None:  # needed for the elevation check
         from .sources import openmeteo
         loc.elevation = openmeteo.fetch_forecast(loc, "gfs_seamless", days=1)[1].get("elevation")
-    source = "all networks (Synoptic)" if synoptic_token() else "airport stations only (add a Synoptic token for all networks)"
+    source = ("ACIS + all networks (Synoptic)" if synoptic_token()
+              else "ACIS + airports (add a Synoptic token for all networks)")
     print(f"Stations near {loc.name}, {source}:")
-    found = stations.find_candidates(loc)
+    found, notes = stations.find_candidates(loc)
+    for n in notes:
+        print(f"  ! {n}")
     if not found:
         print(f"  none within {STATION_SEARCH_RADIUS_KM:.0f} km")
     for s in found:
         warn = "; ".join(w.replace(f"station {s.id} ", "") for w in s.quality_warnings(loc)) or "ok"
         elev = "?" if s.elevation is None else f"{s.elevation:.0f} m"
         groups = "/".join(g for g in ("temp", "wind", "precip") if g in s.variables)
-        print(f"  {s.id:<10} {s.distance_km:5.1f} km  {elev:>7}  {groups:<16} {s.name} [{s.network}]  [{warn}]")
+        print(f"  {s.id:<12} {s.distance_km:5.1f} km  {elev:>7}  {groups:<16} {s.name} [{s.network}]  [{warn}]")
 
 
 def cmd_check_station(args: argparse.Namespace) -> None:

@@ -48,8 +48,12 @@ def run_verification(today: date | None = None) -> pd.DataFrame:
     frames = []
     for (loc, encoded, tz), g in log.groupby(["location", "station", "timezone"]):
         start, end = g["date"].min(), g["date"].max()
-        for group, (source, sid) in decode_stations(encoded).items():
-            st = Station(sid, sid, 0.0, 0.0, None, 0.0, source=source, variables=frozenset({group}))
+        for group, (source, sid, end_hour) in decode_stations(encoded).items():
+            if end_hour != 24:
+                # Logged forecasts are calendar days; a 7 am observer's day can't be scored
+                # against them exactly, so it is left out rather than approximated.
+                continue
+            st = Station(sid, sid, 0.0, 0.0, None, 0.0, source=source, variables=frozenset({group}), ref=sid)
             daily = stations.fetch_daily(st, start, end, tz)
             long = obs_long(daily[[c for c in VAR_GROUPS[group] if c in daily]])
             frames.append(long.assign(location=loc))

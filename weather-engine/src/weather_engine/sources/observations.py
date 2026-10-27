@@ -29,9 +29,10 @@ class Station:
     longitude: float
     elevation: float | None  # metres
     distance_km: float
-    source: str = "iem"  # "iem" (airport history via Iowa Mesonet) or "synoptic"
+    source: str = "iem"  # "iem" (airports via Iowa Mesonet), "synoptic" or "acis"
     network: str = "ASOS/AWOS"
     variables: frozenset = field(default_factory=lambda: frozenset(VAR_GROUPS))  # groups measured
+    ref: str = ""  # source's own lookup id when it differs from the display id (ACIS uid)
 
     @property
     def key(self) -> str:

@@ -162,6 +162,30 @@ def synoptic_precip(start: str, end: str) -> dict:
     }
 
 
+# ACIS stations returned by the fake StnMeta; empty unless a test turns ACIS on.
+ACIS_STATIONS: list = []
+ACIS_COOP = {
+    "uid": 4242, "name": "DENVER 2 SE", "sids": ["264950 2", "USC00264950 6"],
+    "ll": [-104.99, 39.758], "elev": 5300,
+    "valid_daterange": [["1990-01-01", "2026-10-26"], ["1990-01-01", "2026-10-26"], ["1990-01-01", "2026-10-26"]],
+}
+
+
+def acis_stndata(sdate: str, edate: str, past_days: int) -> dict:
+    """A 7 am observer whose readings match previous_runs_payload over 7am-7am windows."""
+    d0, d1 = date.fromisoformat(sdate), date.fromisoformat(edate)
+    start = TODAY - timedelta(days=past_days)  # previous_runs_payload's first day
+    rows = []
+    d = d0
+    while d <= d1:
+        k = (d - start).days
+        # window (7am D-1, 7am D]: rain falls local hours 0-9 on even days -> 8 h on D or 2 h from D-1
+        pcpn = "0.08" if k % 2 == 0 else "0.02"
+        rows.append([d.isoformat(), ["65", 7], ["45", 7], [pcpn, 7]])
+        d += timedelta(days=1)
+    return {"meta": {"uid": 4242}, "data": rows}
+
+
 @pytest.fixture
 def fake_api(monkeypatch, tmp_path):
     """Route all HTTP calls to synthetic payloads; isolate data dirs."""
@@ -212,6 +236,14 @@ def fake_api(monkeypatch, tmp_path):
         stop = date(p["year2"], p["month2"], p["day2"])
         return iem_csv(start, (stop - start).days)
 
+    def post_json(url, payload):
+        if url.endswith("/StnMeta"):
+            return {"meta": list(ACIS_STATIONS)}
+        if url.endswith("/StnData"):
+            return acis_stndata(payload["sdate"], payload["edate"], 67)
+        raise AssertionError(f"unexpected URL {url}")
+
     monkeypatch.setattr(http, "get_json", get_json)
+    monkeypatch.setattr(http, "post_json", post_json)
     monkeypatch.setattr(http, "get_text", get_text)
     return tmp_path

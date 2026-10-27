@@ -16,6 +16,7 @@ from .config import (
     MAX_LEAD,
     MODELS,
     TRAIN_WINDOW_DAYS,
+    VAR_GROUPS,
     Location,
 )
 from .sources import observations, openmeteo, stations
@@ -35,6 +36,7 @@ class ForecastResult:
     notes: list[str] = field(default_factory=list)
     station_rejected: bool = False  # nearest station too far/different to calibrate against
     stations: dict[str, observations.Station] = field(default_factory=dict)  # group -> station used
+    end_hours: dict[str, int] = field(default_factory=dict)  # group -> hour its daily readings end
 
 
 def _fetch_raw(loc: Location, models: list[str], notes: list[str]) -> pd.DataFrame:
@@ -69,14 +71,22 @@ def _train(loc: Location, models: list[str], today, notes: list[str]) -> tuple[p
     for model in models:
         try:
             runs.append(store.cached_frame(
-                f"pastruns_{loc.slug}_{model}_{today}", 6,
+                f"pastruns2_{loc.slug}_{model}_{today}", 6,
                 lambda m=model: openmeteo.fetch_previous_runs(loc, m, past_days),
             ))
         except Exception as e:
             notes.append(f"{model}: no past runs for calibration ({e})")
     if not runs:
         return None, sel
-    pairs = calibrate.build_pairs(pd.concat(runs, ignore_index=True), sel.obs)
+    hourly = pd.concat(runs, ignore_index=True)
+    # Compare each variable over exactly the 24 hours its station's daily reading covers.
+    frames = []
+    windows = {h: openmeteo.aggregate_windows(hourly, h) for h in set(sel.end_hours.values())}
+    for group, end_hour in sel.end_hours.items():
+        daily = windows[end_hour]
+        frames.append(daily[daily["var"].isin(VAR_GROUPS[group])])
+    pairs = calibrate.build_pairs(pd.concat(frames, ignore_index=True), sel.obs[[
+        c for g in sel.end_hours for c in VAR_GROUPS[g]]])
     if pairs.empty:
         notes.append("no overlapping forecast/observation history; using uncalibrated blend")
         return None, sel
@@ -109,10 +119,11 @@ def run_forecast(loc: Location, models: list[str] = MODELS, use_calibration: boo
     raw = _fetch_raw(loc, models, notes)
     today = raw.loc[raw["lead"] == 0, "date"].min()
 
-    station, stats, rejected, chosen = None, None, False, {}
+    station, stats, rejected, chosen, end_hours = None, None, False, {}, {}
     if use_calibration:
         stats, sel = _train(loc, models, today, notes)
         chosen = sel.chosen if stats is not None else {}
+        end_hours = sel.end_hours if stats is not None else {}
         station = chosen.get("temp") or next(iter(chosen.values()), None)
         if not chosen and sel.nearest is not None and not loc.station:
             station, rejected = sel.nearest, True
@@ -123,7 +134,7 @@ def run_forecast(loc: Location, models: list[str] = MODELS, use_calibration: boo
 
     blended = calibrate.blend(calibrate.apply(raw, stats))
     result = ForecastResult(loc, issued_at, blended, raw, _rain_prob(loc, notes), stats, station, notes,
-                            rejected, chosen)
+                            rejected, chosen, end_hours)
     _log(result)
     return result
 
@@ -134,27 +145,33 @@ def _log(result: ForecastResult) -> None:
     rows = pd.concat([blend, raw], ignore_index=True)
     rows.insert(0, "issued_at", result.issued_at.isoformat(timespec="seconds"))
     rows.insert(1, "location", result.location.name)
-    rows.insert(2, "station", encode_stations(result.stations))
+    rows.insert(2, "station", encode_stations(result.stations, result.end_hours))
     rows.insert(3, "timezone", result.location.timezone or "")
     store.append_log(rows)
 
 
-def encode_stations(chosen: dict[str, observations.Station]) -> str:
-    """{'temp': Station} -> 'temp=synoptic:KLAS;...' (stored in the forecast log for verify)."""
-    return ";".join(f"{g}={s.source}:{s.id}" for g, s in chosen.items())
+def encode_stations(chosen: dict[str, observations.Station], end_hours: dict[str, int] | None = None) -> str:
+    """{'temp': Station} -> 'temp=acis:12345@7;...' (stored in the forecast log for verify)."""
+    end_hours = end_hours or {}
+    parts = []
+    for g, s in chosen.items():
+        hour = end_hours.get(g, 24)
+        parts.append(f"{g}={s.source}:{s.ref or s.id}" + ("" if hour == 24 else f"@{hour}"))
+    return ";".join(parts)
 
 
-def decode_stations(text: str) -> dict[str, tuple[str, str]]:
-    """Inverse of encode_stations -> {group: (source, id)}; plain ids are old airport-only logs."""
+def decode_stations(text: str) -> dict[str, tuple[str, str, int]]:
+    """Inverse of encode_stations -> {group: (source, id, end_hour)}; plain ids are old airport-only logs."""
     if not isinstance(text, str) or not text:
         return {}
     if "=" not in text:
-        return {g: ("iem", text) for g in ("temp", "wind", "precip")}
+        return {g: ("iem", text, 24) for g in ("temp", "wind", "precip")}
     out = {}
     for part in text.split(";"):
         group, _, ref = part.partition("=")
         source, _, sid = ref.partition(":")
-        out[group] = (source, sid)
+        sid, _, hour = sid.partition("@")
+        out[group] = (source, sid, int(hour) if hour else 24)
     return out
 
 

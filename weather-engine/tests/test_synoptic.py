@@ -88,7 +88,7 @@ def test_selects_nearest_usable_station_per_variable(fake_api, token):
     assert sel.chosen["precip"].id == "CCPRM"  # 3 km rain gauge
     assert sel.chosen["temp"].id == "NEAR2"  # BORAX is nearer but has no data
     assert sel.chosen["wind"].id == "NEAR2"
-    assert any("BORAX skipped" in n for n in sel.notes)
+    assert any("BORAX passed over" in n for n in sel.notes)
     assert sel.obs["tmax"].notna().sum() > 50 and sel.obs["precip"].notna().sum() > 50
 
 

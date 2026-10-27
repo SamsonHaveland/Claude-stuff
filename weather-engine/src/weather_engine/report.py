@@ -52,9 +52,9 @@ def _fmt(c: dict | None, unit: str = "", ranged: bool = True) -> str:
 
 
 def attribution(result: ForecastResult) -> str:
-    synoptic = any(s.source == "synoptic" for s in result.stations.values())
-    obs = "Synoptic Data (MesoWest)" if synoptic else "NWS / Iowa Environmental Mesonet"
-    return f"Weather data by Open-Meteo.com (CC BY 4.0); observations via {obs}."
+    names = {"synoptic": "Synoptic Data (MesoWest)", "acis": "NOAA RCC-ACIS", "iem": "NWS / Iowa Environmental Mesonet"}
+    used = list(dict.fromkeys(names[s.source] for s in result.stations.values())) or [names["iem"]]
+    return f"Weather data by Open-Meteo.com (CC BY 4.0); observations via {', '.join(used)}."
 
 
 def _is_calibrated(result: ForecastResult) -> bool:
@@ -66,7 +66,9 @@ def _status(result: ForecastResult) -> str:
         return "UNCALIBRATED: blend of raw models (no usable local observation history)"
     by_station: dict[str, list[str]] = {}
     for group, s in result.stations.items():
-        by_station.setdefault(f"{s.id} ({s.name}, {s.distance_km:.0f} km away)", []).append(GROUP_LABELS[group])
+        hour = result.end_hours.get(group, 24)
+        window = "" if hour == 24 else f", daily readings at {hour % 12 or 12} {'am' if hour < 12 else 'pm'}"
+        by_station.setdefault(f"{s.id} ({s.name}, {s.distance_km:.0f} km away{window})", []).append(GROUP_LABELS[group])
     parts = [f"{', '.join(groups)}: {desc}" for desc, groups in by_station.items()]
     return "Calibrated against " + "; ".join(parts)
 

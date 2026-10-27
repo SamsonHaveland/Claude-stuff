@@ -50,13 +50,18 @@ weather-engine verify
 
 ### Station search
 
-For each place, the engine picks the **nearest usable station separately for
-temperature, wind and rain**. A rain gauge 3 km away can supply rain while an
-airport 15 km away supplies wind. A station is usable if it is within 25 km
-and 150 m of elevation, and has at least 20 days of recent data.
+For each place, the engine picks a station **separately for temperature, wind
+and rain**. A rain gauge 3 km away can supply rain while an airport 15 km away
+supplies wind. Candidates must be within 25 km and 150 m of elevation. The
+nearest one with 20+ days of history wins; if none has that, the nearest with
+5+ days is used, with scaled-down corrections.
 
-- **Without a Synoptic token:** only airport stations (ASOS/AWOS) are searched.
-- **With a token:** every network within 40 km is searched, including
+- **Always:** NOAA's ACIS (volunteer COOP observers, CoCoRaHS rain gauges,
+  airports). It has years of daily high/low/rain history but no wind.
+  Volunteers often read at 7 am, so the engine compares the forecast for exactly
+  that 7 am to 7 am window.
+- **Without a Synoptic token:** plus airport stations (ASOS/AWOS).
+- **With a token:** plus every network within 40 km, including
   flood-control gauges, wildfire (RAWS) stations, road-weather sensors and
   local networks. Create a free account at https://synopticdata.com, make an
   API token, and add `WEATHER_ENGINE_SYNOPTIC_TOKEN=...` to `weather-engine/.env`

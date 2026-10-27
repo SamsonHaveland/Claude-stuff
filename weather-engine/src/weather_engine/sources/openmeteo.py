@@ -103,27 +103,58 @@ def _hourly_name(base: str, lead: int) -> str:
     return base if lead == 0 else f"{base}_previous_day{lead}"
 
 
-def parse_previous_runs(payload: dict, leads: range = range(1, MAX_LEAD + 1), min_hours: int = 20) -> pd.DataFrame:
-    """Hourly *_previous_dayN series -> long daily table (date, lead, var, value).
+def parse_previous_runs_hourly(payload: dict, leads: range = range(1, MAX_LEAD + 1)) -> pd.DataFrame:
+    """Hourly *_previous_dayN series -> long hourly table (time, lead, hvar, value).
 
     Each hourly value of `x_previous_dayN` comes from the run issued N days
-    before that hour, so aggregating a local day gives the lead-N daily value.
+    before that hour.
     """
     hourly = payload["hourly"]
     times = pd.to_datetime(hourly["time"])
-    rows = []
-    for canon, (_, hvar, agg) in VARIABLES.items():
+    frames = []
+    for hvar in sorted({v[1] for v in VARIABLES.values()}):
         for lead in leads:
             key = _hourly_name(hvar, lead)
-            if key not in hourly:
-                continue
-            s = pd.Series(pd.to_numeric(pd.Series(hourly[key]), errors="coerce").values, index=times)
-            g = s.groupby(s.index.date)
-            daily = g.agg(agg)
-            daily[g.count() < min_hours] = float("nan")
-            for d, v in daily.dropna().items():
-                rows.append((d, lead, canon, float(v)))
-    return pd.DataFrame(rows, columns=["date", "lead", "var", "value"])
+            if key in hourly:
+                frames.append(pd.DataFrame({
+                    "time": times, "lead": lead, "hvar": hvar,
+                    "value": pd.to_numeric(pd.Series(hourly[key]), errors="coerce").values,
+                }))
+    if not frames:
+        return pd.DataFrame(columns=["time", "lead", "hvar", "value"])
+    return pd.concat(frames, ignore_index=True).dropna(subset=["value"])
+
+
+def aggregate_windows(hourly: pd.DataFrame, end_hour: int = 24, min_hours: int = 20) -> pd.DataFrame:
+    """Hourly forecasts -> daily values over 24-hour windows ending at `end_hour` local time.
+
+    The window labelled D covers (D-1 end_hour, D end_hour]; end_hour=24 is the
+    calendar day. This matches how observers report: a 7 am reading on the 5th
+    covers 7 am on the 4th to 7 am on the 5th. (Open-Meteo's hourly precipitation
+    at time t is the total for the hour ending at t, so the right-closed window is exact.)
+    """
+    if hourly.empty:
+        return pd.DataFrame(columns=["date", "lead", "var", "value"])
+    times = pd.to_datetime(hourly["time"])
+    label = (times - pd.Timedelta(hours=end_hour) - pd.Timedelta(seconds=1)).dt.date + pd.Timedelta(days=1)
+    df = hourly.assign(label=pd.to_datetime(label).dt.date)
+    keys = ["label", "lead"] + (["model"] if "model" in df else [])
+    frames = []
+    for canon, (_, hvar, agg) in VARIABLES.items():
+        sub = df[df["hvar"] == hvar]
+        if sub.empty:
+            continue
+        g = sub.groupby(keys)["value"]
+        out = g.agg(agg).to_frame("value")
+        out = out[g.count() >= min_hours].reset_index().rename(columns={"label": "date"})
+        frames.append(out.assign(var=canon))
+    cols = ["date", "lead", "var", "value"] + (["model"] if "model" in df else [])
+    return pd.concat(frames, ignore_index=True)[cols]
+
+
+def parse_previous_runs(payload: dict, leads: range = range(1, MAX_LEAD + 1), min_hours: int = 20) -> pd.DataFrame:
+    """Calendar-day (date, lead, var, value) table from a previous-runs payload."""
+    return aggregate_windows(parse_previous_runs_hourly(payload, leads), 24, min_hours)
 
 
 def fetch_previous_runs(loc: Location, model: str, past_days: int) -> pd.DataFrame:
@@ -139,7 +170,7 @@ def fetch_previous_runs(loc: Location, model: str, past_days: int) -> pd.DataFra
         "forecast_days": 1,
         **UNIT_PARAMS,
     }
-    df = parse_previous_runs(http.get_json(PREVIOUS_RUNS_URL, params))
+    df = parse_previous_runs_hourly(http.get_json(PREVIOUS_RUNS_URL, params))
     df["model"] = model
     return df
 
