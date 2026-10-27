@@ -28,6 +28,10 @@ weather-engine serve
 Then open http://localhost:8000. Forecasts run only when you search; nothing runs
 in the background. Stop it with Ctrl+C.
 
+**Online (works with your laptop off):** see [deploy/CLOUD_RUN.md](deploy/CLOUD_RUN.md)
+for putting it on Google Cloud Run. Expected to stay within the free tier, and
+protected by a password (`WEATHER_ENGINE_PASSWORD`).
+
 To use it on your phone at home, run `weather-engine serve --host 0.0.0.0`
 and open the address it prints on the phone (same Wi-Fi). In Safari, use
 Share → Add to Home Screen to get an app icon. "Use my location" needs a

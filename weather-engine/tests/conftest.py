@@ -222,6 +222,7 @@ def fake_api(monkeypatch, tmp_path):
     monkeypatch.setattr(store, "CALIBRATION_LOG", tmp_path / "processed" / "calibration_latest.csv")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("WEATHER_ENGINE_PASSWORD", raising=False)
     monkeypatch.delenv("WEATHER_ENGINE_SYNOPTIC_TOKEN", raising=False)
     monkeypatch.setattr(store, "FORECAST_LOG", tmp_path / "processed" / "forecast_log.csv")
     biases = {"ecmwf_ifs025": 0.0, "gfs_seamless": 3.0, "icon_seamless": -2.0, "gem_seamless": 1.0}

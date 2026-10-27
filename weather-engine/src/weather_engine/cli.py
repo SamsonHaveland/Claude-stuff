@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -140,7 +141,8 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("serve", help="run the web app (forecasts run only when you search)")
     p.add_argument("--host", default="127.0.0.1",
                    help="127.0.0.1 = this Mac only; 0.0.0.0 = also phones on your Wi-Fi")
-    p.add_argument("--port", type=int, default=8000)
+    p.add_argument("--port", type=int, default=int(os.environ.get("PORT", 8000)),
+                   help="defaults to $PORT when set (Cloud Run), else 8000")
     p.set_defaults(func=cmd_serve)
 
     args = parser.parse_args(argv)

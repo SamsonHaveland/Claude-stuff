@@ -7,6 +7,7 @@ asks for one.
 from __future__ import annotations
 
 import json
+import os
 import re
 import logging
 import mimetypes
@@ -16,7 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import ai, report
+from . import ai, auth, report
 from .config import resolve_location
 from .forecast import run_forecast
 from .sources import observations
@@ -74,7 +75,7 @@ def _json_default(obj):
 
 
 def api_config(q: dict[str, list[str]]) -> dict:
-    return {"ai": ai.configured()}
+    return {"ai": ai.configured(), "auth_required": auth.enabled()}
 
 
 def api_summary(body: dict) -> dict:
@@ -84,6 +85,7 @@ def api_summary(body: dict) -> dict:
 ROUTES = {"/api/forecast": api_forecast, "/api/stations": api_stations, "/api/config": api_config}
 POST_ROUTES = {"/api/summary": api_summary}
 MAX_POST_BYTES = 256_000
+PUBLIC_API = {"/api/config", "/api/login"}  # reachable without logging in
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -95,6 +97,8 @@ class Handler(BaseHTTPRequestHandler):
         if route is None:
             self._static(url.path)
             return
+        if not self._authorized(url.path):
+            return
         try:
             self._json(route(parse_qs(url.query)))
         except ValueError as e:
@@ -103,19 +107,50 @@ class Handler(BaseHTTPRequestHandler):
             log.exception("request failed: %s", self.path)
             self._json({"error": f"Forecast failed: {e}"}, HTTPStatus.BAD_GATEWAY)
 
+    def _authorized(self, path: str) -> bool:
+        if path in PUBLIC_API or auth.is_authenticated(self.headers.get("Cookie")):
+            return True
+        self._json({"error": "Please log in.", "login_required": True}, HTTPStatus.UNAUTHORIZED)
+        return False
+
+    def _read_json(self) -> dict:
+        length = int(self.headers.get("Content-Length") or 0)
+        if not 0 < length <= MAX_POST_BYTES:
+            raise ValueError("request body missing or too large")
+        body = json.loads(self.rfile.read(length))
+        if not isinstance(body, dict):
+            raise ValueError("expected a JSON object")
+        return body
+
+    def _login(self) -> None:
+        try:
+            body = self._read_json()
+        except (ValueError, json.JSONDecodeError) as e:
+            self._json({"error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+        if not auth.enabled():
+            self._json({"ok": True})
+            return
+        if not auth.check_password(str(body.get("password", ""))):
+            self._json({"error": "Wrong password."}, HTTPStatus.UNAUTHORIZED)
+            return
+        # Behind Cloud Run's HTTPS front end the request arrives as plain HTTP with this header.
+        secure = self.headers.get("X-Forwarded-Proto", "") == "https"
+        self._json({"ok": True}, headers={"Set-Cookie": auth.session_cookie(secure)})
+
     def do_POST(self) -> None:  # noqa: N802 (stdlib naming)
-        route = POST_ROUTES.get(urlparse(self.path).path)
+        path = urlparse(self.path).path
+        if path == "/api/login":
+            self._login()
+            return
+        route = POST_ROUTES.get(path)
         if route is None:
             self.send_error(HTTPStatus.NOT_FOUND)
             return
+        if not self._authorized(path):
+            return
         try:
-            length = int(self.headers.get("Content-Length") or 0)
-            if not 0 < length <= MAX_POST_BYTES:
-                raise ValueError("request body missing or too large")
-            body = json.loads(self.rfile.read(length))
-            if not isinstance(body, dict):
-                raise ValueError("expected a JSON object")
-            self._json(route(body))
+            self._json(route(self._read_json()))
         except ai.AIError as e:
             self._json({"error": str(e)}, HTTPStatus.SERVICE_UNAVAILABLE)
         except (ValueError, json.JSONDecodeError) as e:
@@ -124,9 +159,11 @@ class Handler(BaseHTTPRequestHandler):
             log.exception("request failed: %s", self.path)
             self._json({"error": f"Summary failed: {e}"}, HTTPStatus.BAD_GATEWAY)
 
-    def _json(self, payload: dict, status: HTTPStatus = HTTPStatus.OK) -> None:
+    def _json(self, payload: dict, status: HTTPStatus = HTTPStatus.OK, headers: dict | None = None) -> None:
         body = json.dumps(payload, allow_nan=False, default=_json_default).encode()
         self.send_response(status)
+        for k, v in (headers or {}).items():
+            self.send_header(k, v)
         self.send_header("Content-Type", "application/json")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(body)))
@@ -170,6 +207,11 @@ def lan_ip() -> str | None:
 
 def serve(host: str = "127.0.0.1", port: int = 8000) -> None:
     server = make_server(host, port)
+    if os.environ.get("K_SERVICE"):  # running on Cloud Run
+        print(f"Weather Engine listening on port {port}; password protection "
+              f"{'on' if auth.enabled() else 'OFF'}")
+        server.serve_forever()
+        return
     print(f"Weather Engine running at http://localhost:{port}")
     if host == "0.0.0.0":
         ip = lan_ip()

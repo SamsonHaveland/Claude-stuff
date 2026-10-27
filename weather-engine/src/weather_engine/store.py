@@ -12,7 +12,9 @@ import pandas as pd
 
 from .config import DATA_DIR
 
-CACHE_DIR = DATA_DIR / "cache"
+# Short-lived download cache; on Cloud Run this points at fast local disk (/tmp) while
+# DATA_DIR (archive, logs) lives on the mounted Cloud Storage bucket.
+CACHE_DIR = Path(os.environ.get("WEATHER_ENGINE_CACHE", DATA_DIR / "cache"))
 PROCESSED_DIR = DATA_DIR / "processed"
 FORECAST_LOG = PROCESSED_DIR / "forecast_log.csv"
 ARCHIVE_DIR = PROCESSED_DIR / "obs_archive"

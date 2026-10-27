@@ -105,7 +105,7 @@ def test_summary_endpoint(fake_api, fake_claude):
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{srv.server_address[1]}"
     try:
-        assert json.loads(urllib.request.urlopen(base + "/api/config").read()) == {"ai": True}
+        assert json.loads(urllib.request.urlopen(base + "/api/config").read()) == {"ai": True, "auth_required": False}
         body = json.dumps({"days": [{"date": "2026-10-27", "tmax": {"value": 70}}]}).encode()
         req = urllib.request.Request(base + "/api/summary", data=body, headers={"Content-Type": "application/json"})
         assert json.loads(urllib.request.urlopen(req).read())["summary"].startswith("Dry")

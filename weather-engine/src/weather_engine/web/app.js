@@ -24,6 +24,7 @@ function el(tag, attrs = {}, ...children) {
 }
 function show(id) {
   for (const s of ["loading", "error", "result"]) $("#" + s).hidden = s !== id;
+  $("#login").hidden = true;
 }
 function fmtRange(cell, unit = "") {
   if (!cell) return "—";
@@ -48,10 +49,7 @@ function renderRecent() {
 function remember(place) {
   const list = [place, ...storageGet(RECENT_KEY, []).filter((p) => p !== place)].slice(0, 5);
   storageSet(RECENT_KEY, list);
-  $("#summary-btn").addEventListener("click", summarize);
-fetch("api/config").then((r) => r.json()).then((c) => { $("#ai-box").hidden = !c.ai; }).catch(() => {});
-
-renderRecent();
+  renderRecent();
 }
 
 // --- rendering --------------------------------------------------------------
@@ -183,13 +181,14 @@ async function summarize() {
   box.hidden = false;
   box.textContent = "Writing a summary…";
   try {
-    const res = await fetch("api/summary", {
+    const res = await apiFetch("api/summary", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(lastData),
     });
     const out = await res.json().catch(() => ({ error: `Server error (${res.status})` }));
     if (!res.ok) throw new Error(out.error || `Server error (${res.status})`);
     box.replaceChildren(out.summary, el("span", { class: "muted small" }, "Written by Claude from the forecast numbers above."));
   } catch (err) {
+    if (err.loginRequired) { box.hidden = true; showLogin(summarize); return; }
     box.textContent = `Summary unavailable: ${err.message}`;
   } finally {
     btn.disabled = false;
@@ -230,6 +229,50 @@ function render(data) {
 
 // --- fetching ---------------------------------------------------------------
 
+// --- login (only when the server has a password set) -------------------------
+
+let afterLogin = null;
+
+function showLogin(retry) {
+  afterLogin = retry;
+  for (const s of ["loading", "error", "result"]) $("#" + s).hidden = true;
+  $("#login").hidden = false;
+  $("#login-error").hidden = true;
+  $("#password").focus();
+}
+
+async function apiFetch(url, options = {}) {
+  const res = await fetch(url, options);
+  if (res.status === 401) {
+    const body = await res.json().catch(() => ({}));
+    if (body.login_required) {
+      const err = new Error("login required");
+      err.loginRequired = true;
+      throw err;
+    }
+  }
+  return res;
+}
+
+$("#login-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const res = await fetch("api/login", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password: $("#password").value }),
+  }).catch(() => null);
+  if (!res || !res.ok) {
+    const body = res ? await res.json().catch(() => ({})) : {};
+    $("#login-error").textContent = body.error || "Can't reach the server.";
+    $("#login-error").hidden = false;
+    return;
+  }
+  $("#password").value = "";
+  $("#login").hidden = true;
+  const retry = afterLogin;
+  afterLogin = null;
+  if (retry) retry();
+});
+
 let inFlight = null;
 let lastParams = {};
 
@@ -241,7 +284,7 @@ async function forecast(params) {
   show("loading");
   $("#search button").disabled = true;
   try {
-    const res = await fetch("api/forecast?" + new URLSearchParams(params), { signal: ctrl.signal });
+    const res = await apiFetch("api/forecast?" + new URLSearchParams(params), { signal: ctrl.signal });
     const data = await res.json().catch(() => ({ error: `Server error (${res.status})` }));
     if (!res.ok) throw new Error(data.error || `Server error (${res.status})`);
     lastParams = params;
@@ -252,6 +295,7 @@ async function forecast(params) {
     history.replaceState(null, "", url);
   } catch (err) {
     if (ctrl.signal.aborted && ctrl.signal.reason !== "timeout") return; // superseded by a newer search
+    if (err.loginRequired) { showLogin(() => forecast(params)); return; }
     const msg = ctrl.signal.reason === "timeout"
       ? "That took too long. The weather services may be slow; please try again."
       : err instanceof TypeError

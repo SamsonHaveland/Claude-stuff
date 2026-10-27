@@ -145,6 +145,14 @@ button.secondary { background: var(--card); color: var(--accent); border: 1px so
 #ai-box { margin-bottom: 12px; }
 .override { margin-bottom: 12px; background: var(--warn-bg); color: var(--warn-fg); border-color: transparent; }
 .override p { margin: 0 0 10px; }
+#login-form { display: block; }
+#login-form p { margin: 4px 0 10px; }
+.row-input { display: flex; gap: 8px; }
+input[type=password] {
+  flex: 1; min-width: 0; font: inherit; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--fg);
+}
+.login-error { color: var(--err-fg); margin: 8px 0 0; }
 .notes { padding-left: 18px; color: var(--warn-fg); font-size: .9rem; }
 .notes:empty { display: none; }
 
