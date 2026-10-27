@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import io
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 import pandas as pd
 
 from .. import http
-from ..config import Location
+from ..config import VAR_GROUPS, Location
 
 NWS_POINTS_URL = "https://api.weather.gov/points/{lat:.4f},{lon:.4f}"
 IEM_ASOS_URL = "https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py"
@@ -23,12 +23,19 @@ MAX_STATION_ELEVATION_DIFF_M = 150.0
 
 @dataclass
 class Station:
-    id: str  # ICAO, e.g. KDEN
+    id: str  # ICAO (KDEN) for airport stations, Synoptic STID otherwise
     name: str
     latitude: float
     longitude: float
     elevation: float | None  # metres
     distance_km: float
+    source: str = "iem"  # "iem" (airport history via Iowa Mesonet) or "synoptic"
+    network: str = "ASOS/AWOS"
+    variables: frozenset = field(default_factory=lambda: frozenset(VAR_GROUPS))  # groups measured
+
+    @property
+    def key(self) -> str:
+        return f"{self.source}:{self.id}"
 
     def quality_warnings(self, loc: Location) -> list[str]:
         warnings = []

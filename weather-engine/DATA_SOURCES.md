@@ -22,6 +22,8 @@ feeds if usage becomes commercial or call limits bind.
 
 | Source | What | Coverage | Notes |
 |---|---|---|---|
+| **Synoptic Data (MesoWest)** | Stations from all networks: ASOS, flood-control gauges (e.g. CCRFCD), RAWS, road weather, mesonets | US-wide | **In use when a token is set.** Free account; token in `.env` as `WEATHER_ENGINE_SYNOPTIC_TOKEN`. Station quality varies, so each station is checked for data completeness before use |
+| **NWS API + Iowa Environmental Mesonet** | Airport (ASOS/AWOS) stations and their hourly history | US | **In use without a Synoptic token** (and always for older logs) |
 | Meteostat | Hourly/daily station data | Global | Easy Python access; aggregates national services |
 | NOAA ISD / Global Hourly | Hourly synoptic/METAR obs | Global | Long history; QC flags |
 | NOAA GHCN-Daily | Daily max/min temperature, precipitation | Global | Best source for daily rain totals |

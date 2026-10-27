@@ -34,7 +34,7 @@ def test_forecast_logs_blend_and_raw(fake_api):
     run_forecast(Location("Denver", 39.74, -104.99))
     log = store.read_log()
     assert {"blend", "ecmwf_ifs025", "gfs_seamless"} <= set(log["source"])
-    assert (log["station"] == "KBKF").all()
+    assert (log["station"] == "temp=iem:KBKF;wind=iem:KBKF;precip=iem:KBKF").all()
 
 
 def test_poor_station_match_falls_back_to_raw_blend(fake_api):
@@ -43,7 +43,7 @@ def test_poor_station_match_falls_back_to_raw_blend(fake_api):
     assert result.stats is None
     assert not result.blend["calibrated"].any()
     assert result.station_rejected
-    assert any("too far" in n for n in result.notes)
+    assert any("close enough" in n for n in result.notes)
 
 
 def test_failed_model_is_skipped(fake_api, monkeypatch):
@@ -65,7 +65,7 @@ def test_failed_model_is_skipped(fake_api, monkeypatch):
 def test_reports_render(fake_api):
     result = run_forecast(Location("Denver", 39.74, -104.99))
     text = report.to_text(result)
-    assert "Calibrated against station KBKF" in text
+    assert "Calibrated against temperature, wind, rain: KBKF" in text
     assert "Open-Meteo.com" in text
     assert "Calibration (last" in text and "High" in text
     path = report.to_html(result, fake_api / "r.html")

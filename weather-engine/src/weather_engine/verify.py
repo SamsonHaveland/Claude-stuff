@@ -8,8 +8,10 @@ import pandas as pd
 
 from . import store
 from .calibrate import obs_long
-from .config import RAIN_THRESHOLD_IN
-from .sources import observations
+from .config import RAIN_THRESHOLD_IN, VAR_GROUPS
+from .forecast import decode_stations
+from .sources import stations
+from .sources.observations import Station
 
 
 def score(log: pd.DataFrame, obs: pd.DataFrame) -> pd.DataFrame:
@@ -44,9 +46,13 @@ def run_verification(today: date | None = None) -> pd.DataFrame:
     today = today or date.today()
     log = log[(log["date"] < today) & log["station"].notna() & (log["station"] != "")]
     frames = []
-    for (loc, station, tz), g in log.groupby(["location", "station", "timezone"]):
-        daily = observations.fetch_daily(station, g["date"].min(), g["date"].max(), tz)
-        frames.append(obs_long(daily).assign(location=loc))
+    for (loc, encoded, tz), g in log.groupby(["location", "station", "timezone"]):
+        start, end = g["date"].min(), g["date"].max()
+        for group, (source, sid) in decode_stations(encoded).items():
+            st = Station(sid, sid, 0.0, 0.0, None, 0.0, source=source, variables=frozenset({group}))
+            daily = stations.fetch_daily(st, start, end, tz)
+            long = obs_long(daily[[c for c in VAR_GROUPS[group] if c in daily]])
+            frames.append(long.assign(location=loc))
     if not frames:
         return pd.DataFrame()
     return score(log, pd.concat(frames, ignore_index=True))

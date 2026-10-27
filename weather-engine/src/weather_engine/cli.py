@@ -31,14 +31,23 @@ def cmd_forecast(args: argparse.Namespace) -> None:
 
 
 def cmd_stations(args: argparse.Namespace) -> None:
-    from .sources import observations
+    from .config import STATION_SEARCH_RADIUS_KM, synoptic_token
+    from .sources import stations
 
     loc = _resolve(args)
-    print(f"Nearest observing stations to {loc.name}:")
-    for s in observations.nearest_stations(loc):
-        warn = "; ".join(s.quality_warnings(loc)) or "ok"
+    if loc.elevation is None:  # needed for the elevation check
+        from .sources import openmeteo
+        loc.elevation = openmeteo.fetch_forecast(loc, "gfs_seamless", days=1)[1].get("elevation")
+    source = "all networks (Synoptic)" if synoptic_token() else "airport stations only (add a Synoptic token for all networks)"
+    print(f"Stations near {loc.name}, {source}:")
+    found = stations.find_candidates(loc)
+    if not found:
+        print(f"  none within {STATION_SEARCH_RADIUS_KM:.0f} km")
+    for s in found:
+        warn = "; ".join(w.replace(f"station {s.id} ", "") for w in s.quality_warnings(loc)) or "ok"
         elev = "?" if s.elevation is None else f"{s.elevation:.0f} m"
-        print(f"  {s.id}  {s.distance_km:5.1f} km  {elev:>7}  {s.name}  [{warn}]")
+        groups = "/".join(g for g in ("temp", "wind", "precip") if g in s.variables)
+        print(f"  {s.id:<10} {s.distance_km:5.1f} km  {elev:>7}  {groups:<16} {s.name} [{s.network}]  [{warn}]")
 
 
 def cmd_verify(args: argparse.Namespace) -> None:

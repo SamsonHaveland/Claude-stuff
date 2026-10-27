@@ -48,6 +48,22 @@ weather-engine stations "Denver, CO"
 weather-engine verify
 ```
 
+### Station search
+
+For each place, the engine picks the **nearest usable station separately for
+temperature, wind and rain**. A rain gauge 3 km away can supply rain while an
+airport 15 km away supplies wind. A station is usable if it is within 25 km
+and 150 m of elevation, and has at least 20 days of recent data.
+
+- **Without a Synoptic token:** only airport stations (ASOS/AWOS) are searched.
+- **With a token:** every network within 40 km is searched, including
+  flood-control gauges, wildfire (RAWS) stations, road-weather sensors and
+  local networks. Create a free account at https://synopticdata.com, make an
+  API token, and add `WEATHER_ENGINE_SYNOPTIC_TOKEN=...` to `weather-engine/.env`
+  (that file is git-ignored).
+
+`weather-engine stations "Primm, NV"` lists what's nearby and which checks each station passes.
+
 To save places for reuse, copy `config/locations.example.yaml` to
 `config/locations.yaml` (that file is git-ignored) and forecast them by name.
 

@@ -10,6 +10,21 @@ from pathlib import Path
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _load_dotenv(path: Path) -> None:
+    """Minimal .env support (KEY=VALUE lines); real environment variables win."""
+    if not path.is_file():
+        return
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        os.environ.setdefault(key.strip(), value.strip().strip("'\""))
+
+
+_load_dotenv(PROJECT_ROOT / ".env")
 DEFAULT_LOCATIONS = PROJECT_ROOT / "config" / "locations.yaml"
 DATA_DIR = Path(os.environ.get("WEATHER_ENGINE_DATA", PROJECT_ROOT / "data"))
 REPORTS_DIR = Path(os.environ.get("WEATHER_ENGINE_REPORTS", PROJECT_ROOT / "reports"))
@@ -24,6 +39,13 @@ MODELS = ["ecmwf_ifs025", "gfs_seamless", "icon_seamless", "gem_seamless"]
 ENSEMBLE_MODELS = ["ecmwf_ifs025", "gfs025"]
 # Model reported alongside the blend as the baseline to beat.
 BASELINE_MODEL = "ecmwf_ifs025"
+
+# Station search: every network within this radius is considered (Synoptic token needed
+# for non-airport networks; see DATA_SOURCES.md).
+STATION_SEARCH_RADIUS_KM = 40.0
+# Stations are chosen per group, so rain can come from a rain gauge and wind from an anemometer.
+VAR_GROUPS = {"temp": ["tmax", "tmin"], "wind": ["wind", "gust"], "precip": ["precip"]}
+GROUP_LABELS = {"temp": "temperature", "wind": "wind", "precip": "rain"}
 
 FORECAST_DAYS = 8  # today + 7
 MAX_LEAD = 7
@@ -47,6 +69,10 @@ LABELS = {
     "wind": "Wind",
     "gust": "Gusts",
 }
+
+
+def synoptic_token() -> str | None:
+    return os.environ.get("WEATHER_ENGINE_SYNOPTIC_TOKEN") or None
 
 
 @dataclass

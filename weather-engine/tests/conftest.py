@@ -80,17 +80,80 @@ NWS_STATIONS = {
 }
 
 
+# Synoptic stations around Denver (39.74, -104.99): ~3 km flood gauge (rain only),
+# ~3.5 km station with no recent data, ~10 km full station, ~47 km airport.
+SYNOPTIC_STATIONS = [
+    {"STID": "CCPRM", "NAME": "PRIMM FLOOD GAUGE", "LATITUDE": "39.767", "LONGITUDE": "-104.99",
+     "ELEVATION": "5290", "MNET_ID": "141", "SHORTNAME": "CCRFCD",
+     "SENSOR_VARIABLES": {"precip_accum": {"precip_accum_1": {}}}},
+    {"STID": "BORAX", "NAME": "Borax", "LATITUDE": "39.77", "LONGITUDE": "-104.99",
+     "ELEVATION": "5300", "MNET_ID": "2", "SENSOR_VARIABLES": {"air_temp": {}, "wind_speed": {}}},
+    {"STID": "NEAR2", "NAME": "Near Two", "LATITUDE": "39.83", "LONGITUDE": "-104.99",
+     "ELEVATION": "5350", "MNET_ID": "1", "SENSOR_VARIABLES": {"air_temp": {}, "wind_speed": {}, "wind_gust": {}}},
+    {"STID": "KHND", "NAME": "Henderson", "LATITUDE": "40.16", "LONGITUDE": "-104.99",
+     "ELEVATION": "5400", "MNET_ID": "1", "SENSOR_VARIABLES": {"air_temp": {}, "wind_speed": {}, "precip_accum_one_hour": {}}},
+]
+
+
+def synoptic_timeseries(stid: str, start: str, end: str) -> dict:
+    """10-minute obs in Celsius and m/s (to exercise unit conversion), UTC timestamps."""
+    if stid == "BORAX":  # station listed but with no recent data
+        return {"SUMMARY": {"RESPONSE_CODE": 1}, "UNITS": {}, "STATION": [{"STID": stid, "OBSERVATIONS": {"date_time": []}}]}
+    t0 = datetime.strptime(start, "%Y%m%d%H%M")
+    t1 = datetime.strptime(end, "%Y%m%d%H%M")
+    # Local (America/Denver) midnight is 06:00/07:00 UTC; generate the same daily cycle
+    # as previous_runs_payload in local time so zero-bias models match exactly.
+    from zoneinfo import ZoneInfo
+    times, temps, winds = [], [], []
+    t = t0
+    while t < t1:
+        local = t.replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo("America/Denver"))
+        h = local.hour + local.minute / 60
+        temp_f = 55 + 10 * np.sin((h - 9) / 24 * 2 * np.pi) if local.minute == 0 else None
+        times.append(t.strftime("%Y-%m-%dT%H:%M:%SZ"))
+        temps.append(None if temp_f is None else (temp_f - 32) * 5 / 9)
+        winds.append(10 / 2.23694)
+        t += timedelta(minutes=10)
+    return {
+        "SUMMARY": {"RESPONSE_CODE": 1},
+        "UNITS": {"air_temp": "Celsius", "wind_speed": "m/s", "wind_gust": "m/s"},
+        "STATION": [{"STID": stid, "OBSERVATIONS": {
+            "date_time": times, "air_temp_set_1": temps, "wind_speed_set_1": winds,
+            "wind_gust_set_1": [None] * len(times)}}],
+    }
+
+
+def synoptic_precip(start: str, end: str) -> dict:
+    days = round((datetime.strptime(end, "%Y%m%d%H%M") - datetime.strptime(start, "%Y%m%d%H%M")).total_seconds() / 86400)
+    return {
+        "SUMMARY": {"RESPONSE_CODE": 1},
+        "UNITS": {"precipitation": "Millimeters"},
+        "STATION": [{"STID": "CCPRM", "OBSERVATIONS": {"precipitation": [
+            {"interval": i + 1, "total": 2.54 if i % 2 == 0 else 0.0, "count": 24} for i in range(days)
+        ]}}],
+    }
+
+
 @pytest.fixture
 def fake_api(monkeypatch, tmp_path):
     """Route all HTTP calls to synthetic payloads; isolate data dirs."""
     from weather_engine import http, store
 
     monkeypatch.setattr(store, "CACHE_DIR", tmp_path / "cache")
+    monkeypatch.delenv("WEATHER_ENGINE_SYNOPTIC_TOKEN", raising=False)
     monkeypatch.setattr(store, "FORECAST_LOG", tmp_path / "processed" / "forecast_log.csv")
     biases = {"ecmwf_ifs025": 0.0, "gfs_seamless": 3.0, "icon_seamless": -2.0, "gem_seamless": 1.0}
 
     def get_json(url, params=None):
         params = params or {}
+        if "synopticdata" in url:
+            assert params["token"] == "test-token"
+            if url.endswith("/metadata"):
+                return {"SUMMARY": {"RESPONSE_CODE": 1}, "STATION": SYNOPTIC_STATIONS}
+            if url.endswith("/timeseries"):
+                return synoptic_timeseries(params["stid"], params["start"], params["end"])
+            if url.endswith("/precipitation"):
+                return synoptic_precip(params["start"], params["end"])
         if "previous-runs" in url:
             past = params["past_days"]
             return previous_runs_payload(TODAY - timedelta(days=past), past, biases[params["models"]])

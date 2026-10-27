@@ -17,7 +17,7 @@ from .config import (
     TRAIN_WINDOW_DAYS,
     Location,
 )
-from .sources import observations, openmeteo
+from .sources import observations, openmeteo, stations
 
 log = logging.getLogger(__name__)
 
@@ -30,9 +30,10 @@ class ForecastResult:
     raw: pd.DataFrame  # date, lead, model, var, value
     rain_prob: pd.DataFrame  # index date: rain_prob, n_members
     stats: pd.DataFrame | None = None
-    station: observations.Station | None = None
+    station: observations.Station | None = None  # main station (temperature), or the rejected nearest one
     notes: list[str] = field(default_factory=list)
     station_rejected: bool = False  # nearest station too far/different to calibrate against
+    stations: dict[str, observations.Station] = field(default_factory=dict)  # group -> station used
 
 
 def _fetch_raw(loc: Location, models: list[str], notes: list[str]) -> pd.DataFrame:
@@ -56,32 +57,13 @@ def _fetch_raw(loc: Location, models: list[str], notes: list[str]) -> pd.DataFra
     return pd.concat(frames, ignore_index=True)
 
 
-def _pick_station(loc: Location, notes: list[str]) -> observations.Station | None:
-    try:
-        stations = observations.nearest_stations(loc)
-    except Exception as e:
-        notes.append(f"station lookup failed ({e}); using uncalibrated blend")
-        return None
-    if loc.station:
-        chosen = next((s for s in stations if s.id == loc.station), None)
-        return chosen or observations.Station(loc.station, loc.station, loc.latitude, loc.longitude, None, 0.0)
-    if not stations:
-        notes.append("no nearby observing station; using uncalibrated blend")
-        return None
-    return stations[0]
-
-
-def _train(loc: Location, station: observations.Station, models: list[str], today, notes: list[str]) -> pd.DataFrame | None:
+def _train(loc: Location, models: list[str], today, notes: list[str]) -> tuple[pd.DataFrame | None, stations.Selection]:
     past_days = TRAIN_WINDOW_DAYS + MAX_LEAD
     start, end = today - timedelta(days=past_days), today - timedelta(days=1)
-    try:
-        obs = store.cached_frame(
-            f"obs2_{station.id}_{start}_{end}", 6,
-            lambda: observations.fetch_daily(station.id, start, end, loc.timezone).reset_index(),
-        ).set_index("date")
-    except Exception as e:
-        notes.append(f"observations for {station.id} unavailable ({e}); using uncalibrated blend")
-        return None
+    sel = stations.select(loc, start, end, forced=loc.station)
+    notes.extend(sel.notes)
+    if sel.obs is None:
+        return None, sel
     runs = []
     for model in models:
         try:
@@ -92,12 +74,12 @@ def _train(loc: Location, station: observations.Station, models: list[str], toda
         except Exception as e:
             notes.append(f"{model}: no past runs for calibration ({e})")
     if not runs:
-        return None
-    pairs = calibrate.build_pairs(pd.concat(runs, ignore_index=True), obs)
+        return None, sel
+    pairs = calibrate.build_pairs(pd.concat(runs, ignore_index=True), sel.obs)
     if pairs.empty:
         notes.append("no overlapping forecast/observation history; using uncalibrated blend")
-        return None
-    return calibrate.fit(pairs, as_of=end)
+        return None, sel
+    return calibrate.fit(pairs, as_of=end), sel
 
 
 def _rain_prob(loc: Location, notes: list[str]) -> pd.DataFrame:
@@ -122,21 +104,21 @@ def run_forecast(loc: Location, models: list[str] = MODELS, use_calibration: boo
     raw = _fetch_raw(loc, models, notes)
     today = raw.loc[raw["lead"] == 0, "date"].min()
 
-    station, stats, rejected = None, None, False
+    station, stats, rejected, chosen = None, None, False, {}
     if use_calibration:
-        station = _pick_station(loc, notes)
-        if station is not None:
-            warnings = station.quality_warnings(loc)
-            if warnings and not loc.station:
-                notes.extend(warnings)
-                notes.append(f"that is too far to correct against reliably, so this is the uncalibrated "
-                             f"model blend (to use it anyway: `--station {station.id}`, or the button in the web app)")
-                rejected = True
-            else:
-                stats = _train(loc, station, models, today, notes)
+        stats, sel = _train(loc, models, today, notes)
+        chosen = sel.chosen if stats is not None else {}
+        station = chosen.get("temp") or next(iter(chosen.values()), None)
+        if not chosen and sel.nearest is not None and not loc.station:
+            station, rejected = sel.nearest, True
+            notes.extend(sel.nearest.quality_warnings(loc))
+            notes.append(f"no station close enough to correct against reliably, so this is the uncalibrated "
+                         f"model blend (to use {sel.nearest.id} anyway: `--station {sel.nearest.id}`, "
+                         f"or the button in the web app)")
 
     blended = calibrate.blend(calibrate.apply(raw, stats))
-    result = ForecastResult(loc, issued_at, blended, raw, _rain_prob(loc, notes), stats, station, notes, rejected)
+    result = ForecastResult(loc, issued_at, blended, raw, _rain_prob(loc, notes), stats, station, notes,
+                            rejected, chosen)
     _log(result)
     return result
 
@@ -147,9 +129,28 @@ def _log(result: ForecastResult) -> None:
     rows = pd.concat([blend, raw], ignore_index=True)
     rows.insert(0, "issued_at", result.issued_at.isoformat(timespec="seconds"))
     rows.insert(1, "location", result.location.name)
-    rows.insert(2, "station", result.station.id if result.station else "")
+    rows.insert(2, "station", encode_stations(result.stations))
     rows.insert(3, "timezone", result.location.timezone or "")
     store.append_log(rows)
+
+
+def encode_stations(chosen: dict[str, observations.Station]) -> str:
+    """{'temp': Station} -> 'temp=synoptic:KLAS;...' (stored in the forecast log for verify)."""
+    return ";".join(f"{g}={s.source}:{s.id}" for g, s in chosen.items())
+
+
+def decode_stations(text: str) -> dict[str, tuple[str, str]]:
+    """Inverse of encode_stations -> {group: (source, id)}; plain ids are old airport-only logs."""
+    if not isinstance(text, str) or not text:
+        return {}
+    if "=" not in text:
+        return {g: ("iem", text) for g in ("temp", "wind", "precip")}
+    out = {}
+    for part in text.split(";"):
+        group, _, ref = part.partition("=")
+        source, _, sid = ref.partition(":")
+        out[group] = (source, sid)
+    return out
 
 
 def baseline(result: ForecastResult) -> pd.DataFrame:

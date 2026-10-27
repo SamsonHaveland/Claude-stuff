@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from .config import BASELINE_MODEL, LABELS, REPORTS_DIR, UNITS, VARIABLES
+from .config import BASELINE_MODEL, GROUP_LABELS, LABELS, REPORTS_DIR, UNITS, VARIABLES
 from .forecast import ForecastResult, baseline
 
 
@@ -58,8 +58,11 @@ def _is_calibrated(result: ForecastResult) -> bool:
 def _status(result: ForecastResult) -> str:
     if not _is_calibrated(result):
         return "UNCALIBRATED: blend of raw models (no usable local observation history)"
-    stn = result.station
-    return f"Calibrated against station {stn.id} ({stn.name}, {stn.distance_km:.0f} km away)"
+    by_station: dict[str, list[str]] = {}
+    for group, s in result.stations.items():
+        by_station.setdefault(f"{s.id} ({s.name}, {s.distance_km:.0f} km away)", []).append(GROUP_LABELS[group])
+    parts = [f"{', '.join(groups)}: {desc}" for desc, groups in by_station.items()]
+    return "Calibrated against " + "; ".join(parts)
 
 
 def calibration_rows(result: ForecastResult) -> list[dict]:
@@ -88,7 +91,8 @@ def calibration_summary(result: ForecastResult) -> list[str]:
     if not rows:
         return []
     days = max(r["days"] for r in rows)
-    lines = [f"Calibration (last {days} days at {result.station.id}, all models and lead days):"]
+    ids = ", ".join(dict.fromkeys(s.id for s in result.stations.values()))
+    lines = [f"Calibration (last {days} days at {ids}, all models and lead days):"]
     for r in rows:
         lines.append(
             f"  {r['label']:<6} {r['shift']}; typical error {r['error_before']:.1f} → "
@@ -205,6 +209,11 @@ def to_dict(result: ForecastResult) -> dict:
         "station": None if stn is None else {
             "id": stn.id, "name": stn.name, "distance_km": round(stn.distance_km, 1)},
         "station_rejected": result.station_rejected,
+        "stations": [
+            {"group": g, "label": GROUP_LABELS[g], "id": s.id, "name": s.name,
+             "distance_km": round(s.distance_km, 1), "network": s.network}
+            for g, s in result.stations.items()
+        ],
         "units": UNITS,
         "days": days,
         "calibration": calibration_rows(result),

@@ -101,7 +101,8 @@ function renderOverride(data) {
   if (box.hidden) return;
   const s = data.station;
   $("#override-text").textContent =
-    `The nearest weather station, ${s.name} (${s.id}), is ${Math.round(s.distance_km)} km away, so this forecast ` +
+    `No weather station passed the closeness check (the nearest, ${s.name} (${s.id}), is ` +
+    `${Math.round(s.distance_km)} km away), so this forecast ` +
     `isn't corrected for local conditions. Calibrating against it anyway usually still helps in flat, open ` +
     `areas, but can mislead across mountains, coastlines or big elevation changes.`;
   $("#override-btn").textContent = `Calibrate against ${s.id} anyway`;
@@ -113,7 +114,7 @@ function render(data) {
   const pill = $("#status");
   if (data.calibrated) {
     pill.className = "pill ok";
-    pill.textContent = `Calibrated · ${data.station.id}`;
+    pill.textContent = "Calibrated";
     pill.title = data.status;
   } else {
     pill.className = "pill warn";
@@ -121,7 +122,14 @@ function render(data) {
     pill.title = data.status;
   }
   const issued = new Date(data.issued_at);
-  const where = data.station ? ` · checked against ${data.station.name} (${Math.round(data.station.distance_km)} km away)` : "";
+  const byStation = new Map();
+  for (const s of data.stations || []) {
+    const k = `${s.name} (${Math.round(s.distance_km)} km)`;
+    byStation.set(k, [...(byStation.get(k) || []), s.label]);
+  }
+  const where = byStation.size
+    ? " · checked against " + [...byStation].map(([k, labels]) => `${k} for ${labels.join(" & ")}`).join("; ")
+    : "";
   $("#issued").textContent = `Updated ${issued.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}${where}`;
   renderOverride(data);
   renderDays(data.days);
