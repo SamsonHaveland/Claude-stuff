@@ -20,11 +20,20 @@ BASE_URL = "https://api.synopticdata.com/v2"
 METADATA_URL = f"{BASE_URL}/stations/metadata"
 NETWORKS_URL = f"{BASE_URL}/networks"
 TIMESERIES_URL = f"{BASE_URL}/stations/timeseries"
-PRECIP_URL = f"{BASE_URL}/stations/precipitation"
 
 KM_PER_MILE = 1.609344
 FT_TO_M = 0.3048
 UNITS_PARAM = "temp|F,speed|mph,precip|in"
+# Rain gauges report in different ways; the daily total is derived from whichever is present,
+# in this order of preference (see daily_precip). The free tier has no precipitation service.
+PRECIP_VARS = {
+    "p_midnight": "precip_accum_since_local_midnight",
+    "p_accum": "precip_accum",
+    "p_1h": "precip_accum_one_hour",
+    "p_15m": "precip_accum_fifteen_minute",
+    "p_5m": "precip_accum_five_minute",
+}
+TIMESERIES_VARS = ",".join(["air_temp", "wind_speed", "wind_gust", *PRECIP_VARS.values()])
 MIN_HOURS_PER_DAY = 18
 
 
@@ -176,7 +185,7 @@ def _to_in(s: pd.Series, unit: str) -> pd.Series:
 
 
 def parse_timeseries(payload: dict, tz: str) -> pd.DataFrame:
-    """Timeseries -> DataFrame (valid local time, tmpf, wind, gust), mph/°F."""
+    """Timeseries -> DataFrame (valid local time, tmpf, wind, gust, p_* rain columns), °F/mph/in."""
     if not _check(payload) or not payload.get("STATION"):
         msg = payload.get("SUMMARY", {}).get("RESPONSE_MESSAGE", "no data returned")
         raise SynopticError(f"no observations ({msg})")
@@ -184,110 +193,105 @@ def parse_timeseries(payload: dict, tz: str) -> pd.DataFrame:
     units = payload.get("UNITS", {})
     times = pd.to_datetime(pd.Series(obs.get("date_time", [])), utc=True)
     n = len(times)
-    return pd.DataFrame({
+    df = pd.DataFrame({
         "valid": times.dt.tz_convert(tz).dt.tz_localize(None),
         "tmpf": _to_f(_series(obs, "air_temp", n), units.get("air_temp", "")).values,
         "wind": _to_mph(_series(obs, "wind_speed", n), units.get("wind_speed", "")).values,
         "gust": _to_mph(_series(obs, "wind_gust", n), units.get("wind_gust", "")).values,
     })
+    for col, var in PRECIP_VARS.items():
+        df[col] = _to_in(_series(obs, var, n), units.get(var, "")).values
+    return df.sort_values("valid").reset_index(drop=True)
+
+
+def _hours_with(df: pd.DataFrame, col: str, index: pd.Index) -> pd.Series:
+    d = df.dropna(subset=[col])
+    return d.groupby(d["valid"].dt.date)["valid"].apply(lambda v: v.dt.floor("h").nunique()).reindex(index, fill_value=0)
+
+
+def daily_precip(df: pd.DataFrame) -> pd.Series:
+    """Daily rain (inches, local days) from whichever accumulation the gauge reports."""
+    day = df["valid"].dt.date
+    for col in PRECIP_VARS:
+        if col not in df or df[col].notna().sum() == 0:
+            continue
+        d = df.dropna(subset=[col])
+        dday = d["valid"].dt.date
+        if col == "p_midnight":  # resets at local midnight: the day's maximum is the total
+            totals = d.groupby(dday)[col].max()
+        elif col == "p_accum":  # running counter: add up increases; drops are resets
+            inc = d[col].diff()
+            inc[(inc < 0) | (inc > 2.0)] = 0.0  # resets and implausible jumps
+            totals = inc.fillna(0.0).groupby(dday).sum()
+        elif col == "p_1h":  # rolling hourly total: take each clock hour's value once
+            hourly = d.groupby(d["valid"].dt.floor("h"))[col].max()
+            totals = hourly.groupby(hourly.index.date).sum()
+        else:  # fixed short intervals: sum them
+            totals = d.groupby(dday)[col].sum()
+        index = pd.Index(sorted(set(day)), name="date")
+        totals = totals.reindex(index)
+        totals[_hours_with(df, col, index) < MIN_HOURS_PER_DAY] = float("nan")
+        return totals.rename("precip")
+    return pd.Series(dtype=float, name="precip")
 
 
 def daily_from_obs(df: pd.DataFrame) -> pd.DataFrame:
-    """Sub-hourly/hourly obs -> daily tmax, tmin, wind, gust (needs 18+ hours of data per day)."""
+    """Sub-hourly/hourly obs -> daily tmax, tmin, wind, gust, precip (needs 18+ hours of data per day)."""
+    cols = ["tmax", "tmin", "wind", "gust", "precip"]
     if df.empty:
-        return pd.DataFrame(columns=["tmax", "tmin", "wind", "gust"]).rename_axis("date")
+        return pd.DataFrame(columns=cols).rename_axis("date")
     # Many stations report gusts only when gusty; a blank gust means "no higher than sustained".
-    df = df.assign(gust=df["gust"].fillna(df["wind"]), hour=df["valid"].dt.floor("h"))
+    df = df.assign(gust=df["gust"].fillna(df["wind"]))
     g = df.groupby(df["valid"].dt.date)
-
-    def hours(col: str) -> pd.Series:
-        return df.dropna(subset=[col]).groupby(df["valid"].dt.date)["hour"].nunique().reindex(g.size().index, fill_value=0)
-
     out = pd.DataFrame({
         "tmax": g["tmpf"].max(), "tmin": g["tmpf"].min(),
         "wind": g["wind"].max(), "gust": g["gust"].max(),
     })
-    out.loc[hours("tmpf") < MIN_HOURS_PER_DAY, ["tmax", "tmin"]] = float("nan")
-    out.loc[hours("wind") < MIN_HOURS_PER_DAY, ["wind", "gust"]] = float("nan")
+    out.loc[_hours_with(df, "tmpf", out.index) < MIN_HOURS_PER_DAY, ["tmax", "tmin"]] = float("nan")
+    out.loc[_hours_with(df, "wind", out.index) < MIN_HOURS_PER_DAY, ["wind", "gust"]] = float("nan")
+    out["precip"] = daily_precip(df).reindex(out.index)
     out.index.name = "date"
-    return out
-
-
-def parse_daily_precip(payload: dict, start: date) -> pd.Series:
-    """Precipitation service in 24-hour intervals starting at local midnight -> inches per date."""
-    if not _check(payload) or not payload.get("STATION"):
-        msg = payload.get("SUMMARY", {}).get("RESPONSE_MESSAGE", "no data returned")
-        raise SynopticError(f"no precipitation ({msg})")
-    units = payload.get("UNITS", {})
-    intervals = payload["STATION"][0].get("OBSERVATIONS", {}).get("precipitation", [])
-    values = {}
-    for i, iv in enumerate(intervals):
-        idx = int(iv.get("interval", i + 1)) - 1
-        total = _num(iv.get("total"))
-        if total is None or not iv.get("count"):
-            continue
-        values[start + timedelta(days=idx)] = total
-    s = _to_in(pd.Series(values, dtype=float), units.get("precipitation", units.get("precip", "")))
-    s.index.name = "date"
-    return s.rename("precip")
+    return out[cols]
 
 
 def fetch_daily(stid: str, start: date, end: date, tz: str, groups: frozenset) -> pd.DataFrame:
-    """Daily observations (tmax, tmin, wind, gust, precip) for local dates start..end."""
+    """Daily observations (tmax, tmin, wind, gust, precip) for local dates start..end.
+
+    Free accounts only return about the last 7 days; older days come back empty
+    and are filled from the local archive (see stations.fetch_daily).
+    """
     t0, t1 = _utc_bounds(start, end, tz)
     fmt = "%Y%m%d%H%M"
-    out = pd.DataFrame(index=pd.Index([start + timedelta(days=i) for i in range((end - start).days + 1)], name="date"))
-    errors = []
-    if groups & {"temp", "wind"}:
-        try:
-            payload = http.get_json(TIMESERIES_URL, _params(
-                stid=stid, start=t0.strftime(fmt), end=t1.strftime(fmt),
-                vars="air_temp,wind_speed,wind_gust", units=UNITS_PARAM,
-            ))
-            out = out.join(daily_from_obs(parse_timeseries(payload, tz)))
-        except Exception as e:
-            errors.append(f"temp/wind: {e}")
-    if "precip" in groups:
-        try:
-            payload = http.get_json(PRECIP_URL, _params(
-                stid=stid, start=t0.strftime(fmt), end=t1.strftime(fmt),
-                pmode="intervals", interval="24", units=UNITS_PARAM,
-            ))
-            out = out.join(parse_daily_precip(payload, start))
-        except Exception as e:
-            errors.append(f"rain: {e}")
-    if errors and len(errors) == len([g for g in (groups & {"temp", "wind"}, groups & {"precip"}) if g]):
-        raise SynopticError("; ".join(errors))
-    out.attrs["errors"] = errors
-    for col in ("tmax", "tmin", "precip", "wind", "gust"):
-        if col not in out:
-            out[col] = float("nan")
-    return out[["tmax", "tmin", "precip", "wind", "gust"]]
+    payload = http.get_json(TIMESERIES_URL, _params(
+        stid=stid, start=t0.strftime(fmt), end=t1.strftime(fmt), vars=TIMESERIES_VARS, units=UNITS_PARAM,
+    ))
+    daily = daily_from_obs(parse_timeseries(payload, tz))
+    index = pd.Index([start + timedelta(days=i) for i in range((end - start).days + 1)], name="date")
+    return daily.reindex(index)[["tmax", "tmin", "precip", "wind", "gust"]]
 
 
 def diagnose(stid: str, start: date, end: date, tz: str) -> list[str]:
     """Human-readable summary of what Synoptic returns for one station (never prints the token)."""
     t0, t1 = _utc_bounds(start, end, tz)
     fmt = "%Y%m%d%H%M"
-    lines = []
-    for label, url, extra in (
-        ("timeseries", TIMESERIES_URL, {"vars": "air_temp,wind_speed,wind_gust"}),
-        ("precipitation", PRECIP_URL, {"pmode": "intervals", "interval": "24"}),
-    ):
-        try:
-            payload = http.get_json(url, _params(stid=stid, start=t0.strftime(fmt), end=t1.strftime(fmt),
-                                                 units=UNITS_PARAM, **extra))
-        except Exception as e:
-            lines.append(f"{label}: request failed: {str(e).replace(synoptic_token() or '-', '***')}")
-            continue
-        summary = payload.get("SUMMARY", {})
-        lines.append(f"{label}: code {summary.get('RESPONSE_CODE')} — {summary.get('RESPONSE_MESSAGE')}")
-        lines.append(f"  units: {payload.get('UNITS')}")
-        for st in payload.get("STATION", [])[:1]:
-            obs = st.get("OBSERVATIONS", {})
-            for key, vals in obs.items():
-                if isinstance(vals, list):
-                    non_null = sum(v is not None for v in vals)
-                    sample = vals[:2] if key == "precipitation" else (vals[0], vals[-1]) if vals else ()
-                    lines.append(f"  {key}: {len(vals)} values, {non_null} non-empty, e.g. {sample}")
+    try:
+        payload = http.get_json(TIMESERIES_URL, _params(
+            stid=stid, start=t0.strftime(fmt), end=t1.strftime(fmt), vars=TIMESERIES_VARS, units=UNITS_PARAM))
+    except Exception as e:
+        return [f"timeseries: request failed: {str(e).replace(synoptic_token() or '-', '***')}"]
+    summary = payload.get("SUMMARY", {})
+    lines = [f"timeseries: code {summary.get('RESPONSE_CODE')} — {summary.get('RESPONSE_MESSAGE')}",
+             f"  units: {payload.get('UNITS')}"]
+    for st in payload.get("STATION", [])[:1]:
+        for key, vals in st.get("OBSERVATIONS", {}).items():
+            if isinstance(vals, list):
+                non_null = sum(v is not None for v in vals)
+                lines.append(f"  {key}: {len(vals)} values, {non_null} non-empty, e.g. {(vals[0], vals[-1]) if vals else ()}")
+        if summary.get("RESPONSE_CODE") == 1:
+            try:
+                daily = daily_from_obs(parse_timeseries(payload, tz))
+                lines.append("  daily values the engine derives (blank = fewer than 18 hours of data that day):")
+                lines += ["    " + ln for ln in daily.round(2).to_string().splitlines()]
+            except Exception as e:
+                lines.append(f"  could not derive daily values: {e}")
     return lines

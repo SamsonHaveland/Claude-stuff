@@ -12,6 +12,7 @@ from . import calibrate, store
 from .config import (
     BASELINE_MODEL,
     ENSEMBLE_MODELS,
+    FULL_HISTORY_DAYS,
     MAX_LEAD,
     MODELS,
     TRAIN_WINDOW_DAYS,
@@ -79,6 +80,10 @@ def _train(loc: Location, models: list[str], today, notes: list[str]) -> tuple[p
     if pairs.empty:
         notes.append("no overlapping forecast/observation history; using uncalibrated blend")
         return None, sel
+    days = int(pairs["date"].nunique())
+    if days < FULL_HISTORY_DAYS:
+        notes.append(f"calibrated on only {days} days of station history so far, so corrections are "
+                     f"scaled down; checking this place at least weekly builds up the history")
     return calibrate.fit(pairs, as_of=end), sel
 
 

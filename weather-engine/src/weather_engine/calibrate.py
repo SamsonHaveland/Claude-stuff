@@ -43,13 +43,22 @@ def fit(
     for (model, lead, var), g in recent.groupby(KEYS):
         n = len(g)
         bias, ratio = 0.0, 1.0
+        err = g["fcst"] - g["obs"]
         if var == "precip":
-            # Multiplicative so corrected rain can never go negative.
+            # Multiplicative so corrected rain can never go negative; shrunk toward 1
+            # when there are few days, since rain totals are noisy.
             if g["fcst"].sum() > 0.1:
                 ratio = float(np.clip(g["obs"].sum() / g["fcst"].sum(), 0.5, 2.0))
+                ratio = 1.0 + (ratio - 1.0) * n / (n + 10)
             corrected = g["fcst"] * ratio
         else:
-            bias = float((g["fcst"] - g["obs"]).mean())
+            # Shrink the bias by how well it's determined: a consistent error is
+            # trusted even from a few days, a noisy one is scaled down.
+            raw_bias = float(err.mean())
+            se2 = float(err.var(ddof=1)) / n if n > 1 else float("inf")
+            denom = raw_bias**2 + se2
+            weight = 1.0 if denom == 0 else raw_bias**2 / denom
+            bias = raw_bias * weight
             corrected = g["fcst"] - bias
         rows.append({
             "model": model, "lead": lead, "var": var, "n": n,

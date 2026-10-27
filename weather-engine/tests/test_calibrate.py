@@ -40,7 +40,8 @@ def test_precip_correction_is_multiplicative_and_clipped():
     pairs = make_pairs("a", 0.0, 0.0, var="precip")
     pairs["obs"], pairs["fcst"] = 0.1, 0.5  # model 5x too wet -> clipped to 0.5
     stats = calibrate.fit(pairs, AS_OF)
-    assert stats.iloc[0]["ratio"] == 0.5
+    # 5x too wet -> clipped to 0.5, then shrunk toward 1 by n/(n+10) with n=40
+    assert stats.iloc[0]["ratio"] == pytest.approx(1 - 0.5 * 40 / 50)
     assert stats.iloc[0]["bias"] == 0.0
 
 

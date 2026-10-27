@@ -58,13 +58,29 @@ def test_parse_timeseries_converts_units_and_timezone():
     assert df["gust"].isna().all()
 
 
-def test_daily_precip_intervals():
-    payload = {"SUMMARY": {"RESPONSE_CODE": 1}, "UNITS": {"precipitation": "Millimeters"},
-               "STATION": [{"OBSERVATIONS": {"precipitation": [
-                   {"interval": 1, "total": 25.4, "count": 30}, {"interval": 2, "total": None, "count": 0},
-                   {"interval": 3, "total": 0, "count": 30}]}}]}
-    s = synoptic.parse_daily_precip(payload, date(2026, 10, 1))
-    assert s.to_dict() == {date(2026, 10, 1): pytest.approx(1.0), date(2026, 10, 3): 0.0}
+def test_daily_precip_from_running_counter_handles_resets():
+    # every 30 min for 2 days; counter rises 0.5 in on day 1, resets to 0 on day 2 then rises 0.25
+    n = 96
+    vals = [10 + 0.5 * min(i, 10) / 10 for i in range(48)] + [0.25 * min(i, 5) / 5 for i in range(48)]
+    df = pd.DataFrame({"valid": pd.date_range("2026-10-01", periods=n, freq="30min"), "p_accum": vals})
+    s = synoptic.daily_precip(df)
+    assert s[date(2026, 10, 1)] == pytest.approx(0.5)
+    assert s[date(2026, 10, 2)] == pytest.approx(0.25)
+
+
+def test_daily_precip_since_midnight_and_hourly():
+    times = pd.date_range("2026-10-01", periods=24 * 4, freq="15min")
+    since = pd.DataFrame({"valid": times, "p_midnight": [0.0] * 40 + [0.3] * 56})
+    assert synoptic.daily_precip(since)[date(2026, 10, 1)] == pytest.approx(0.3)
+    # rolling 1-hour totals reported every 15 min: count each clock hour once
+    hourly = pd.DataFrame({"valid": times, "p_1h": [0.1 if 8 <= t.hour < 10 else 0.0 for t in times]})
+    assert synoptic.daily_precip(hourly)[date(2026, 10, 1)] == pytest.approx(0.2)
+
+
+def test_daily_precip_needs_enough_hours():
+    times = pd.date_range("2026-10-01", periods=10, freq="1h")
+    s = synoptic.daily_precip(pd.DataFrame({"valid": times, "p_midnight": [0.1] * 10}))
+    assert s.isna().all()
 
 
 def test_selects_nearest_usable_station_per_variable(fake_api, token):
@@ -129,3 +145,36 @@ def test_station_errors_are_reported(fake_api, token, monkeypatch):
     sel = stations.select(DENVER, date(2026, 8, 21), date(2026, 10, 26))
     assert any("NEAR2: data unavailable" in n and "No stations found" in n for n in sel.notes)
     assert sel.chosen["precip"].id == "CCPRM"
+
+
+def test_history_accumulates_under_free_tier_limit(fake_api, token, monkeypatch):
+    """Free accounts get ~7 days per request; the local archive keeps older days."""
+    from datetime import datetime, timedelta
+
+    from weather_engine import http
+
+    real = http.get_json
+
+    def last_7_days(url, params=None):
+        if url.endswith("/timeseries"):
+            end = datetime.strptime(params["end"], "%Y%m%d%H%M")
+            params = {**params, "start": max(params["start"], (end - timedelta(days=7)).strftime("%Y%m%d%H%M"))}
+        return real(url, params)
+
+    monkeypatch.setattr(http, "get_json", last_7_days)
+    first = stations.select(DENVER, date(2026, 8, 5), date(2026, 10, 10))
+    assert 5 <= first.obs["tmax"].notna().sum() <= 7  # usable right away, with few days
+    later = stations.select(DENVER, date(2026, 8, 21), date(2026, 10, 26))
+    assert later.obs["tmax"].notna().sum() >= 12  # earlier download kept
+
+
+def test_short_noisy_history_shrinks_bias():
+    from weather_engine import calibrate
+
+    pairs = pd.DataFrame({
+        "date": [date(2026, 10, d) for d in range(20, 27)], "lead": 1, "var": "tmax", "model": "a",
+        "obs": [60.0] * 7, "fcst": [61, 55, 66, 58, 63, 57, 64],  # mean error +payload noise
+    })
+    stats = calibrate.fit(pairs, date(2026, 10, 26)).iloc[0]
+    raw_bias = (pairs["fcst"] - pairs["obs"]).mean()
+    assert 0 < stats["bias"] < raw_bias  # noisy -> scaled down, same sign

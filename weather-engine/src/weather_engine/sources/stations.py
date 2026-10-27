@@ -48,7 +48,14 @@ def fetch_daily(station: Station, start: date, end: date, tz: str) -> pd.DataFra
             df = observations.fetch_daily(station.id, start, end, tz)
         return df.reset_index()
 
-    return store.cached_frame(f"obs4_{station.source}_{station.id}_{''.join(sorted(station.variables))}_{start}_{end}", 6, fetch).set_index("date")
+    fresh = store.cached_frame(
+        f"obs5_{station.source}_{station.id}_{''.join(sorted(station.variables))}_{start}_{end}", 6, fetch
+    ).set_index("date")
+    # Keep every day ever downloaded, so history builds up even when the source
+    # only serves recent days (Synoptic free accounts: ~7 days).
+    archive = store.merge_archive(f"{station.source}_{station.id}", fresh)
+    index = pd.Index([d for d in archive.index if start <= d <= end], name="date")
+    return archive.reindex(index)
 
 
 def _usable_days(df: pd.DataFrame, group: str) -> int:
@@ -101,8 +108,8 @@ def select(loc: Location, start: date, end: date, forced: str | None = None) -> 
                 sel.chosen[group] = station
                 break
             if not df.empty or station.key not in errors:
-                sel.notes.append(f"{station.id} skipped for {GROUP_LABELS[group]}: only {days} of "
-                                 f"{(end - start).days + 1} recent days had complete data "
-                                 f"(need {MIN_TRAIN_SAMPLES})")
+                sel.notes.append(f"{station.id} skipped for {GROUP_LABELS[group]}: only {days} "
+                                 f"days with complete data "
+                                 f"(need {MIN_TRAIN_SAMPLES}); history builds up each time you check this place")
     sel.obs = obs if sel.chosen else None
     return sel

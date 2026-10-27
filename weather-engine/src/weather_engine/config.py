@@ -50,7 +50,8 @@ GROUP_LABELS = {"temp": "temperature", "wind": "wind", "precip": "rain"}
 FORECAST_DAYS = 8  # today + 7
 MAX_LEAD = 7
 TRAIN_WINDOW_DAYS = 60
-MIN_TRAIN_SAMPLES = 20
+MIN_TRAIN_SAMPLES = 5  # fewer days -> corrections are shrunk, see calibrate.fit
+FULL_HISTORY_DAYS = 20  # below this, the forecast notes that history is still building
 RAIN_THRESHOLD_IN = 0.01
 
 # canonical name -> (Open-Meteo daily var, Open-Meteo hourly var, daily aggregation)

@@ -97,6 +97,8 @@ SYNOPTIC_STATIONS = [
 
 def synoptic_timeseries(stid: str, start: str, end: str) -> dict:
     """10-minute obs in Celsius and m/s (to exercise unit conversion), UTC timestamps."""
+    if stid == "CCPRM":
+        return synoptic_gauge(start, end)
     if stid == "BORAX":  # station listed but with no recent data
         return {"SUMMARY": {"RESPONSE_CODE": 1}, "UNITS": {}, "STATION": [{"STID": stid, "OBSERVATIONS": {"date_time": []}}]}
     t0 = datetime.strptime(start, "%Y%m%d%H%M")
@@ -123,6 +125,32 @@ def synoptic_timeseries(stid: str, start: str, end: str) -> dict:
     }
 
 
+def synoptic_gauge(start: str, end: str) -> dict:
+    """Flood gauge: running precip_accum counter in mm every 10 minutes, rain matching
+    previous_runs_payload (0.01 in/hour for local hours 0-9 of every other day)."""
+    from zoneinfo import ZoneInfo
+    t0 = datetime.strptime(start, "%Y%m%d%H%M")
+    t1 = datetime.strptime(end, "%Y%m%d%H%M")
+    first_local = t0.replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo("America/Denver")).date()
+    times, accum, total = [], [], 1000.0  # counter does not start at zero
+    t = t0
+    while t < t1:
+        local = t.replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo("America/Denver"))
+        day_idx = (local.date() - first_local).days
+        if day_idx % 2 == 0 and local.hour < 10 and not (local.hour == 0 and local.minute == 0):
+            total += 0.254 / 6  # 0.01 in per hour
+        if local.hour == 0 and local.minute == 0 and day_idx % 2 == 0:
+            total += 0.254 / 6  # first step of the rainy window
+        times.append(t.strftime("%Y-%m-%dT%H:%M:%SZ"))
+        accum.append(round(total, 4))
+        t += timedelta(minutes=10)
+    return {
+        "SUMMARY": {"RESPONSE_CODE": 1},
+        "UNITS": {"precip_accum": "Millimeters"},
+        "STATION": [{"STID": "CCPRM", "OBSERVATIONS": {"date_time": times, "precip_accum_set_1": accum}}],
+    }
+
+
 def synoptic_precip(start: str, end: str) -> dict:
     days = round((datetime.strptime(end, "%Y%m%d%H%M") - datetime.strptime(start, "%Y%m%d%H%M")).total_seconds() / 86400)
     return {
@@ -140,6 +168,7 @@ def fake_api(monkeypatch, tmp_path):
     from weather_engine import http, store
 
     monkeypatch.setattr(store, "CACHE_DIR", tmp_path / "cache")
+    monkeypatch.setattr(store, "ARCHIVE_DIR", tmp_path / "archive")
     monkeypatch.delenv("WEATHER_ENGINE_SYNOPTIC_TOKEN", raising=False)
     monkeypatch.setattr(store, "FORECAST_LOG", tmp_path / "processed" / "forecast_log.csv")
     biases = {"ecmwf_ifs025": 0.0, "gfs_seamless": 3.0, "icon_seamless": -2.0, "gem_seamless": 1.0}
