@@ -85,7 +85,8 @@ def test_daily_from_hourly():
     assert df["tmin"].iloc[0] == pytest.approx(45.0, abs=0.1)
     assert df["wind"].iloc[0] == pytest.approx(10.0, abs=0.05)
     assert df["precip"].iloc[0] == pytest.approx(0.10)
-    assert df["gust"].isna().all()
+    # No gust reported -> gust equals sustained wind, not missing.
+    assert df["gust"].iloc[0] == pytest.approx(df["wind"].iloc[0])
 
 
 def test_daily_from_hourly_requires_enough_reports():

@@ -93,6 +93,10 @@ def daily_from_hourly(df: pd.DataFrame, min_reports: int = 18) -> pd.DataFrame:
     Daily high/low from hourly reports can miss the true extremes by ~1 °F;
     calibration learns against the same definition, so it stays consistent.
     """
+    # ASOS only reports a gust when it is notably above the sustained wind, so a
+    # blank gust means "no higher than sustained", not missing. Without this,
+    # only gusty days would count and the gust climatology would skew high.
+    df = df.assign(gust=df["gust"].fillna(df["sknt"]))
     g = df.groupby(df["valid"].dt.date)
     out = pd.DataFrame({
         "tmax": g["tmpf"].max(),

@@ -66,6 +66,7 @@ def test_reports_render(fake_api):
     text = report.to_text(result)
     assert "Calibrated against station KBKF" in text
     assert "Open-Meteo.com" in text
+    assert "Calibration (last" in text and "High" in text
     path = report.to_html(result, fake_api / "r.html")
     assert "<table>" in path.read_text()
 

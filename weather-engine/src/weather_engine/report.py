@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from .config import BASELINE_MODEL, REPORTS_DIR, UNITS
+from .config import BASELINE_MODEL, LABELS, REPORTS_DIR, UNITS, VARIABLES
 from .forecast import ForecastResult, baseline
 
 
@@ -58,6 +58,30 @@ def _status(result: ForecastResult) -> str:
     return f"Calibrated against station {stn.id} ({stn.name}, {stn.distance_km:.0f} km away)"
 
 
+def calibration_summary(result: ForecastResult) -> list[str]:
+    """How far off the raw models were at this station, and how much correcting helped."""
+    if result.stats is None:
+        return []
+    s = result.stats.dropna(subset=["mae_cal"])
+    if s.empty:
+        return []
+    lines = [f"Calibration (last {int(s['n'].max())} days at {result.station.id}, all models and lead days):"]
+    for var in [v for v in VARIABLES if v in set(s["var"])]:
+        g, unit = s[s["var"] == var], UNITS[var]
+        if var == "precip":
+            shift = f"amounts scaled ×{g['ratio'].mean():.2f}"
+        else:
+            b = g["bias"].mean()
+            shift = f"models ran {abs(b):.1f} {unit} too {'high' if b > 0 else 'low'}"
+        lines.append(
+            f"  {LABELS[var]:<6} {shift}; typical error {g['mae_raw'].mean():.1f} → "
+            f"{g['mae_cal'].mean():.1f} {unit} after correction"
+        )
+    lines.append("  (errors measured on the same days used for correction, so slightly optimistic;"
+                 " `weather-engine verify` gives the true score)")
+    return lines
+
+
 def to_text(result: ForecastResult) -> str:
     loc = result.location
     lines = [
@@ -75,6 +99,9 @@ def to_text(result: ForecastResult) -> str:
             f"{_fmt(r['precip'], '″'):<18}{chance:<8}"
             f"{_fmt(r['wind'], '', False) + ' mph':<14}{_fmt(r['gust'], '', False) + ' mph':<10}"
         )
+    summary = calibration_summary(result)
+    if summary:
+        lines += [""] + summary
     if result.notes:
         lines += ["", "Notes:"] + [f"  - {n}" for n in result.notes]
     lines += ["", "Weather data by Open-Meteo.com (CC BY 4.0); observations via NWS / Iowa Environmental Mesonet."]

@@ -75,7 +75,7 @@ def _train(loc: Location, station: observations.Station, models: list[str], toda
     start, end = today - timedelta(days=past_days), today - timedelta(days=1)
     try:
         obs = store.cached_frame(
-            f"obs_{station.id}_{start}_{end}", 6,
+            f"obs2_{station.id}_{start}_{end}", 6,
             lambda: observations.fetch_daily(station.id, start, end, loc.timezone).reset_index(),
         ).set_index("date")
     except Exception as e:
