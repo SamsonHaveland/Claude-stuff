@@ -1,0 +1,19 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Weather data
+data/raw/
+data/processed/
+data/cache/
+
+# Model artifacts
+models/*.pkl
+models/*.joblib
+models/*.bin
+
+# IDE
+.vscode/
+.idea/
