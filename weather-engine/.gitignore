@@ -17,3 +17,9 @@ models/*.bin
 # IDE
 .vscode/
 .idea/
+
+# Personal config and generated output
+config/locations.yaml
+reports/*.html
+*.egg-info/
+.pytest_cache/

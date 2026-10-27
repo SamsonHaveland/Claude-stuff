@@ -46,7 +46,7 @@ than the inputs change adds cost, not accuracy.
  └──────┬───────┘   └────────┬─────────┘
         ▼                    ▼
  ┌─────────────────────────────────────┐
- │ archive: every model run + obs,     │   data/processed (Parquet)
+ │ archive: every model run + obs,     │   data/cache, data/processed (CSV)
  │ keyed by location, run time, lead   │
  └──────┬──────────────────────────────┘
         ▼
@@ -64,19 +64,19 @@ than the inputs change adds cost, not accuracy.
  └──────────────┘   └──────────────────┘
 ```
 
-## Package layout (planned)
+## Package layout
 
 | Module | Responsibility |
 |---|---|
 | `weather_engine/config.py` | Load locations and settings |
-| `weather_engine/ingest/models.py` | Fetch model + ensemble forecasts |
-| `weather_engine/ingest/obs.py` | Fetch station observations |
-| `weather_engine/store.py` | Read/write the Parquet archive |
-| `weather_engine/calibrate.py` | Bias correction, EMOS |
-| `weather_engine/blend.py` | Skill-weighted model blending |
+| `weather_engine/sources/openmeteo.py` | Geocoding, model, past-run and ensemble forecasts |
+| `weather_engine/sources/observations.py` | Nearest station + observation history |
+| `weather_engine/store.py` | CSV cache and forecast log |
+| `weather_engine/calibrate.py` | Bias correction and skill-weighted blending |
 | `weather_engine/verify.py` | Scoring and baseline comparisons |
-| `weather_engine/scheduler.py` | Detect new runs, drive the pipeline |
-| `weather_engine/cli.py` | `forecast`, `backfill`, `verify` commands |
+| `weather_engine/forecast.py` | End-to-end pipeline |
+| `weather_engine/report.py` | Terminal and HTML output |
+| `weather_engine/cli.py` | `forecast`, `stations`, `verify` commands |
 
 ## Locations
 
@@ -125,9 +125,16 @@ Scores are broken down by location, variable and lead day (day 1 … day 7).
 4. **Day 6–7 skill is inherently limited**, especially for rain. Forecasts at
    that range are presented as probabilities and ranges, not single values.
 
-## Open decisions
+## Decisions
 
-- Locations (and whether any are outside the US, which affects data sources).
-- Personal vs. commercial use. The Open-Meteo free tier is non-commercial only;
-  commercial use needs their paid plan or direct ingestion from ECMWF/NOAA.
-- Output: CLI/report only, or an API/dashboard.
+- **Locations:** mostly US and chosen per forecast, so any place name or
+  lat/lon works ad hoc; saved locations are optional. Verification stations
+  come from the NWS API and history from the Iowa Environmental Mesonet (both
+  US only).
+- **Use:** personal, so the Open-Meteo free tier (non-commercial) is fine.
+- **Output:** a command-line tool plus an optional static HTML report. This is
+  the simplest option for one user and needs no server. The core is a Python
+  package, so an API or dashboard can be added later without a rewrite.
+- **Training data:** fetched on demand (Open-Meteo Previous Runs, last 67
+  days) and cached, so a new location is calibrated on its first run instead
+  of after weeks of archiving.
