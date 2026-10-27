@@ -18,7 +18,9 @@ def get(url: str, params: dict | None = None, retries: int = 3, timeout: int = 3
         try:
             resp = _session.get(url, params=params, timeout=timeout)
             if resp.status_code < 500 and resp.status_code != 429:
-                resp.raise_for_status()
+                if resp.status_code >= 400:
+                    # Include the server's explanation; APIs say why they rejected a request.
+                    raise requests.HTTPError(f"{resp.status_code} from {resp.url}: {resp.text[:300]}")
                 return resp
             last_error = requests.HTTPError(f"{resp.status_code} from {url}")
         except requests.RequestException as e:

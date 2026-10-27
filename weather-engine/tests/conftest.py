@@ -100,7 +100,11 @@ def fake_api(monkeypatch, tmp_path):
             return {"results": [{"name": "Denver", "admin1": "Colorado", "country_code": "US",
                                  "latitude": 39.74, "longitude": -104.99, "elevation": 1609,
                                  "timezone": "America/Denver"}]}
-        if "weather.gov" in url:
+        if "weather.gov/points" in url:
+            assert params == {}, "NWS rejects unknown query parameters"
+            return {"properties": {"observationStations": "https://api.weather.gov/gridpoints/BOU/62,60/stations"}}
+        if "weather.gov/gridpoints" in url:
+            assert params == {}
             return NWS_STATIONS
         if "api.open-meteo.com" in url:
             return daily_payload(warm_bias=biases[params["models"]])

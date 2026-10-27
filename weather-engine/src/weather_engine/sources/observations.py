@@ -12,7 +12,7 @@ import pandas as pd
 from .. import http
 from ..config import Location
 
-NWS_STATIONS_URL = "https://api.weather.gov/points/{lat:.4f},{lon:.4f}/stations"
+NWS_POINTS_URL = "https://api.weather.gov/points/{lat:.4f},{lon:.4f}"
 IEM_ASOS_URL = "https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py"
 
 KNOTS_TO_MPH = 1.15078
@@ -67,8 +67,10 @@ def parse_nws_stations(payload: dict, loc: Location) -> list[Station]:
 
 
 def nearest_stations(loc: Location, n: int = 5) -> list[Station]:
-    url = NWS_STATIONS_URL.format(lat=loc.latitude, lon=loc.longitude)
-    return parse_nws_stations(http.get_json(url, {"limit": 50}), loc)[:n]
+    # Documented NWS flow: the point's metadata links to its forecast grid's station list.
+    point = http.get_json(NWS_POINTS_URL.format(lat=loc.latitude, lon=loc.longitude))
+    stations_url = point["properties"]["observationStations"]
+    return parse_nws_stations(http.get_json(stations_url), loc)[:n]
 
 
 def iem_station_id(icao: str) -> str:
