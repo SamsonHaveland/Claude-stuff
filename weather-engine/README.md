@@ -10,9 +10,12 @@ model's weight depends on how accurate it has been there recently. See
 
 ## Install
 
+Requires Python 3.9 or newer; 3.12+ is recommended, since 3.9 no longer gets security fixes.
+
 ```bash
 cd weather-engine
-python -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
+pip install --upgrade pip      # older pips cannot do editable installs
 pip install -e ".[dev]"
 ```
 
