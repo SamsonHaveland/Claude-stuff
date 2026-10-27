@@ -157,11 +157,29 @@ def make_server(host: str, port: int) -> ThreadingHTTPServer:
     return server
 
 
+def lan_ip() -> str | None:
+    """This computer's address on the local network (no traffic is sent)."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        try:
+            s.connect(("192.168.0.1", 80))  # any private address; UDP connect just picks a route
+            ip = s.getsockname()[0]
+        except OSError:
+            return None
+    return None if ip.startswith("127.") else ip
+
+
 def serve(host: str = "127.0.0.1", port: int = 8000) -> None:
     server = make_server(host, port)
     print(f"Weather Engine running at http://localhost:{port}")
     if host == "0.0.0.0":
-        print(f"On your phone (same Wi-Fi): http://{socket.gethostname()}:{port}")
+        ip = lan_ip()
+        if ip:
+            print(f"On your phone (same Wi-Fi), open: http://{ip}:{port}")
+        else:
+            print("Couldn't find this computer's Wi-Fi address; check System Settings > Wi-Fi > Details.")
+        print("If your Mac asks whether to allow incoming connections for Python, click Allow.")
+    else:
+        print("This Mac only. To use it from your phone, restart with: weather-engine serve --host 0.0.0.0")
     print("Press Ctrl+C to stop.")
     try:
         server.serve_forever()
