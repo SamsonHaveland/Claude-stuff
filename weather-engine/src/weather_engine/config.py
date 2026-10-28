@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
 import yaml
@@ -57,7 +58,11 @@ GROUP_LABELS = {"temp": "temperature", "wind": "wind", "precip": "rain"}
 FORECAST_DAYS = 8  # today + 7
 MAX_LEAD = 7
 TRAIN_WINDOW_DAYS = 60  # recent window for the overall bias of each model
-HISTORY_DAYS = 365  # how far back past runs are archived, for weather-pattern corrections (regime.py)
+# How far back the models' past runs are kept, for bias and weather-pattern corrections:
+# up to 10 years. Open-Meteo has kept past runs of most models only since January 2024
+# (GFS temperature since 2021), so the history grows toward 10 years from there.
+HISTORY_DAYS = 3650
+ARCHIVE_START = date(2024, 1, 1)
 MIN_TRAIN_SAMPLES = 5  # fewer days -> corrections are shrunk, see calibrate.fit
 FULL_HISTORY_DAYS = 20  # below this, the forecast notes that history is still building
 RAIN_THRESHOLD_IN = 0.01

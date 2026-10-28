@@ -45,7 +45,11 @@ def _daily(df: pd.DataFrame) -> pd.DataFrame:
     """Hourly (date, lead, model, wind, wind_dir, pressure) -> daily pattern features."""
     rad = np.deg2rad(df["wind_dir"])
     df = df.assign(u=-df["wind"] * np.sin(rad), v=-df["wind"] * np.cos(rad))
-    g = df.groupby(PAIR_KEYS)[["u", "v", "wind", "pressure"]].mean()
+    return _finish(df.groupby(PAIR_KEYS)[["u", "v", "wind", "pressure"]].mean())
+
+
+def _finish(g: pd.DataFrame) -> pd.DataFrame:
+    """Daily means (index date, lead, model; columns u, v, wind, pressure) -> pattern features."""
     out = pd.DataFrame(index=g.index)
     out["wind_dir"] = (np.rad2deg(np.arctan2(-g["u"], -g["v"])) % 360).where(g["wind"] >= CALM_MPH)
     out["wind_speed"] = g["wind"]
@@ -73,6 +77,27 @@ def features_from_past_runs(hourly: pd.DataFrame) -> pd.DataFrame:
     return _daily(wide)
 
 
+def features_from_wide(wide: pd.DataFrame, model: str, max_lead: int = 7) -> pd.DataFrame:
+    """Archived wide past runs (see openmeteo.previous_runs_wide) -> daily features, without a long table."""
+    days = wide.index.normalize().date
+    parts = []
+    for lead in range(1, max_lead + 1):
+        def col(name):
+            key = f"{name}_previous_day{lead}"
+            return wide[key].to_numpy(dtype=float) if key in wide else np.full(len(wide), np.nan)
+        spd, wd, p = col("wind_speed_10m"), col("wind_direction_10m"), col("pressure_msl")
+        if np.isnan(spd).all() and np.isnan(p).all():
+            continue
+        rad = np.deg2rad(wd)
+        hourly = pd.DataFrame({"u": -spd * np.sin(rad), "v": -spd * np.cos(rad), "wind": spd, "pressure": p})
+        g = hourly.groupby(days).mean()
+        g.index = pd.MultiIndex.from_arrays([g.index, [lead] * len(g), [model] * len(g)], names=PAIR_KEYS)
+        parts.append(g)
+    if not parts:
+        return pd.DataFrame(columns=PAIR_KEYS + ["wind_dir", "wind_speed", "pressure", "tendency", "doy"])
+    return _finish(pd.concat(parts))
+
+
 def features_from_forecast(per_model_hourly: pd.DataFrame, today: date) -> pd.DataFrame:
     """Live hourly detail (time, model, wind, wind_dir, pressure, ...) -> daily features."""
     if per_model_hourly is None or per_model_hourly.empty or "pressure" not in per_model_hourly:
@@ -80,7 +105,12 @@ def features_from_forecast(per_model_hourly: pd.DataFrame, today: date) -> pd.Da
     df = per_model_hourly[["time", "model", "wind", "wind_dir", "pressure"]].copy()
     df["date"] = pd.to_datetime(df["time"]).dt.date
     df["lead"] = df["date"].map(lambda d: (d - today).days)
-    return _daily(df)
+    out = _daily(df).sort_values(["model", "date"])
+    # One run covers every day here, so the 24-hour pressure change is day to day within each model.
+    prev = out.groupby("model")[["date", "pressure"]].shift(1)
+    consecutive = (pd.to_datetime(out["date"]) - pd.to_datetime(prev["date"])).dt.days == 1
+    out["tendency"] = (out["pressure"] - prev["pressure"]).where(consecutive)
+    return out.reset_index(drop=True)
 
 
 # --- similarity weights -------------------------------------------------------
@@ -110,24 +140,6 @@ def similarity(targets: np.ndarray, train: np.ndarray) -> np.ndarray:
 
 # --- fitting ------------------------------------------------------------------
 
-def _shrunk_bias(err: np.ndarray) -> float:
-    """Same shrinkage as calibrate.fit: a noisy mean error is scaled toward zero."""
-    n = len(err)
-    if n < 2:
-        return 0.0
-    b = float(err.mean())
-    denom = b * b + float(err.var(ddof=1)) / n
-    return 0.0 if denom == 0 else b * b * b / denom
-
-
-def _shrunk_ratio(fcst: np.ndarray, obs: np.ndarray) -> float:
-    n = len(fcst)
-    if n == 0 or fcst.sum() <= 0.1:
-        return 1.0
-    r = float(np.clip(obs.sum() / fcst.sum(), 0.5, 2.0))
-    return 1.0 + (r - 1.0) * n / (n + 10)
-
-
 def _pattern_estimate(var: str, w: np.ndarray, fcst: np.ndarray, obs: np.ndarray) -> np.ndarray:
     """Pattern-weighted bias (or rain ratio) per target row; NaN where nothing similar is known."""
     sw = w.sum(axis=1)
@@ -155,64 +167,119 @@ def _combine(var: str, base: np.ndarray, est: np.ndarray, n_eff: np.ndarray, k: 
     return fcst * corr if var == "precip" else fcst - corr
 
 
+def consensus(feats: pd.DataFrame, lead: int | None = None) -> pd.DataFrame:
+    """One pattern per date (index date): the models' agreed wind direction, mean pressure and tendency."""
+    cols = ["wind_dir", "wind_agree", "wind_speed", "pressure", "tendency", "doy"]
+    f = feats if lead is None else feats[feats["lead"] == lead]
+    if f.empty:
+        return pd.DataFrame(columns=cols)
+    rad = np.deg2rad(f["wind_dir"].astype(float))
+    g = f.assign(u=-np.sin(rad), v=-np.cos(rad)).groupby("date")
+    um, vm = g["u"].mean(), g["v"].mean()
+    agree = np.hypot(um, vm)  # 1 = every model gives the same direction
+    return pd.DataFrame({
+        "wind_dir": (np.rad2deg(np.arctan2(-um, -vm)) % 360).where(agree >= 0.5),
+        "wind_agree": agree,
+        "wind_speed": g["wind_speed"].mean(),
+        "pressure": g["pressure"].mean(),
+        "tendency": g["tendency"].mean(),
+        "doy": g["doy"].first(),
+    })[cols]
+
+
+def past_patterns(feats: pd.DataFrame) -> pd.DataFrame:
+    """Each past day's pattern from its shortest-lead forecasts (closest to what actually happened)."""
+    return consensus(feats, lead=1).combine_first(consensus(feats))
+
+
 @dataclass
 class RegimeModel:
-    train: pd.DataFrame  # pairs + features: date, lead, model, var, fcst, obs, wind_dir, pressure, tendency, doy
-    p_mean: dict[str, float]  # model -> usual sea-level pressure here
+    train: pd.DataFrame  # pairs: date, lead, model, var, fcst, obs
+    patterns: pd.DataFrame  # index date: wind_dir, pressure, tendency, doy (see past_patterns)
+    p_mean: float  # usual sea-level pressure here (pressure anomaly = high vs low pressure)
     k: dict[str, float]  # var -> shrinkage (inf = pattern correction off)
     cv: pd.DataFrame  # var, days, mae_plain, mae_pattern, gain, k
     mae: pd.DataFrame = field(default_factory=pd.DataFrame)  # model, lead, var, mae_cal (held-out, pattern-corrected)
+    groups: dict = field(default_factory=dict)  # (model, lead, var) -> (pattern row positions, fcst, obs)
+
+    def __post_init__(self):
+        pos = pd.Series(np.arange(len(self.patterns)), index=self.patterns.index)
+        for key, g in self.train.groupby(["model", "lead", "var"]):
+            self.groups[key] = (pos.loc[g["date"]].to_numpy(), g["fcst"].to_numpy(dtype=float),
+                                g["obs"].to_numpy(dtype=float))
 
     def active(self, var: str) -> bool:
         return not np.isinf(self.k.get(var, np.inf))
+
+
+def _window_base(var: str, day: np.ndarray, fcst: np.ndarray, obs: np.ndarray, block_start: np.ndarray) -> np.ndarray:
+    """For each row, the plain correction from the TRAIN_WINDOW_DAYS before its held-out week (rows sorted by day).
+
+    Same formulas as calibrate.fit (shrunk bias; shrunk, clipped rain ratio), computed for every
+    week at once with running sums. NaN where fewer than 5 days are available.
+    """
+    lo = np.searchsorted(day, block_start - TRAIN_WINDOW_DAYS, side="left")
+    hi = np.searchsorted(day, block_start, side="left")
+    n = (hi - lo).astype(float)
+
+    def window_sum(x):
+        c = np.concatenate([[0.0], np.cumsum(x)])
+        return c[hi] - c[lo]
+
+    with np.errstate(invalid="ignore", divide="ignore"):
+        if var == "precip":
+            sf, so = window_sum(fcst), window_sum(obs)
+            r = np.clip(so / sf, 0.5, 2.0)
+            base = np.where(sf > 0.1, 1.0 + (r - 1.0) * n / (n + 10), 1.0)
+        else:
+            err = fcst - obs
+            mean = window_sum(err) / n
+            var_ = (window_sum(err * err) - n * mean * mean) / (n - 1)
+            denom = mean * mean + var_ / n
+            base = np.where(denom > 0, mean * mean * mean / denom, 0.0)
+    return np.where(n >= 5, base, np.nan)
 
 
 def fit(pairs: pd.DataFrame, feats: pd.DataFrame, as_of: date) -> RegimeModel | None:
     """Learn pattern-dependent errors from (date, lead, model, var, fcst, obs) pairs and daily features."""
     if pairs.empty or feats.empty:
         return None
-    data = pairs.merge(feats[PAIR_KEYS + ["wind_dir", "pressure", "tendency", "doy"]], on=PAIR_KEYS, how="inner")
-    data = data[data["date"] <= as_of]
+    pats = past_patterns(feats)
+    pats = pats[pats.index <= as_of]
+    data = pairs[(pairs["date"] <= as_of) & pairs["date"].isin(pats.index)].dropna(subset=["fcst", "obs"])
     if data.empty or data["date"].nunique() < MIN_DAYS:
         return None
-    p_mean = data.groupby("model")["pressure"].mean().to_dict()
-    data = data.assign(ordinal=data["date"].map(date.toordinal))
+    p_mean = float(pats["pressure"].mean()) if pats["pressure"].notna().any() else 0.0
+    dates = sorted(data["date"].unique())
+    pats = pats.loc[dates]
+    pos = pd.Series(np.arange(len(dates)), index=dates)
+    ordinal = np.array([d.toordinal() for d in dates])
+    w_all = similarity(_matrix(pats, p_mean), _matrix(pats, p_mean))  # one day-to-day similarity for everything
 
     scores: dict[str, dict[float, list[np.ndarray]]] = {}
     recent_err: dict[tuple[str, int, str], dict[float, np.ndarray]] = {}
     recent_cut = (as_of - timedelta(days=TRAIN_WINDOW_DAYS)).toordinal()
-    for (model, lead), ml in data.groupby(["model", "lead"]):
-        # One similarity matrix per model and lead, shared by all variables (same days, same patterns).
-        days_ml = ml.drop_duplicates("ordinal").sort_values("ordinal")
-        pos = pd.Series(np.arange(len(days_ml)), index=days_ml["ordinal"].to_numpy())
-        p = p_mean.get(model, 0.0)
-        w_all = similarity(_matrix(days_ml, p), _matrix(days_ml, p))
-        for var, g in ml.groupby("var"):
-            g = g.dropna(subset=["fcst", "obs"]).sort_values("ordinal")
-            if len(g) < 30:
-                continue
-            fcst, obs, day = g["fcst"].to_numpy(), g["obs"].to_numpy(), g["ordinal"].to_numpy()
-            block = day // BLOCK_DAYS
-            ix = pos.loc[day].to_numpy()
-            w = w_all[np.ix_(ix, ix)] * (block[:, None] != block[None, :])  # never learn from the held-out week
-            est, n_eff = _pattern_estimate(var, w, fcst, obs), _n_eff(w)
-            # The plain correction each held-out week would have had: the recent window before it.
-            base = np.full(len(g), np.nan)
-            for b in np.unique(block):
-                start = b * BLOCK_DAYS
-                prior = (day < start) & (day >= start - TRAIN_WINDOW_DAYS)
-                if prior.sum() >= 5:
-                    base[block == b] = (_shrunk_ratio(fcst[prior], obs[prior]) if var == "precip"
-                                        else _shrunk_bias(fcst[prior] - obs[prior]))
-            ok = ~np.isnan(base)
-            if ok.sum() < 20:
-                continue
-            per_k = {}
-            for k in K_CANDIDATES:
-                err = np.abs(_combine(var, base[ok], est[ok], n_eff[ok], k, fcst[ok]) - obs[ok])
-                scores.setdefault(var, {}).setdefault(k, []).append(err)
-                per_k[k] = np.where(day[ok] >= recent_cut, err, np.nan)
-            recent_err[(model, lead, var)] = per_k
+    for (model, lead, var), g in data.groupby(["model", "lead", "var"]):
+        if len(g) < 30:
+            continue
+        g = g.sort_values("date")
+        ix = pos.loc[g["date"]].to_numpy()
+        day, fcst, obs = ordinal[ix], g["fcst"].to_numpy(dtype=float), g["obs"].to_numpy(dtype=float)
+        block_start = (day // BLOCK_DAYS) * BLOCK_DAYS
+        # Like the live engine, a held-out week may only learn from days before it (never from
+        # later weeks: with the season feature they would act as a peek at the future).
+        w = w_all[np.ix_(ix, ix)] * (day[None, :] < block_start[:, None])
+        est, n_eff = _pattern_estimate(var, w, fcst, obs), _n_eff(w)
+        base = _window_base(var, day, fcst, obs, block_start)
+        ok = ~np.isnan(base)
+        if ok.sum() < 20:
+            continue
+        per_k = {}
+        for k in K_CANDIDATES:
+            err = np.abs(_combine(var, base[ok], est[ok], n_eff[ok], k, fcst[ok]) - obs[ok])
+            scores.setdefault(var, {}).setdefault(k, []).append(err)
+            per_k[k] = np.where(day[ok] >= recent_cut, err, np.nan)
+        recent_err[(model, lead, var)] = per_k
 
     chosen, cv_rows = {}, []
     for var, by_k in scores.items():
@@ -230,46 +297,49 @@ def fit(pairs: pd.DataFrame, feats: pd.DataFrame, as_of: date) -> RegimeModel | 
         k = chosen.get(var, np.inf)
         if not np.isinf(k) and np.isfinite(per_k[k]).any():
             mae_rows.append({"model": model, "lead": lead, "var": var, "mae_cal": float(np.nanmean(per_k[k]))})
-    train = data.drop(columns="ordinal")
-    return RegimeModel(train, p_mean, chosen, pd.DataFrame(cv_rows), pd.DataFrame(mae_rows))
+    return RegimeModel(data[["date", "lead", "model", "var", "fcst", "obs"]], pats, p_mean, chosen,
+                       pd.DataFrame(cv_rows), pd.DataFrame(mae_rows))
 
 
 # --- applying -----------------------------------------------------------------
 
 def adjust(rm: RegimeModel, df: pd.DataFrame, feats: pd.DataFrame) -> pd.DataFrame:
-    """Rows (model, stats_lead, var, value, bias, ratio, mae_cal) + live features -> pattern-aware bias/ratio.
+    """Rows (date, model, stats_lead, var, value, bias, ratio, mae_cal) + live features -> pattern-aware bias/ratio.
 
-    Adds `pattern_n` (how many similar past days, effectively) where a pattern correction was applied.
+    Each forecast day's pattern is the models' consensus for that day. Adds `pattern_n`
+    (how many similar past days, effectively) where a pattern correction was applied.
     """
     out = df.copy()
     out["pattern_n"] = np.nan
-    if rm is None or feats.empty:
+    if rm is None or feats.empty or not any(rm.active(v) for v in set(out["var"])):
         return out
-    live = out.merge(feats[PAIR_KEYS + ["wind_dir", "pressure", "tendency", "doy"]],
-                     on=PAIR_KEYS, how="left")
-    live.index = out.index
-    for (model, lead, var), idx in live.groupby(["model", "stats_lead", "var"]).groups.items():
-        if not rm.active(var):
+    live = consensus(feats)
+    live_dates = [d for d in live.index if d in set(out["date"])]
+    if not live_dates:
+        return out
+    live = live.loc[live_dates]
+    w_live = similarity(_matrix(live, rm.p_mean), _matrix(rm.patterns, rm.p_mean))  # live days x past days
+    live_pos = pd.Series(np.arange(len(live_dates)), index=live_dates)
+    described = live[["wind_dir", "pressure"]].notna().any(axis=1)  # no wind or pressure: nothing to match
+    for (model, lead, var), idx in out.groupby(["model", "stats_lead", "var"]).groups.items():
+        if not rm.active(var) or (model, lead, var) not in rm.groups:
             continue
-        g = rm.train[(rm.train["model"] == model) & (rm.train["lead"] == lead) & (rm.train["var"] == var)]
-        g = g.dropna(subset=["fcst", "obs"])
-        if len(g) < 30:
+        past, fcst, obs = rm.groups[(model, lead, var)]
+        if len(past) < 30:
             continue
-        rows = live.loc[idx]
-        p = rm.p_mean.get(model, 0.0)
-        w = similarity(_matrix(rows, p), _matrix(g, p))
-        est = _pattern_estimate(var, w, g["fcst"].to_numpy(), g["obs"].to_numpy())
+        rows = out.loc[idx]
+        known = rows["date"].isin(live_pos.index).to_numpy()
+        if not known.any():
+            continue
+        rows, idx = rows[known], rows.index[known]
+        w = w_live[np.ix_(live_pos.loc[rows["date"]].to_numpy(), past)]
+        est = _pattern_estimate(var, w, fcst, obs)
         n_eff = _n_eff(w)
-        k = rm.k[var]
-        # Without wind direction or pressure there's no pattern to match, only the season.
-        described = rows[["wind_dir", "pressure"]].notna().any(axis=1).to_numpy()
-        frac = np.where(np.isnan(est) | ~described, 0.0, n_eff / (n_eff + k))
-        if var == "precip":
-            base = rows["ratio"].fillna(1.0).to_numpy()
-            out.loc[idx, "ratio"] = base + (np.where(np.isnan(est), base, est) - base) * frac
-        else:
-            base = rows["bias"].fillna(0.0).to_numpy()
-            out.loc[idx, "bias"] = base + (np.where(np.isnan(est), base, est) - base) * frac
+        ok = described.loc[rows["date"]].to_numpy()
+        frac = np.where(np.isnan(est) | ~ok, 0.0, n_eff / (n_eff + rm.k[var]))
+        col, default = ("ratio", 1.0) if var == "precip" else ("bias", 0.0)
+        base = rows[col].fillna(default).to_numpy()
+        out.loc[idx, col] = base + (np.where(np.isnan(est), base, est) - base) * frac
         out.loc[idx, "pattern_n"] = np.where(frac > 0, n_eff, np.nan)
     if not rm.mae.empty:  # weight models by how well they did once pattern-corrected
         m = rm.mae.rename(columns={"lead": "stats_lead", "mae_cal": "mae_pattern"})
@@ -288,24 +358,13 @@ def compass(deg: float) -> str:
     return COMPASS[int((deg % 360) / 22.5 + 0.5) % 16]
 
 
-def day_patterns(feats: pd.DataFrame, p_means: dict[str, float]) -> pd.DataFrame:
+def day_patterns(feats: pd.DataFrame, p_mean: float | None) -> pd.DataFrame:
     """Consensus pattern per forecast date across models: wind from, pressure anomaly, tendency."""
-    if feats.empty:
-        return pd.DataFrame()
-    f = feats.copy()
-    f["pressure_anom"] = f["pressure"] - f["model"].map(p_means).fillna(f["pressure"].mean())
-    rad = np.deg2rad(f["wind_dir"])
-    f["u"], f["v"] = -np.sin(rad), -np.cos(rad)
-    g = f.groupby("date")
-    out = pd.DataFrame({
-        "wind_dir": (np.rad2deg(np.arctan2(-g["u"].mean(), -g["v"].mean())) % 360),
-        "wind_agree": np.hypot(g["u"].mean(), g["v"].mean()),  # 1 = all models same direction
-        "wind_speed": g["wind_speed"].mean(),
-        "pressure": g["pressure"].mean(),
-        "pressure_anom": g["pressure_anom"].mean(),
-        "tendency": g["tendency"].mean(),
-    })
-    return out
+    days = consensus(feats)
+    if days.empty:
+        return days
+    days["pressure_anom"] = days["pressure"] - (p_mean if p_mean is not None else days["pressure"].mean())
+    return days
 
 
 def describe(row: pd.Series) -> str:

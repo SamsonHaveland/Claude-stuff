@@ -15,6 +15,7 @@ function storageSet(key, value) {
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
+    if (v == null) continue;
     if (k === "class") node.className = v;
     else if (k === "style") node.style.cssText = v;
     else node.setAttribute(k, v);
@@ -203,8 +204,48 @@ function renderPatterns(data) {
   } else if (data.calibrated) {
     items.push("Weather-pattern corrections switch on once about 90 days of history is stored for this place.");
   }
+  const h = data.history;
+  if (h && h.target_days && !h.complete) {
+    items.push(historyText(h));
+  }
   box.hidden = items.length === 0;
-  box.querySelector("ul").replaceChildren(...items.map((t) => el("li", {}, t)));
+  box.querySelector("ul").replaceChildren(...items.map((t, i) =>
+    el("li", { id: h && !h.complete && i === items.length - 1 ? "history-line" : null }, t)));
+  if (h && h.target_days && !h.complete) buildHistory(lastParams);
+}
+
+function historyText(h) {
+  const left = Math.max(h.target_days - h.stored_days, 0);
+  const minutes = Math.max(1, Math.round(left / 60 * 9 * 3.7 / 60));  // ~3.7 s per model per 60 days
+  return `Building this place's forecast history: ${h.stored_days} of ${h.target_days} days of past model ` +
+    `runs stored. Keep the app open to finish (about ${minutes} min); refresh afterwards to use it all.`;
+}
+
+// Fill in older model history in ~50-second steps while this place stays on screen.
+let historyKey = null;
+async function buildHistory(params) {
+  if (!params) return;
+  const key = JSON.stringify(params);
+  if (historyKey === key) return;
+  historyKey = key;
+  while (historyKey === key && document.visibilityState === "visible") {
+    let h;
+    try {
+      const res = await apiFetch("api/backfill?" + new URLSearchParams(params));
+      h = await res.json();
+      if (!res.ok) break;
+    } catch {
+      break;
+    }
+    if (historyKey !== key) break;
+    const line = $("#history-line");
+    if (h.complete) {
+      if (line) line.textContent = `Full forecast history stored (${h.target_days} days). Refresh to use it.`;
+      break;
+    }
+    if (line) line.textContent = historyText(h);
+  }
+  if (historyKey === key) historyKey = null;
 }
 
 function renderOverride(data) {

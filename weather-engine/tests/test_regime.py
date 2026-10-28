@@ -124,3 +124,37 @@ def test_backtest_replays_without_peeking(fake_api):
     text = report.backtest_to_text(summary)
     print(text)
     assert "Bias-corrected" in text
+
+
+def test_slow_drift_is_not_mistaken_for_a_pattern():
+    """Bias that drifts with time (not weather): cross-validation must not peek at later weeks.
+
+    With the peek, this scored a 23% "gain". Without it, only the small honest gain from
+    weighting recent weeks more remains."""
+    pairs, feats = synthetic(days=390, pattern_bias=0.0, noise=1.0, seed=3)
+    t = np.arange(len(pairs))
+    pairs["fcst"] += 3 * np.sin(2 * np.pi * t / 200)
+    rm = regime.fit(pairs, feats, AS_OF)
+    assert rm.cv.set_index("var").loc["tmax", "gain"] < 0.08
+
+
+def test_live_pressure_tendency():
+    t = pd.date_range("2026-10-27", periods=72, freq="h")
+    hourly = pd.DataFrame({"time": t, "model": "m", "wind": 10.0, "wind_dir": 200.0,
+                           "pressure": np.repeat([1010.0, 1006.0, 1000.0], 24)})
+    f = regime.features_from_forecast(hourly, date(2026, 10, 27)).set_index("lead")
+    assert np.isnan(f.loc[0, "tendency"]) and f.loc[1, "tendency"] == -4 and f.loc[2, "tendency"] == -6
+
+
+def test_fill_reaches_back_to_the_start(fake_api, monkeypatch):
+    from weather_engine.config import Location
+
+    monkeypatch.setattr(history.time, "sleep", lambda s: None)
+    loc = Location("Denver", 39.74, -104.99)
+    end = date(2026, 10, 26)
+    start = end - timedelta(days=400)
+    history.update(loc, "ecmwf_ifs025", start, end, backfill_chunks=0)
+    before = history.coverage(loc, ["ecmwf_ifs025"], start, end)
+    assert not before["complete"] and before["stored_days"] == history.CHUNK_DAYS
+    after = history.fill(loc, ["ecmwf_ifs025"], start, end, budget_s=30, pause_s=0)
+    assert after["complete"] and after["stored_days"] == after["target_days"] == 401

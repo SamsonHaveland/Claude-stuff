@@ -122,9 +122,12 @@ Speed:
   the app (startup CPU boost is on to shorten this).
 - **A brand-new place:** the slowest case (expect 15–40 seconds), because it
   searches stations and downloads about 4 months of past runs from 9 models
-  plus a year of station history. Everything is kept in the bucket, so later
-  visits only fetch what's new, and each visit adds 2 more months of model
-  history (up to a year) for the weather-pattern corrections.
+  plus station history. Everything is kept in the bucket, so later visits only
+  fetch what's new. While the app stays open it keeps filling in older model
+  history in the background (all of it since January 2024, about 10 minutes
+  the first time); the progress shows under "Weather pattern & live readings".
+- **First forecast of the day for a place:** a few extra seconds while the
+  weather-pattern corrections are refitted on the new day's data.
 
 To see where time goes: **Cloud Run → weather-engine → Logs**. Each forecast
 logs a line like `forecast 'Primm, Nevada': 6.2s (models 1.1, calibration 4.8, ...)`.

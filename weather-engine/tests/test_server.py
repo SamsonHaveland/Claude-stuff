@@ -109,3 +109,13 @@ def test_recent_forecasts_are_reused_until_refresh(server, monkeypatch):
     assert len(calls) == 1 and first["issued_at"] == second["issued_at"]
     get(url + "&refresh=1")
     assert len(calls) == 2
+
+
+def test_backfill_api(server, monkeypatch):
+    from weather_engine import history
+
+    monkeypatch.setattr(history, "fill", lambda loc, models, start, end, **k: {
+        "target_days": (end - start).days + 1, "stored_days": 10, "complete": False})
+    status, _, body = get(server + "/api/backfill?place=Denver,%20CO")
+    data = json.loads(body)
+    assert status == 200 and data["stored_days"] == 10 and data["complete"] is False

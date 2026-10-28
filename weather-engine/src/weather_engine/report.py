@@ -366,6 +366,7 @@ def to_dict(result: ForecastResult) -> dict:
         "days": days,
         "calibration": calibration_rows(result),
         "patterns": pattern_status(result),
+        "history": result.history,
         "nowcast": result.nowcast,
         "notes": result.notes,
         "baseline_model": BASELINE_MODEL,

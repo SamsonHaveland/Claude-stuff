@@ -230,6 +230,30 @@ def wide_to_long(wide: pd.DataFrame) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True).dropna(subset=["value"])
 
 
+def daily_from_wide(wide: pd.DataFrame, end_hour: int = 24, min_hours: int = 20) -> pd.DataFrame:
+    """Archived wide past runs -> daily (date, lead, var, value), like aggregate_windows but without
+    first unpacking years of hourly data into a long table (much less memory)."""
+    if wide.empty:
+        return pd.DataFrame(columns=["date", "lead", "var", "value"])
+    label = ((wide.index - pd.Timedelta(hours=end_hour) - pd.Timedelta(seconds=1)).normalize()
+             + pd.Timedelta(days=1)).date
+    frames = []
+    for canon, (_, hvar, agg) in VARIABLES.items():
+        cols = {_hourly_name(hvar, lead): lead for lead in range(1, MAX_LEAD + 1) if _hourly_name(hvar, lead) in wide}
+        if not cols:
+            continue
+        g = wide[list(cols)].groupby(label)
+        vals = g.agg(agg).where(g.count() >= min_hours).rename(columns=cols)
+        long = vals.rename_axis("date").reset_index().melt(id_vars="date", var_name="lead", value_name="value")
+        frames.append(long.dropna(subset=["value"]).assign(var=canon))
+    if not frames:
+        return pd.DataFrame(columns=["date", "lead", "var", "value"])
+    out = pd.concat(frames, ignore_index=True)
+    out["lead"] = out["lead"].astype(int)
+    out["value"] = out["value"].astype(float)
+    return out[["date", "lead", "var", "value"]]
+
+
 def fetch_previous_runs_range(loc: Location, model: str, start, end) -> pd.DataFrame:
     """Past runs for local dates start..end (inclusive) as a wide table (see previous_runs_wide)."""
     params = {

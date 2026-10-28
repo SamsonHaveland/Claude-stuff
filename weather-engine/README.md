@@ -152,7 +152,7 @@ that won't change much. Calibration data is cached for 6 hours under
 ### Backfill and backtest
 
 ```
-weather-engine backfill "Primm, NV"     # download a year of past model runs (a few minutes, once)
+weather-engine backfill "Primm, NV"     # download all available past model runs (10+ minutes, once)
 weather-engine backtest "Primm, NV"     # replay the last 60 days: error of raw ECMWF vs each correction step
 ```
 

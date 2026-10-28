@@ -20,7 +20,8 @@ FORECAST_LOG = PROCESSED_DIR / "forecast_log.csv"
 ARCHIVE_DIR = PROCESSED_DIR / "obs_archive"
 CALIBRATION_LOG = PROCESSED_DIR / "calibration_latest.csv"
 PATTERN_LOG = PROCESSED_DIR / "pattern_tests_latest.csv"
-RUNS_DIR = PROCESSED_DIR / "runs_archive"  # models' past runs per place (see history.py)
+RUNS_DIR = PROCESSED_DIR / "runs_archive"
+MODELS_DIR = PROCESSED_DIR / "fitted"  # fitted correction models, reused until their data changes  # models' past runs per place (see history.py)
 
 # The web server handles requests in parallel threads; serialise file writes.
 _write_lock = threading.Lock()
@@ -166,3 +167,21 @@ def merge_runs(name: str, new: pd.DataFrame, keep_days: int, old: pd.DataFrame |
         merged.to_pickle(tmp, compression={"method": "gzip", "compresslevel": 1})
         os.replace(tmp, path)
     return merged
+
+
+def read_pickle(name: str):
+    """A fitted object saved by write_pickle (this app's own private storage), or None."""
+    path = MODELS_DIR / f"{name}.pkl"
+    try:
+        return pd.read_pickle(path) if path.exists() else None
+    except Exception:  # e.g. written by an older version: just refit
+        return None
+
+
+def write_pickle(name: str, obj) -> None:
+    path = MODELS_DIR / f"{name}.pkl"
+    with _write_lock:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(f"{name}.{threading.get_ident()}.tmp")
+        pd.to_pickle(obj, tmp)
+        os.replace(tmp, path)

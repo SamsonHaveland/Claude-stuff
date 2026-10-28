@@ -220,6 +220,7 @@ def fake_api(monkeypatch, tmp_path):
     monkeypatch.setattr(store, "CACHE_DIR", tmp_path / "cache")
     monkeypatch.setattr(store, "ARCHIVE_DIR", tmp_path / "archive")
     monkeypatch.setattr(store, "RUNS_DIR", tmp_path / "runs")
+    monkeypatch.setattr(store, "MODELS_DIR", tmp_path / "fitted")
     monkeypatch.setattr(store, "PATTERN_LOG", tmp_path / "processed" / "pattern_tests_latest.csv")
     from weather_engine import forecast
     monkeypatch.setattr(forecast, "HISTORY_DAYS", 120)  # enough for pattern corrections, keeps tests quick

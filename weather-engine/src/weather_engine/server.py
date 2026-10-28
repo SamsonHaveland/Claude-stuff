@@ -87,6 +87,19 @@ def api_forecast(q: dict[str, list[str]]) -> dict:
     return payload
 
 
+def api_backfill(q: dict[str, list[str]]) -> dict:
+    """Fill in more of a place's model history (about 50 seconds per call; the app repeats it while open)."""
+    from datetime import date
+
+    from . import history
+    from .config import MODELS
+    from .forecast import history_window
+
+    loc = _location_from_query(q)
+    start, end = history_window(date.today())
+    return history.fill(loc, MODELS, start, end)
+
+
 def api_stations(q: dict[str, list[str]]) -> dict:
     loc = _location_from_query(q)
     return {
@@ -114,7 +127,8 @@ def api_summary(body: dict) -> dict:
     return {"summary": ai.summarize(body)}
 
 
-ROUTES = {"/api/forecast": api_forecast, "/api/stations": api_stations, "/api/config": api_config}
+ROUTES = {"/api/forecast": api_forecast, "/api/stations": api_stations, "/api/config": api_config,
+          "/api/backfill": api_backfill}
 POST_ROUTES = {"/api/summary": api_summary}
 MAX_POST_BYTES = 256_000
 PUBLIC_API = {"/api/config", "/api/login"}  # reachable without logging in

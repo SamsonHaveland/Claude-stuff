@@ -112,10 +112,22 @@ the model was on them here (an analog method, Delle Monache et al. 2013). The
 pattern-specific error is blended with the plain 60-day bias by
 n_eff/(n_eff+k).
 
+History: every model's past runs are archived per place back to January 2024
+(the start of Open-Meteo's past-run archive for most models), growing to a
+10-year cap. Older years are not available as issued forecasts, and models
+are upgraded often enough that errors from a decade ago would describe a
+different model; the similarity weights include the season, so each year
+mainly informs the same time of year.
+
+Each past day's pattern is taken from the models' consensus at the shortest
+lead (closest to what actually happened); a forecast day's pattern is the
+models' consensus for that day.
+
 Guardrails against overfitting: it needs 90+ days of history; k is chosen per
 variable by cross-validation that holds out whole weeks (errors on nearby days
-are correlated) and compares against what the plain correction would have
-done with only the 60 days before each held-out week; the pattern correction
+are correlated), lets each held-out week learn only from days before it (as
+the live engine would), and compares against what the plain correction would
+have done with only the 60 days before that week; the pattern correction
 is used only if it cuts error by at least 2%. `weather-engine backtest`
 measures the true out-of-sample gain.
 

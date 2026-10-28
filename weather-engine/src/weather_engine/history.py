@@ -2,9 +2,11 @@
 
 The models' old forecasts are the training data for calibration. Instead of
 re-downloading them on every forecast, they're kept (Cloud Storage on Cloud
-Run) and only the newest days are fetched. Older history is filled in one
-chunk per forecast, up to HISTORY_DAYS, which keeps each request quick and
-inside Open-Meteo's free rate limits; `weather-engine backfill` fills it all at once.
+Run) and only the newest days are fetched. Older history (back to
+config.ARCHIVE_START, up to HISTORY_DAYS) is filled in one chunk per forecast,
+and by `fill` in paced steps: the web app calls it while it's open, and
+`weather-engine backfill` runs it from the command line. Pacing keeps every
+request inside Open-Meteo's free rate limits.
 """
 
 from __future__ import annotations
@@ -68,9 +70,17 @@ def update(loc: Location, model: str, start: date, end: date, backfill_chunks: i
     if have is not None and mtime and time.time() - mtime < FRESH_HOURS * 3600 and have.index.max().date() >= end:
         first = have.index.min().date()
         spans = [s for s in spans if s[1] < first]  # newest runs were just fetched: only reach further back
-    fresh = [openmeteo.fetch_previous_runs_range(loc, model, a, b) for a, b in spans]
+    fresh, error = [], None
+    for a, b in spans:
+        try:
+            fresh.append(openmeteo.fetch_previous_runs_range(loc, model, a, b))
+        except Exception as e:  # keep what did arrive; the rest is retried next time
+            error = e
+            break
     if fresh:
         store.merge_runs(name, pd.concat(fresh), keep_days=HISTORY_DAYS + 30, old=have)
+    if error is not None:
+        raise error
 
 
 def daily(loc: Location, model: str, start: date, end: date, end_hours: set[int]) -> tuple[dict[int, pd.DataFrame], pd.DataFrame]:
@@ -90,10 +100,52 @@ def daily(loc: Location, model: str, start: date, end: date, end_hours: set[int]
         empty = pd.DataFrame(columns=["date", "lead", "var", "value", "model"])
         return {h: empty for h in end_hours}, regime.features_from_past_runs(pd.DataFrame(columns=["time", "lead", "hvar", "value", "model"]))
     window = have[(have.index >= pd.Timestamp(start)) & (have.index < pd.Timestamp(end + timedelta(days=1)))]
-    long = openmeteo.wide_to_long(window).assign(model=model)
-    out = ({h: openmeteo.aggregate_windows(long, h) for h in end_hours}, regime.features_from_past_runs(long))
+    out = ({h: openmeteo.daily_from_wide(window, h).assign(model=model) for h in end_hours},
+           regime.features_from_wide(window, model))
     with _memo_lock:
         _memo[key] = out
         while len(_memo) > MEMO_SIZE:
             _memo.pop(next(iter(_memo)))
     return out
+
+
+def coverage(loc: Location, models: list[str], start: date, end: date) -> dict:
+    """How much of start..end is stored: {"target_days", "stored_days" (least-covered model), "complete"}."""
+    target = (end - start).days + 1
+    stored = []
+    for model in models:
+        have = store.read_runs(archive_name(loc, model))
+        if have is not None and not have.empty:
+            stored.append((end - max(have.index.min().date(), start)).days + 1)
+    least = min(stored) if stored else 0
+    return {"target_days": target, "stored_days": least, "complete": bool(stored) and least >= target}
+
+
+def fill(loc: Location, models: list[str], start: date, end: date, budget_s: float = 50, pause_s: float = 3.5) -> dict:
+    """Download older history one chunk at a time, round-robin over models, for up to `budget_s` seconds.
+
+    The pause between downloads keeps this, plus forecasts running alongside it,
+    inside Open-Meteo's free limits (600 calls/minute; a 60-day chunk counts as ~18).
+    Models without an archive yet are left to the next forecast (it creates them).
+    """
+    deadline = time.time() + budget_s
+    progress = True
+    while progress and time.time() < deadline:
+        progress = False
+        for model in models:
+            if time.time() >= deadline:
+                break
+            name = archive_name(loc, model)
+            have = store.read_runs(name)
+            if have is None or have.empty:
+                continue
+            first = have.index.min().date()
+            older = [s for s in missing_spans(have, start, end, backfill_chunks=1) if s[1] < first]
+            if not older:
+                continue
+            a, b = older[0]
+            store.merge_runs(name, openmeteo.fetch_previous_runs_range(loc, model, a, b),
+                             keep_days=HISTORY_DAYS + 30, old=have)
+            progress = True
+            time.sleep(pause_s)
+    return coverage(loc, models, start, end)

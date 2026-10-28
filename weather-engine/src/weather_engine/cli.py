@@ -106,25 +106,21 @@ def _prepare(loc: Location) -> None:
 
 
 def _backfill(loc: Location) -> None:
-    import time
+    from . import history
+    from .config import MODELS
+    from .forecast import history_window, training_data
 
-    from . import history, store
-    from .config import HISTORY_DAYS, MAX_LEAD, MODELS
-
-    end = date.today() - timedelta(days=1)
-    start = end - timedelta(days=HISTORY_DAYS + MAX_LEAD)
-    print(f"Filling in {HISTORY_DAYS} days of past model runs for {loc.name} "
-          f"(paced to stay inside Open-Meteo's free limits; a few minutes the first time)...")
-    for i, model in enumerate(MODELS):
-        try:
-            history.update(loc, model, start, end, backfill_chunks=10)
-            have = store.read_runs(history.archive_name(loc, model))
-            days = 0 if have is None else have.index.normalize().nunique()
-            print(f"  {model:<22} {days} days")
-        except Exception as e:
-            print(f"  {model:<22} unavailable ({e})")
-        if i < len(MODELS) - 1:
-            time.sleep(12)
+    start, end = history_window(date.today())
+    print(f"Filling in past model runs for {loc.name} from {start} "
+          f"(paced to stay inside Open-Meteo's free limits; can take 10+ minutes the first time)...")
+    training_data(loc, MODELS, date.today(), [], backfill_chunks=0)  # creates each model's archive
+    last = -1
+    while True:
+        h = history.fill(loc, MODELS, start, end, budget_s=60)
+        print(f"  {h['stored_days']} of {h['target_days']} days stored")
+        if h["complete"] or h["stored_days"] == last:  # done, or a model can't go further back
+            break
+        last = h["stored_days"]
 
 
 def cmd_backfill(args: argparse.Namespace) -> None:
@@ -195,7 +191,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--show-data", action="store_true", help="print exactly what would be sent, without calling Claude")
     p.set_defaults(func=cmd_analyze)
 
-    p = sub.add_parser("backfill", help="download a year of past model runs for a place (speeds up and improves its forecasts)")
+    p = sub.add_parser("backfill", help="download all available past model runs for a place (since Jan 2024, up to 10 years)")
     place_args(p)
     p.set_defaults(func=cmd_backfill)
 

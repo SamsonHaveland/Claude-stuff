@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -16,6 +17,7 @@ from .config import (
     BASELINE_MODEL,
     ENSEMBLE_MODELS,
     FULL_HISTORY_DAYS,
+    ARCHIVE_START,
     HISTORY_DAYS,
     MAX_LEAD,
     MODELS,
@@ -47,6 +49,7 @@ class ForecastResult:
     patterns: pd.DataFrame | None = None  # per date: the day's pattern and what it changed (see _patterns)
     nowcast: list[dict] = field(default_factory=list)  # latest station readings used to nudge the next hours
     terrain: pd.DataFrame | None = None  # elevation around the place (terrain.py)
+    history: dict = field(default_factory=dict)  # stored vs wanted days of model history (history.coverage)
 
 
 def _fetch_raw(loc: Location, models: list[str], notes: list[str]) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -83,7 +86,13 @@ class Training:
     stats: pd.DataFrame | None
     sel: stations.Selection
     pattern: regime.RegimeModel | None = None
-    p_means: dict[str, float] = field(default_factory=dict)
+    p_mean: float | None = None
+    history: dict = field(default_factory=dict)
+
+
+def history_window(today) -> tuple:
+    """(first, last) local dates of model history used for training."""
+    return max(today - timedelta(days=HISTORY_DAYS + MAX_LEAD), ARCHIVE_START), today - timedelta(days=1)
 
 
 @dataclass
@@ -91,14 +100,14 @@ class TrainingData:
     sel: stations.Selection
     pairs: pd.DataFrame  # date, lead, model, var, fcst, obs
     feats: pd.DataFrame  # daily pattern features per (date, lead, model), see regime.py
-    p_means: dict[str, float] = field(default_factory=dict)
+    p_mean: float | None = None  # usual sea-level pressure here
+    history: dict = field(default_factory=dict)  # how much of the wanted model history is stored
 
 
 def training_data(loc: Location, models: list[str], today, notes: list[str],
                   backfill_chunks: int = 1) -> TrainingData:
     """Past model runs matched with station observations at this place (plus each day's pattern)."""
-    past_days = HISTORY_DAYS + MAX_LEAD
-    start, end = today - timedelta(days=past_days), today - timedelta(days=1)
+    start, end = history_window(today)
     empty = pd.DataFrame()
     # Station search/history and the models' past runs are independent: fetch them together.
     with ThreadPoolExecutor(max_workers=len(models) + 1) as pool:
@@ -128,10 +137,11 @@ def training_data(loc: Location, models: list[str], today, notes: list[str],
     if not frames:
         return TrainingData(sel, empty, empty)
     feats = pd.concat(feat_frames, ignore_index=True)
-    p_means = feats.groupby("model")["pressure"].mean().dropna().to_dict() if not feats.empty else {}
+    pats = regime.past_patterns(feats) if not feats.empty else pd.DataFrame()
+    p_mean = float(pats["pressure"].mean()) if not pats.empty and pats["pressure"].notna().any() else None
     pairs = calibrate.build_pairs(pd.concat(frames, ignore_index=True), sel.obs[[
         c for g in sel.end_hours for c in VAR_GROUPS[g]]])
-    return TrainingData(sel, pairs, feats, p_means)
+    return TrainingData(sel, pairs, feats, p_mean, history.coverage(loc, models, start, end))
 
 
 @dataclass
@@ -139,21 +149,33 @@ class Training:
     stats: pd.DataFrame | None
     sel: stations.Selection
     pattern: regime.RegimeModel | None = None
-    p_means: dict[str, float] = field(default_factory=dict)
+    p_mean: float | None = None
+    history: dict = field(default_factory=dict)
 
 
 _pattern_memo: dict[tuple, regime.RegimeModel | None] = {}
+_pattern_lock = threading.Lock()
 
 
 def _fit_pattern(loc: Location, td: TrainingData, end) -> regime.RegimeModel | None:
     """regime.fit, reused while the training data is unchanged (it changes about once a day)."""
     p = td.pairs
     key = (loc.slug, end, len(p), round(float(p["fcst"].sum()), 3), round(float(p["obs"].sum()), 3), len(td.feats))
-    if key not in _pattern_memo:
+    with _pattern_lock:
+        if key in _pattern_memo:
+            return _pattern_memo[key]
+    # Saved copy: survives the server going to sleep (Cloud Run), so the fit runs about once a day.
+    saved = store.read_pickle(f"pattern_{loc.slug}")
+    if saved is not None and saved[0] == key:
+        fitted = saved[1]
+    else:
+        fitted = regime.fit(p, td.feats, as_of=end)
+        store.write_pickle(f"pattern_{loc.slug}", (key, fitted))
+    with _pattern_lock:
         if len(_pattern_memo) > 20:
-            _pattern_memo.clear()
-        _pattern_memo[key] = regime.fit(p, td.feats, as_of=end)
-    return _pattern_memo[key]
+            _pattern_memo.pop(next(iter(_pattern_memo)))
+        _pattern_memo[key] = fitted
+    return fitted
 
 
 def _train(loc: Location, models: list[str], today, notes: list[str]) -> Training:
@@ -172,7 +194,7 @@ def _train(loc: Location, models: list[str], today, notes: list[str]) -> Trainin
     if pattern is None and days < regime.MIN_DAYS:
         notes.append(f"weather-pattern corrections start once {regime.MIN_DAYS} days of history are "
                      f"stored ({days} so far; older history is filled in a little on each forecast)")
-    return Training(calibrate.fit(td.pairs, as_of=end), td.sel, pattern, td.p_means)
+    return Training(calibrate.fit(td.pairs, as_of=end), td.sel, pattern, td.p_mean, td.history)
 
 
 def _rain_prob(loc: Location, notes: list[str]) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -212,11 +234,11 @@ def run_forecast(loc: Location, models: list[str] = MODELS, use_calibration: boo
     timings["models"] = time.perf_counter() - t0
 
     station, stats, rejected, chosen, end_hours = None, None, False, {}, {}
-    pattern, p_means = None, {}
+    pattern, p_mean, hist = None, None, {}
     if use_calibration:
         t = time.perf_counter()
         tr = _train(loc, models, today, notes)
-        stats, sel, pattern, p_means = tr.stats, tr.sel, tr.pattern, tr.p_means
+        stats, sel, pattern, p_mean, hist = tr.stats, tr.sel, tr.pattern, tr.p_mean, tr.history
         timings["calibration"] = time.perf_counter() - t
         chosen = sel.chosen if stats is not None else {}
         end_hours = sel.end_hours if stats is not None else {}
@@ -247,7 +269,7 @@ def run_forecast(loc: Location, models: list[str] = MODELS, use_calibration: boo
     except Exception as e:
         ground = None
         log.info("terrain unavailable: %s", e)
-    patterns = _patterns(feats, p_means, plain, blended, corrected, ground)
+    patterns = _patterns(feats, p_mean, plain, blended, corrected, ground)
     t = time.perf_counter()
     rain_daily, rain_hourly = rain_future.result()
     timings["ensembles_wait"] = time.perf_counter() - t
@@ -264,7 +286,7 @@ def run_forecast(loc: Location, models: list[str] = MODELS, use_calibration: boo
     background.shutdown()
     result = ForecastResult(loc, issued_at, blended, raw, rain_daily, stats, station, notes,
                             rejected, chosen, end_hours, hourly, sun, pattern=pattern, patterns=patterns,
-                            nowcast=nowcast_used, terrain=ground)
+                            nowcast=nowcast_used, terrain=ground, history=hist)
     _log(result)
     timings["total"] = time.perf_counter() - t0
     result.timings = timings
@@ -285,10 +307,10 @@ def _latest(stations_by_var: dict[str, observations.Station], tz: str) -> dict[s
     return out
 
 
-def _patterns(feats: pd.DataFrame, p_means: dict[str, float], plain: pd.DataFrame, blended: pd.DataFrame,
+def _patterns(feats: pd.DataFrame, p_mean: float | None, plain: pd.DataFrame, blended: pd.DataFrame,
               corrected: pd.DataFrame | None, ground: pd.DataFrame | None = None) -> pd.DataFrame:
     """Per date: the weather pattern in words, and how much the pattern correction moved each variable."""
-    days = regime.day_patterns(feats, p_means)
+    days = regime.day_patterns(feats, p_mean)
     if days.empty:
         return days
     days["summary"] = days.apply(regime.describe, axis=1)

@@ -28,6 +28,8 @@ def run(pairs: pd.DataFrame, feats: pd.DataFrame, today: date, days: int = 60, r
     """Per (date, lead, var): obs and each method's forecast, over the last `days` days before today."""
     first = today - timedelta(days=days)
     evaluate = pairs[(pairs["date"] >= first) & (pairs["date"] < today)].copy()
+    if evaluate.empty:
+        return pd.DataFrame(columns=["date", "lead", "var", "obs", *METHODS, "pattern_on"])
     evaluate["origin"] = evaluate.apply(lambda r: r["date"] - timedelta(days=int(r["lead"])), axis=1)
     rows = []
     fits: dict[date, tuple] = {}
