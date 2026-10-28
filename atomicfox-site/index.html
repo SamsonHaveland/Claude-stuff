@@ -196,10 +196,11 @@ p { margin: 0; }
 .feature-body h3 { font-size: var(--step-3); }
 .feature-body > p { color: var(--muted); max-width: 34rem; }
 .laurels { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; border-top: 1px solid var(--rule); }
-.laurels li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--rule); font-size: 0.9375rem; }
-.laurels li span:last-child { font: 400 var(--step--1)/1.5 var(--mono); color: var(--muted); white-space: nowrap; }
-@media (max-width: 520px) { .laurels li { grid-template-columns: minmax(0, 1fr); gap: 0.15rem; } }
-.laurels li.win span:first-child { color: var(--copper); font-weight: 600; }
+.laurels li { display: grid; grid-template-columns: 8.5rem minmax(0, 1fr); gap: 0.35rem 1.25rem; padding: 0.9rem 0; border-bottom: 1px solid var(--rule); font-size: 0.9375rem; }
+.laurels li span:first-child { font: 500 0.6875rem/1.9 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.laurels li.win span:first-child { color: var(--copper); }
+.laurels li.win span:last-child { font-weight: 600; }
+@media (max-width: 520px) { .laurels li { grid-template-columns: minmax(0, 1fr); } }
 .slate { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 1rem 1.5rem; }
 .slate div { display: grid; gap: 0.2rem; }
 .slate dt { font: 500 0.6875rem/1.3 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
@@ -434,14 +435,13 @@ button:hover .play-badge svg { fill: var(--ink); }
           <span class="play-badge" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z"/></svg></span>
         </button>
         <div class="feature-body">
-          <p class="label">Short film · Award winner</p>
+          <p class="label">Short film · 13 festival honours</p>
           <h3>Desert Grave</h3>
           <p>When a life-changing event happens to a simple man, he is faced with a big challenge. Written, produced and directed by Samson Haveland. Shot on location in the Nevada desert.</p>
           <ul class="laurels" aria-label="Festival recognition">
-            <li class="win"><span>Winner, Best Shorts Competition</span><span>Award of Merit, Special Mention</span></li>
-            <li><span>Official Selection, LA Silver Screen Film Festival</span><span>2025</span></li>
-            <li><span>Official Selection, Area51 FilmFest</span><span>2026</span></li>
-            <li><span>Semi-Finalist, Berlin Shorts Award</span><span>Mar 2025</span></li>
+            <li class="win"><span>Award winner</span><span>Best Shorts Competition: Award of Merit, Special Mention</span></li>
+            <li><span>Semi-finalist</span><span>Berlin Shorts Award · Los Angeles Silver Screen Film Festival · ICEBERG Film Awards · Lonely Wolf (LWIFF) · Caçador de Filmes · Pražské filmové ceny IndieMania · Film Revolution · Moondust</span></li>
+            <li><span>Nominee</span><span>AREA51 FilmFest · DARK-LAND · Creator X Awards · YETI FilmFest</span></li>
           </ul>
           <dl class="slate">
             <div><dt>Written &amp; directed</dt><dd>Samson Haveland</dd></div>
