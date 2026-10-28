@@ -1,5 +1,5 @@
-// Inbox for inquiries. TODO: confirm the address before launch.
-const CONTACT_EMAIL = "hello@atomicfox.media";
+// Inbox for inquiries.
+const CONTACT_EMAIL = "Samson@filmlv.com";
 
 document.getElementById("year").textContent = new Date().getFullYear();
 
