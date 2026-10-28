@@ -55,6 +55,12 @@
         <span id="status" class="pill"></span>
       </div>
       <p id="issued" class="muted"></p>
+
+      <div class="hero card">
+        <div id="hero-main" class="hero-main"></div>
+        <div id="hero-stats" class="hero-stats"></div>
+      </div>
+
       <div id="ai-box" hidden>
         <button id="summary-btn" type="button" class="secondary">Plain-English summary</button>
         <div id="summary" class="card summary" hidden aria-live="polite"></div>
@@ -63,7 +69,24 @@
         <p id="override-text"></p>
         <button id="override-btn" type="button"></button>
       </div>
-      <ol id="days" class="days"></ol>
+      <section id="hourly" class="card panel-card" aria-label="Hourly forecast">
+        <h3>Next 48 hours</h3>
+        <ol id="hourly-list" class="hourly-list"></ol>
+      </section>
+
+      <section id="charts" class="card panel-card" aria-label="Temperature and rain chance charts">
+        <h3>Temperature &amp; rain, hour by hour</h3>
+        <div class="chart-wrap">
+          <div id="chart-area" class="chart-area"></div>
+          <div id="chart-tip" class="chart-tip" hidden></div>
+        </div>
+        <p class="muted small">Touch and drag across the chart for any hour. Shaded = night.</p>
+      </section>
+
+      <section class="card panel-card days-card">
+        <h3>7-day forecast</h3>
+        <ol id="days" class="days"></ol>
+      </section>
       <p class="muted small">Where the corrected models disagree, the day shows their range for the high — a wider range means less certainty. Rain chance comes from the ECMWF and GFS ensembles.</p>
 
       <details id="calibration" class="card">
@@ -79,6 +102,7 @@
       <p id="attribution" class="muted small"></p>
     </section>
   </main>
+  <script src="views.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

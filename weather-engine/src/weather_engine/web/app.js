@@ -64,24 +64,26 @@ function renderDays(days) {
     const left = tmin == null ? 0 : ((tmin - lo) / span) * 100;
     const width = tmin == null || tmax == null ? 0 : ((tmax - tmin) / span) * 100;
 
-    const rainAmt = d.precip && d.precip.value > 0 ? ` · ${d.precip.value}″` : "";
-    const rain = d.rain_prob == null ? "Rain —" : `Rain ${d.rain_prob}%${rainAmt}`;
+    const rain = d.precip && d.precip.value > 0 ? `${d.precip.value}″ rain` : "";
     const wind = d.wind ? `Wind ${d.wind.value} mph` : "Wind —";
     const gust = d.gust ? `gusts ${d.gust.value}` : "";
 
+    const cond = dayCondition(d);
     const row = el("div", { class: "day-row", role: "button", tabindex: "0", "aria-expanded": "false" },
       el("div", { class: "when" }, name, el("small", {}, date)),
+      el("div", { class: "day-cond" }, icon(cond.icon, 34, cond.text),
+        el("span", { class: (d.rain_prob ?? 0) >= 20 ? "drop" : "drop dim" }, d.rain_prob == null ? "" : `${d.rain_prob}%`)),
       el("div", { class: "temps" },
         el("span", { class: "lo", title: `Low, model range ${fmtRange(d.tmin, "°")}` }, tmin == null ? "—" : `${tmin}°`),
         el("div", { class: "bar", "aria-hidden": "true" }, el("span", { style: `left:${left}%;width:${Math.max(width, 2)}%` })),
         el("span", { class: "hi", title: `High, model range ${fmtRange(d.tmax, "°")}` }, tmax == null ? "—" : `${tmax}°`),
       ),
       el("div", { class: "details" },
-        el("span", { class: d.rain_prob >= 30 ? "rain" : "" }, rain),
+        rain ? el("span", { class: d.rain_prob >= 30 ? "rain" : "" }, rain) : null,
         el("span", {}, [wind, gust].filter(Boolean).join(", ")),
         d.tmax && d.tmax.low !== d.tmax.high ? el("span", { class: "range" }, `high ${fmtRange(d.tmax, "°")}`) : null,
       ),
-      d.hours || d.detail ? el("span", { class: "chev" }, "Hour by hour ▾") : null,
+      d.hours || d.detail ? el("span", { class: "chev", "aria-hidden": "true" }, "▾") : null,
     );
     const li = el("li", { class: "day" }, row);
     if (d.hours || d.detail) {
@@ -91,7 +93,7 @@ function renderDays(days) {
       const toggle = () => {
         panel.hidden = !panel.hidden;
         row.setAttribute("aria-expanded", String(!panel.hidden));
-        row.querySelector(".chev").textContent = panel.hidden ? "Hour by hour ▾" : "Hide hours ▴";
+        li.classList.toggle("open", !panel.hidden);
       };
       row.addEventListener("click", toggle);
       row.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
@@ -220,6 +222,10 @@ function render(data) {
     : "";
   $("#issued").textContent = `Updated ${issued.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}${where}`;
   renderOverride(data);
+  show("result");  // charts measure their container, so it must be visible first
+  renderHero(data);
+  renderStrip(data);
+  renderCharts(data);
   renderDays(data.days);
   renderCalibration(data.calibration);
   $("#notes").replaceChildren(...data.notes.map((n) => el("li", {}, n)));

@@ -63,6 +63,7 @@ def test_stations_api(server):
 @pytest.mark.parametrize("path,ctype", [
     ("/", "text/html"),
     ("/app.js", "text/javascript"),
+    ("/views.js", "text/javascript"),
     ("/style.css", "text/css"),
     ("/manifest.webmanifest", "application/manifest+json"),
     ("/icon-180.png", "image/png"),
