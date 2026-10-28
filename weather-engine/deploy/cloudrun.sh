@@ -14,6 +14,12 @@ set -euo pipefail
 PROJECT_ID="${1:-}"
 REGION="${REGION:-us-central1}"   # us-central1, us-east1, us-west1 are Always Free storage regions
 SERVICE="weather-engine"
+# Optional paid speed-ups (defaults keep it within the free tier):
+#   MIN_INSTANCES=1  keep one copy always running: no startup wait, billed around the clock
+#   CPU=2 MEMORY=2Gi faster number crunching; billed only while a request is running
+MIN_INSTANCES="${MIN_INSTANCES:-0}"
+CPU="${CPU:-1}"
+MEMORY="${MEMORY:-1Gi}"
 SA_NAME="weather-engine"
 
 if [[ -z "$PROJECT_ID" ]]; then
@@ -115,9 +121,9 @@ gcloud run deploy "$SERVICE" \
   --service-account "$SA_EMAIL" \
   --allow-unauthenticated \
   --execution-environment gen2 \
-  --cpu 1 --memory 1Gi \
+  --cpu "$CPU" --memory "$MEMORY" \
   --cpu-boost \
-  --min-instances 0 --max-instances 1 \
+  --min-instances "$MIN_INSTANCES" --max-instances 1 \
   --concurrency 4 \
   --timeout 300 \
   --set-secrets "$SECRET_ARG" \
