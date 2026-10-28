@@ -1,6 +1,6 @@
 // Caches only the app shell so it opens instantly from the home screen.
 // Forecasts are always fetched fresh — never served from cache.
-const CACHE = "weather-engine-shell-v2";
+const CACHE = "weather-engine-shell-v3";
 const SHELL = ["./", "index.html", "style.css", "views.js", "app.js", "manifest.webmanifest", "icon.svg"];
 
 self.addEventListener("install", (e) => {

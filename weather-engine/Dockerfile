@@ -4,10 +4,9 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    # Archive, forecast log and calibration live on the mounted Cloud Storage bucket;
-    # the short-lived download cache stays on fast local disk.
-    WEATHER_ENGINE_DATA=/data \
-    WEATHER_ENGINE_CACHE=/tmp/weather-cache
+    # Archive, forecast log, calibration and the download cache all live on the mounted
+    # Cloud Storage bucket, so a cold start doesn't re-download 60 days of history.
+    WEATHER_ENGINE_DATA=/data
 
 WORKDIR /app
 COPY pyproject.toml README.md ./

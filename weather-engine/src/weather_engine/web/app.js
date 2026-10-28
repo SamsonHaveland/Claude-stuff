@@ -282,19 +282,57 @@ $("#login-form").addEventListener("submit", async (e) => {
 let inFlight = null;
 let lastParams = {};
 
+// The last forecast for each place is kept on this device and shown instantly
+// while a fresh one loads.
+const SAVED_KEY = "weather-engine:saved";
+const SAVED_MAX = 5;
+
+function savedKey(params) {
+  const { refresh, ...rest } = params;
+  return JSON.stringify(Object.keys(rest).sort().map((k) => [k, String(rest[k]).toLowerCase()]));
+}
+function loadSaved(params) {
+  return storageGet(SAVED_KEY, {})[savedKey(params)] || null;
+}
+function storeSaved(params, data) {
+  const all = storageGet(SAVED_KEY, {});
+  all[savedKey(params)] = data;
+  const keys = Object.keys(all);
+  for (const k of keys.slice(0, Math.max(0, keys.length - SAVED_MAX))) delete all[k];
+  storageSet(SAVED_KEY, all);
+}
+function setUpdating(text) {
+  const badge = $("#updating");
+  badge.textContent = text || "";
+  badge.hidden = !text;
+}
+
 async function forecast(params) {
   inFlight?.abort();
   const ctrl = new AbortController();
   inFlight = ctrl;
   const timer = setTimeout(() => ctrl.abort("timeout"), TIMEOUT_MS);
-  show("loading");
+  const saved = params.refresh ? null : loadSaved(params);
+  if (saved) {
+    lastParams = params;
+    render(saved);
+    setUpdating("Updating…");
+  } else if (!params.refresh || $("#result").hidden) {
+    show("loading");
+  } else {
+    setUpdating("Updating…");
+  }
   $("#search button").disabled = true;
   try {
     const res = await apiFetch("api/forecast?" + new URLSearchParams(params), { signal: ctrl.signal });
     const data = await res.json().catch(() => ({ error: `Server error (${res.status})` }));
     if (!res.ok) throw new Error(data.error || `Server error (${res.status})`);
+    const { refresh, ...clean } = params;
+    params = clean;
     lastParams = params;
     render(data);
+    setUpdating("");
+    storeSaved(params, data);
     if (params.place) remember(params.place);
     const url = new URL(location.href);
     url.search = new URLSearchParams(params);
@@ -302,6 +340,10 @@ async function forecast(params) {
   } catch (err) {
     if (ctrl.signal.aborted && ctrl.signal.reason !== "timeout") return; // superseded by a newer search
     if (err.loginRequired) { showLogin(() => forecast(params)); return; }
+    if (!$("#result").hidden && lastData) {  // keep showing what we have
+      setUpdating("Couldn't update; showing the last forecast");
+      return;
+    }
     const msg = ctrl.signal.reason === "timeout"
       ? "That took too long. The weather services may be slow; please try again."
       : err instanceof TypeError
@@ -316,6 +358,8 @@ async function forecast(params) {
 }
 
 // --- wiring -----------------------------------------------------------------
+
+$("#refresh").addEventListener("click", () => forecast({ ...lastParams, refresh: 1 }));
 
 $("#search").addEventListener("submit", (e) => {
   e.preventDefault();

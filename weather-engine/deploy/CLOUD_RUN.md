@@ -114,9 +114,22 @@ Allowances are Google's published free tier and can change; the $1 budget
 alert is your safety net. The app is limited to **one instance at a time**,
 so it can't scale up and run up a bill.
 
-The first open after a quiet spell takes a few extra seconds while it starts.
-A new place's first forecast can take 20–60 seconds while it finds stations
-and downloads their history.
+Speed:
+- **Reopening a place:** instant. Your phone shows the last forecast
+  straight away and quietly updates it, and the server reuses a forecast for 20
+  minutes (tap **Refresh** to force a new one).
+- **First open after a quiet spell:** a few extra seconds while Google starts
+  the app (startup CPU boost is on to shorten this).
+- **A brand-new place:** the slowest case, because it searches stations and
+  downloads their history. Downloads run in parallel, and history is kept in
+  the bucket so later visits skip it.
+
+To see where time goes: **Cloud Run → weather-engine → Logs**. Each forecast
+logs a line like `forecast 'Primm, Nevada': 6.2s (models 1.1, calibration 4.8, ...)`.
+
+Keeping one copy always running (`--min-instances 1`) would remove the startup
+wait, but it is billed continuously and would no longer be free. Not
+recommended.
 
 ## Where things are stored
 

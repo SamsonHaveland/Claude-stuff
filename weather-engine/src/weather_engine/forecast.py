@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
@@ -39,14 +41,18 @@ class ForecastResult:
     end_hours: dict[str, int] = field(default_factory=dict)  # group -> hour its daily readings end
     hourly: pd.DataFrame | None = None  # calibrated hour-by-hour detail (see detail.py)
     sun: pd.DataFrame | None = None  # index date: sunrise, sunset
+    timings: dict[str, float] = field(default_factory=dict)  # seconds per phase (logged by the server)
 
 
 def _fetch_raw(loc: Location, models: list[str], notes: list[str]) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """(daily long table, per-model hourly detail, sunrise/sunset)."""
     frames, hourly, sun = [], [], None
-    for model in models:
+    # All models are requested at once; results are then processed in the configured order.
+    with ThreadPoolExecutor(max_workers=len(models)) as pool:
+        futures = [(m, pool.submit(openmeteo.fetch_forecast, loc, m)) for m in models]
+    for model, future in futures:
         try:
-            daily, meta = openmeteo.fetch_forecast(loc, model)
+            daily, meta = future.result()
         except Exception as e:  # one model failing shouldn't sink the forecast
             notes.append(f"{model}: unavailable ({e})")
             continue
@@ -70,17 +76,20 @@ def _fetch_raw(loc: Location, models: list[str], notes: list[str]) -> tuple[pd.D
 def _train(loc: Location, models: list[str], today, notes: list[str]) -> tuple[pd.DataFrame | None, stations.Selection]:
     past_days = TRAIN_WINDOW_DAYS + MAX_LEAD
     start, end = today - timedelta(days=past_days), today - timedelta(days=1)
-    sel = stations.select(loc, start, end, forced=loc.station)
+    # Station search/history and the models' past runs are independent: fetch them together.
+    with ThreadPoolExecutor(max_workers=len(models) + 1) as pool:
+        sel_future = pool.submit(stations.select, loc, start, end, loc.station)
+        run_futures = [(m, pool.submit(store.cached_frame, f"pastruns2_{loc.slug}_{m}_{today}", 6,
+                                       lambda m=m: openmeteo.fetch_previous_runs(loc, m, past_days)))
+                       for m in models]
+    sel = sel_future.result()
     notes.extend(sel.notes)
     if sel.obs is None:
         return None, sel
     runs = []
-    for model in models:
+    for model, future in run_futures:
         try:
-            runs.append(store.cached_frame(
-                f"pastruns2_{loc.slug}_{model}_{today}", 6,
-                lambda m=model: openmeteo.fetch_previous_runs(loc, m, past_days),
-            ))
+            runs.append(future.result())
         except Exception as e:
             notes.append(f"{model}: no past runs for calibration ({e})")
     if not runs:
@@ -107,9 +116,11 @@ def _train(loc: Location, models: list[str], today, notes: list[str]) -> tuple[p
 def _rain_prob(loc: Location, notes: list[str]) -> tuple[pd.DataFrame, pd.DataFrame]:
     """(daily rain probability, hourly ensemble member counts summed over ensembles)."""
     frames, hourly = [], []
-    for model in ENSEMBLE_MODELS:
+    with ThreadPoolExecutor(max_workers=len(ENSEMBLE_MODELS)) as pool:
+        futures = [(m, pool.submit(openmeteo.fetch_ensemble_precip, loc, m)) for m in ENSEMBLE_MODELS]
+    for model, future in futures:
         try:
-            daily, hours = openmeteo.fetch_ensemble_precip(loc, model)
+            daily, hours = future.result()
             frames.append(daily)
             hourly.append(hours)
         except Exception as e:
@@ -128,12 +139,20 @@ def _rain_prob(loc: Location, notes: list[str]) -> tuple[pd.DataFrame, pd.DataFr
 def run_forecast(loc: Location, models: list[str] = MODELS, use_calibration: bool = True) -> ForecastResult:
     notes: list[str] = []
     issued_at = datetime.now(timezone.utc)
+    timings: dict[str, float] = {}
+    t0 = time.perf_counter()
+    # Ensembles (rain chance) don't depend on anything else: start them now, collect at the end.
+    background = ThreadPoolExecutor(max_workers=1)
+    rain_future = background.submit(_rain_prob, loc, notes)
     raw, per_model_hourly, sun = _fetch_raw(loc, models, notes)
     today = raw.loc[raw["lead"] == 0, "date"].min()
+    timings["models"] = time.perf_counter() - t0
 
     station, stats, rejected, chosen, end_hours = None, None, False, {}, {}
     if use_calibration:
+        t = time.perf_counter()
         stats, sel = _train(loc, models, today, notes)
+        timings["calibration"] = time.perf_counter() - t
         chosen = sel.chosen if stats is not None else {}
         end_hours = sel.end_hours if stats is not None else {}
         station = chosen.get("temp") or next(iter(chosen.values()), None)
@@ -147,7 +166,10 @@ def run_forecast(loc: Location, models: list[str] = MODELS, use_calibration: boo
     if stats is not None:
         store.save_calibration(loc.name, stats)
     blended = calibrate.blend(calibrate.apply(raw, stats))
-    rain_daily, rain_hourly = _rain_prob(loc, notes)
+    t = time.perf_counter()
+    rain_daily, rain_hourly = rain_future.result()
+    background.shutdown()
+    timings["ensembles_wait"] = time.perf_counter() - t
     hourly = None
     if not per_model_hourly.empty:
         daily_cal = blended.pivot_table(index="date", columns="var", values="value")
@@ -155,6 +177,8 @@ def run_forecast(loc: Location, models: list[str] = MODELS, use_calibration: boo
     result = ForecastResult(loc, issued_at, blended, raw, rain_daily, stats, station, notes,
                             rejected, chosen, end_hours, hourly, sun)
     _log(result)
+    timings["total"] = time.perf_counter() - t0
+    result.timings = timings
     return result
 
 

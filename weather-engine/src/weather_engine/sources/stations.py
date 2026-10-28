@@ -18,6 +18,7 @@ the same 24 hours.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import date
 
@@ -37,6 +38,7 @@ from . import acis, observations, synoptic
 from .observations import Station
 
 MAX_CANDIDATES_PER_GROUP = 6
+PREFETCH_PER_GROUP = 2  # stations downloaded in parallel up front; more are tried one by one if needed
 OBS_COLUMNS = ["tmax", "tmin", "precip", "wind", "gust", "obs_hour_temp", "obs_hour_precip"]
 
 
@@ -57,9 +59,11 @@ def find_candidates(loc: Location) -> tuple[list[Station], list[str]]:
         searches.append(("Synoptic", lambda: synoptic.find_stations(loc, STATION_SEARCH_RADIUS_KM)))
     else:
         searches.append(("NWS", lambda: observations.nearest_stations(loc, n=10)))
-    for name, search in searches:
+    with ThreadPoolExecutor(max_workers=len(searches)) as pool:
+        futures = [(name, pool.submit(search)) for name, search in searches]
+    for name, future in futures:
         try:
-            found += search()
+            found += future.result()
         except Exception as e:
             notes.append(f"{name} station search failed ({e})")
     return sorted(found, key=lambda s: s.distance_km), notes
@@ -121,9 +125,25 @@ def select(loc: Location, start: date, end: date, forced: str | None = None) -> 
 
     frames: dict[str, pd.DataFrame] = {}  # station key -> daily obs (fetched once per station)
     errors: set[str] = set()
+
+    # Download the most likely stations for every variable at once.
+    def usable_for(group: str) -> list[Station]:
+        return [s for s in candidates if group in s.variables and (forced or not s.quality_warnings(loc))]
+
+    first_picks = {s.key: s for g in VAR_GROUPS for s in usable_for(g)[:PREFETCH_PER_GROUP]}
+    if first_picks:
+        with ThreadPoolExecutor(max_workers=min(len(first_picks), 6)) as pool:
+            futures = {k: pool.submit(fetch_daily, s, start, end, loc.timezone) for k, s in first_picks.items()}
+        for key, future in futures.items():
+            try:
+                frames[key] = future.result()
+            except Exception as e:
+                sel.notes.append(f"{first_picks[key].id}: data unavailable ({e})")
+                errors.add(key)
+                frames[key] = pd.DataFrame(columns=OBS_COLUMNS)
     obs = pd.DataFrame()
     for group, cols in VAR_GROUPS.items():
-        usable = [s for s in candidates if group in s.variables and (forced or not s.quality_warnings(loc))]
+        usable = usable_for(group)
         if not usable:
             sel.notes.append(f"no {GROUP_LABELS[group]} station within "
                              f"{observations.MAX_STATION_DISTANCE_KM:.0f} km and "

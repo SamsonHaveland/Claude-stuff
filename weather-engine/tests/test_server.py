@@ -94,3 +94,18 @@ def test_far_station_rejected_then_overridden(server):
 def test_bad_station_param(server):
     status, _, _ = get(server + "/api/forecast?place=Denver&station=../../x")
     assert status == 400
+
+
+def test_recent_forecasts_are_reused_until_refresh(server, monkeypatch):
+    from weather_engine import server as srv
+
+    monkeypatch.setattr(srv, "_recent", {})
+    calls = []
+    real = srv.run_forecast
+    monkeypatch.setattr(srv, "run_forecast", lambda *a, **k: calls.append(1) or real(*a, **k))
+    url = server + "/api/forecast?place=Denver,%20CO"
+    first = json.loads(get(url)[2])
+    second = json.loads(get(url.replace("Denver", "denver"))[2])  # same place, different case
+    assert len(calls) == 1 and first["issued_at"] == second["issued_at"]
+    get(url + "&refresh=1")
+    assert len(calls) == 2

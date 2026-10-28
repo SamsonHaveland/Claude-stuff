@@ -116,6 +116,7 @@ gcloud run deploy "$SERVICE" \
   --allow-unauthenticated \
   --execution-environment gen2 \
   --cpu 1 --memory 1Gi \
+  --cpu-boost \
   --min-instances 0 --max-instances 1 \
   --concurrency 4 \
   --timeout 300 \

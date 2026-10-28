@@ -12,6 +12,8 @@ import re
 import logging
 import mimetypes
 import socket
+import threading
+import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -50,9 +52,39 @@ def _location_from_query(q: dict[str, list[str]]):
     return loc
 
 
+# Recent forecasts are reused for a while: the models only update every few hours,
+# so recomputing on every view just adds waiting. "refresh=1" forces a new one.
+FORECAST_TTL_S = 20 * 60
+_recent: dict[tuple, tuple[float, dict]] = {}
+_recent_lock = threading.Lock()
+
+
+def _cache_key(q: dict[str, list[str]]) -> tuple:
+    get = lambda k: q.get(k, [""])[0].strip().lower()  # noqa: E731
+    lat, lon = get("lat"), get("lon")
+    if lat and lon:
+        lat, lon = f"{float(lat):.3f}", f"{float(lon):.3f}"
+    return (get("place"), lat, lon, get("station"), get("raw"))
+
+
 def api_forecast(q: dict[str, list[str]]) -> dict:
+    key = _cache_key(q)
+    if q.get("refresh", ["0"])[0] != "1":
+        with _recent_lock:
+            hit = _recent.get(key)
+        if hit and time.time() - hit[0] < FORECAST_TTL_S:
+            return hit[1]
     loc = _location_from_query(q)
-    return report.to_dict(run_forecast(loc, use_calibration=q.get("raw", ["0"])[0] != "1"))
+    result = run_forecast(loc, use_calibration=q.get("raw", ["0"])[0] != "1")
+    t = result.timings
+    print(f"forecast {loc.name!r}: {t.get('total', 0):.1f}s (" +
+          ", ".join(f"{k} {v:.1f}" for k, v in t.items() if k != "total") + ")", flush=True)
+    payload = report.to_dict(result)
+    with _recent_lock:
+        _recent[key] = (time.time(), payload)
+        for old in [k for k, (ts, _) in _recent.items() if time.time() - ts > FORECAST_TTL_S]:
+            del _recent[old]
+    return payload
 
 
 def api_stations(q: dict[str, list[str]]) -> dict:

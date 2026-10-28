@@ -280,3 +280,9 @@ input[type=password] {
   .days-card .details { grid-column: 4; padding-right: 22px; }
 }
 @media (prefers-reduced-motion: reduce) { .days-card .day-row .chev { transition: none; } }
+
+/* --- updated line --- */
+.issued-row { margin: 4px 0 12px; font-size: .9rem; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.issued-row #issued { margin: 0; }
+.updating { font-size: .8rem; font-weight: 600; color: var(--accent); }
+.issued-row .link { padding: 0; font-size: .85rem; }
