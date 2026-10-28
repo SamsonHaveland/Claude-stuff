@@ -7,17 +7,18 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from . import calibrate, detail, store
+from . import calibrate, detail, history, nowcast, regime, store, terrain
 from .config import (
     BASELINE_MODEL,
     ENSEMBLE_MODELS,
     FULL_HISTORY_DAYS,
+    HISTORY_DAYS,
     MAX_LEAD,
     MODELS,
-    TRAIN_WINDOW_DAYS,
     VAR_GROUPS,
     Location,
 )
@@ -42,6 +43,10 @@ class ForecastResult:
     hourly: pd.DataFrame | None = None  # calibrated hour-by-hour detail (see detail.py)
     sun: pd.DataFrame | None = None  # index date: sunrise, sunset
     timings: dict[str, float] = field(default_factory=dict)  # seconds per phase (logged by the server)
+    pattern: regime.RegimeModel | None = None  # weather-pattern corrections, if history supports them
+    patterns: pd.DataFrame | None = None  # per date: the day's pattern and what it changed (see _patterns)
+    nowcast: list[dict] = field(default_factory=list)  # latest station readings used to nudge the next hours
+    terrain: pd.DataFrame | None = None  # elevation around the place (terrain.py)
 
 
 def _fetch_raw(loc: Location, models: list[str], notes: list[str]) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -73,44 +78,101 @@ def _fetch_raw(loc: Location, models: list[str], notes: list[str]) -> tuple[pd.D
     return pd.concat(frames, ignore_index=True), (pd.concat(hourly, ignore_index=True) if hourly else pd.DataFrame()), sun
 
 
-def _train(loc: Location, models: list[str], today, notes: list[str]) -> tuple[pd.DataFrame | None, stations.Selection]:
-    past_days = TRAIN_WINDOW_DAYS + MAX_LEAD
+@dataclass
+class Training:
+    stats: pd.DataFrame | None
+    sel: stations.Selection
+    pattern: regime.RegimeModel | None = None
+    p_means: dict[str, float] = field(default_factory=dict)
+
+
+@dataclass
+class TrainingData:
+    sel: stations.Selection
+    pairs: pd.DataFrame  # date, lead, model, var, fcst, obs
+    feats: pd.DataFrame  # daily pattern features per (date, lead, model), see regime.py
+    p_means: dict[str, float] = field(default_factory=dict)
+
+
+def training_data(loc: Location, models: list[str], today, notes: list[str],
+                  backfill_chunks: int = 1) -> TrainingData:
+    """Past model runs matched with station observations at this place (plus each day's pattern)."""
+    past_days = HISTORY_DAYS + MAX_LEAD
     start, end = today - timedelta(days=past_days), today - timedelta(days=1)
+    empty = pd.DataFrame()
     # Station search/history and the models' past runs are independent: fetch them together.
     with ThreadPoolExecutor(max_workers=len(models) + 1) as pool:
         sel_future = pool.submit(stations.select, loc, start, end, loc.station)
-        run_futures = [(m, pool.submit(store.cached_frame, f"pastruns2_{loc.slug}_{m}_{today}", 6,
-                                       lambda m=m: openmeteo.fetch_previous_runs(loc, m, past_days)))
-                       for m in models]
+        run_futures = [(m, pool.submit(history.update, loc, m, start, end, backfill_chunks)) for m in models]
     sel = sel_future.result()
     notes.extend(sel.notes)
-    if sel.obs is None:
-        return None, sel
-    runs = []
     for model, future in run_futures:
         try:
-            runs.append(future.result())
-        except Exception as e:
-            notes.append(f"{model}: no past runs for calibration ({e})")
-    if not runs:
-        return None, sel
-    hourly = pd.concat(runs, ignore_index=True)
-    # Compare each variable over exactly the 24 hours its station's daily reading covers.
-    frames = []
-    windows = {h: openmeteo.aggregate_windows(hourly, h) for h in set(sel.end_hours.values())}
-    for group, end_hour in sel.end_hours.items():
-        daily = windows[end_hour]
-        frames.append(daily[daily["var"].isin(VAR_GROUPS[group])])
+            future.result()
+        except Exception as e:  # older archived runs (if any) are still used below
+            notes.append(f"{model}: couldn't update past runs ({e})")
+    if sel.obs is None:
+        return TrainingData(sel, empty, empty)
+    # Daily values per model over exactly the 24 hours each station's daily reading covers.
+    hours = set(sel.end_hours.values())
+    with ThreadPoolExecutor(max_workers=min(len(models), 4)) as pool:
+        daily_futures = [pool.submit(history.daily, loc, m, start, end, hours) for m in models]
+    frames, feat_frames = [], []
+    for future in daily_futures:
+        windows, f = future.result()
+        feat_frames.append(f)
+        for group, end_hour in sel.end_hours.items():
+            d = windows[end_hour]
+            frames.append(d[d["var"].isin(VAR_GROUPS[group])])
+    frames = [f for f in frames if not f.empty]
+    if not frames:
+        return TrainingData(sel, empty, empty)
+    feats = pd.concat(feat_frames, ignore_index=True)
+    p_means = feats.groupby("model")["pressure"].mean().dropna().to_dict() if not feats.empty else {}
     pairs = calibrate.build_pairs(pd.concat(frames, ignore_index=True), sel.obs[[
         c for g in sel.end_hours for c in VAR_GROUPS[g]]])
-    if pairs.empty:
+    return TrainingData(sel, pairs, feats, p_means)
+
+
+@dataclass
+class Training:
+    stats: pd.DataFrame | None
+    sel: stations.Selection
+    pattern: regime.RegimeModel | None = None
+    p_means: dict[str, float] = field(default_factory=dict)
+
+
+_pattern_memo: dict[tuple, regime.RegimeModel | None] = {}
+
+
+def _fit_pattern(loc: Location, td: TrainingData, end) -> regime.RegimeModel | None:
+    """regime.fit, reused while the training data is unchanged (it changes about once a day)."""
+    p = td.pairs
+    key = (loc.slug, end, len(p), round(float(p["fcst"].sum()), 3), round(float(p["obs"].sum()), 3), len(td.feats))
+    if key not in _pattern_memo:
+        if len(_pattern_memo) > 20:
+            _pattern_memo.clear()
+        _pattern_memo[key] = regime.fit(p, td.feats, as_of=end)
+    return _pattern_memo[key]
+
+
+def _train(loc: Location, models: list[str], today, notes: list[str]) -> Training:
+    td = training_data(loc, models, today, notes)
+    if td.sel.obs is None:
+        return Training(None, td.sel)
+    if td.pairs.empty:
         notes.append("no overlapping forecast/observation history; using uncalibrated blend")
-        return None, sel
-    days = int(pairs["date"].nunique())
+        return Training(None, td.sel)
+    end = today - timedelta(days=1)
+    days = int(td.pairs["date"].nunique())
     if days < FULL_HISTORY_DAYS:
         notes.append(f"calibrated on only {days} days of station history so far, so corrections are "
                      f"scaled down; checking this place at least weekly builds up the history")
-    return calibrate.fit(pairs, as_of=end), sel
+    pattern = _fit_pattern(loc, td, end)
+    if pattern is None and days < regime.MIN_DAYS:
+        notes.append(f"weather-pattern corrections start once {regime.MIN_DAYS} days of history are "
+                     f"stored ({days} so far; older history is filled in a little on each forecast)")
+    return Training(calibrate.fit(td.pairs, as_of=end), td.sel, pattern, td.p_means)
 
 
 def _rain_prob(loc: Location, notes: list[str]) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -142,16 +204,19 @@ def run_forecast(loc: Location, models: list[str] = MODELS, use_calibration: boo
     timings: dict[str, float] = {}
     t0 = time.perf_counter()
     # Ensembles (rain chance) don't depend on anything else: start them now, collect at the end.
-    background = ThreadPoolExecutor(max_workers=1)
+    background = ThreadPoolExecutor(max_workers=3)
     rain_future = background.submit(_rain_prob, loc, notes)
+    terrain_future = background.submit(terrain.fetch, loc)
     raw, per_model_hourly, sun = _fetch_raw(loc, models, notes)
     today = raw.loc[raw["lead"] == 0, "date"].min()
     timings["models"] = time.perf_counter() - t0
 
     station, stats, rejected, chosen, end_hours = None, None, False, {}, {}
+    pattern, p_means = None, {}
     if use_calibration:
         t = time.perf_counter()
-        stats, sel = _train(loc, models, today, notes)
+        tr = _train(loc, models, today, notes)
+        stats, sel, pattern, p_means = tr.stats, tr.sel, tr.pattern, tr.p_means
         timings["calibration"] = time.perf_counter() - t
         chosen = sel.chosen if stats is not None else {}
         end_hours = sel.end_hours if stats is not None else {}
@@ -163,23 +228,79 @@ def run_forecast(loc: Location, models: list[str] = MODELS, use_calibration: boo
                          f"model blend (to use {sel.nearest.id} anyway: `--station {sel.nearest.id}`, "
                          f"or the button in the web app)")
 
+    # Latest readings at the chosen stations (fetched while the blend is computed).
+    live = {g: chosen[g] for g in ("temp", "wind") if g in chosen}
+    latest_future = background.submit(_latest, live, loc.timezone) if live and loc.timezone else None
     if stats is not None:
         store.save_calibration(loc.name, stats)
-    blended = calibrate.blend(calibrate.apply(raw, stats))
+    if pattern is not None:
+        store.save_pattern_tests(loc.name, pattern.cv)
+    feats = regime.features_from_forecast(per_model_hourly, today)
+    plain = calibrate.blend(calibrate.apply(raw, stats))
+    if pattern is not None and stats is not None:
+        corrected = calibrate.apply(raw, stats, pattern, feats)
+        blended = calibrate.blend(corrected)
+    else:
+        corrected, blended = None, plain
+    try:
+        ground = terrain_future.result()
+    except Exception as e:
+        ground = None
+        log.info("terrain unavailable: %s", e)
+    patterns = _patterns(feats, p_means, plain, blended, corrected, ground)
     t = time.perf_counter()
     rain_daily, rain_hourly = rain_future.result()
-    background.shutdown()
     timings["ensembles_wait"] = time.perf_counter() - t
     hourly = None
     if not per_model_hourly.empty:
         daily_cal = blended.pivot_table(index="date", columns="var", values="value")
         hourly = detail.calibrate_hourly(detail.blend_hourly(per_model_hourly), daily_cal, rain_hourly)
+    nowcast_used = []
+    if latest_future is not None:
+        latest = latest_future.result()
+        if hourly is not None and latest:
+            now = issued_at.astimezone(ZoneInfo(loc.timezone)).replace(tzinfo=None)
+            hourly, nowcast_used = nowcast.apply(hourly, latest, now)
+    background.shutdown()
     result = ForecastResult(loc, issued_at, blended, raw, rain_daily, stats, station, notes,
-                            rejected, chosen, end_hours, hourly, sun)
+                            rejected, chosen, end_hours, hourly, sun, pattern=pattern, patterns=patterns,
+                            nowcast=nowcast_used, terrain=ground)
     _log(result)
     timings["total"] = time.perf_counter() - t0
     result.timings = timings
     return result
+
+
+def _latest(stations_by_var: dict[str, observations.Station], tz: str) -> dict[str, nowcast.Latest]:
+    """{"temp": Latest, "wind": Latest}; a station without live data is simply left out."""
+    out, seen = {}, {}
+    for var, st in stations_by_var.items():
+        try:
+            if st.key not in seen:
+                seen[st.key] = nowcast.fetch_latest(st, tz)
+            if seen[st.key] is not None:
+                out[var] = seen[st.key]
+        except Exception as e:  # live readings are a bonus; never fail the forecast over them
+            log.info("latest reading for %s unavailable: %s", st.id, e)
+    return out
+
+
+def _patterns(feats: pd.DataFrame, p_means: dict[str, float], plain: pd.DataFrame, blended: pd.DataFrame,
+              corrected: pd.DataFrame | None, ground: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Per date: the weather pattern in words, and how much the pattern correction moved each variable."""
+    days = regime.day_patterns(feats, p_means)
+    if days.empty:
+        return days
+    days["summary"] = days.apply(regime.describe, axis=1)
+    windy = (days["wind_agree"] >= 0.5) & (days["wind_speed"] >= regime.CALM_MPH)
+    days["upwind"] = [terrain.describe_upwind(ground, d) if ok else "" for d, ok in zip(days["wind_dir"], windy)]
+    if corrected is not None:
+        shift = (blended.set_index(["date", "var"])["value"] - plain.set_index(["date", "var"])["value"]).unstack()
+        for var in shift.columns:
+            days[f"shift_{var}"] = shift[var].reindex(days.index)
+        n = corrected.groupby("date")["pattern_n"].median()
+        days["similar_days"] = n.reindex(days.index)
+    return days
 
 
 def _log(result: ForecastResult) -> None:

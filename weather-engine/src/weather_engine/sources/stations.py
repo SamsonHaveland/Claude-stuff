@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 
 import pandas as pd
 
@@ -38,6 +38,7 @@ from . import acis, observations, synoptic
 from .observations import Station
 
 MAX_CANDIDATES_PER_GROUP = 6
+RECHECK_DAYS = 5  # recent days are re-downloaded: stations report late or correct values
 PREFETCH_PER_GROUP = 2  # stations downloaded in parallel up front; more are tried one by one if needed
 OBS_COLUMNS = ["tmax", "tmin", "precip", "wind", "gust", "obs_hour_temp", "obs_hour_precip"]
 
@@ -69,26 +70,44 @@ def find_candidates(loc: Location) -> tuple[list[Station], list[str]]:
     return sorted(found, key=lambda s: s.distance_km), notes
 
 
-def fetch_daily(station: Station, start: date, end: date, tz: str) -> pd.DataFrame:
-    def fetch() -> pd.DataFrame:
-        if station.source == "synoptic":
-            df = synoptic.fetch_daily(station.id, start, end, tz, station.variables)
-        elif station.source == "acis":
-            df = acis.fetch_daily(station.ref or station.id, start, end)
-        else:
-            df = observations.fetch_daily(station.id, start, end, tz)
-        for col in OBS_COLUMNS:
-            if col not in df:
-                df[col] = 24.0 if col.startswith("obs_hour") else float("nan")
-        return df[OBS_COLUMNS].reset_index()
+def _download(station: Station, start: date, end: date, tz: str) -> pd.DataFrame:
+    if station.source == "synoptic":
+        df = synoptic.fetch_daily(station.id, start, end, tz, station.variables)
+    elif station.source == "acis":
+        df = acis.fetch_daily(station.ref or station.id, start, end)
+    else:
+        df = observations.fetch_daily(station.id, start, end, tz)
+    for col in OBS_COLUMNS:
+        if col not in df:
+            df[col] = 24.0 if col.startswith("obs_hour") else float("nan")
+    return df[OBS_COLUMNS].reset_index()
 
-    fresh = store.cached_frame(
-        f"obs6_{station.source}_{station.ref or station.id}_{''.join(sorted(station.variables))}_{start}_{end}",
-        6, fetch,
-    ).set_index("date")
+
+def _spans(archived: pd.DataFrame | None, station: Station, start: date, end: date) -> list[tuple[date, date]]:
+    """What still has to be downloaded: the last few days (late reports) plus any older days never fetched."""
+    if archived is None or archived.empty:
+        if station.source == "synoptic":  # same request length as before the year-long history
+            return [(max(start, end - timedelta(days=66)), end)]
+        return [(start, end)]
+    first, last = min(archived.index), max(archived.index)
+    spans = [(max(start, last - timedelta(days=RECHECK_DAYS)), end)]
+    # Free Synoptic accounts only serve ~7 days, so asking for older days is pointless there.
+    if first > start + timedelta(days=7) and station.source != "synoptic":
+        spans.append((start, first - timedelta(days=1)))
+    return [(a, b) for a, b in spans if a <= b]
+
+
+def fetch_daily(station: Station, start: date, end: date, tz: str) -> pd.DataFrame:
+    """Daily observations start..end, from the permanent archive plus whatever it's missing."""
+    name = f"{station.source}_{station.ref or station.id}"
+    archived = store.read_archive(name)
+    fresh = []
+    for a, b in _spans(archived, station, start, end):
+        key = f"obs7_{station.source}_{station.ref or station.id}_{''.join(sorted(station.variables))}_{a}_{b}"
+        fresh.append(store.cached_frame(key, 6, lambda a=a, b=b: _download(station, a, b, tz)).set_index("date"))
     # Keep every day ever downloaded, so history builds up even when the source
     # only serves recent days (Synoptic free accounts: ~7 days).
-    archive = store.merge_archive(f"{station.source}_{station.ref or station.id}", fresh)
+    archive = store.merge_archive(name, pd.concat(fresh)) if fresh else archived
     index = pd.Index([d for d in archive.index if start <= d <= end], name="date")
     return archive.reindex(index)
 

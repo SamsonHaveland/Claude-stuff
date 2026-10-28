@@ -69,6 +69,9 @@ weather-engine forecast "Asheville, NC" --html      # also writes reports/<place
 # See which weather station will be used to check the forecast, and whether it's a good match
 weather-engine stations "Denver, CO"
 
+# Measure how much each correction helps at a place, on past days it never saw
+weather-engine backtest "Denver, CO"
+
 # Score past forecasts against what actually happened (run after a few days of forecasts)
 weather-engine verify
 ```
@@ -132,6 +135,29 @@ Each run fetches the latest published forecasts, so run it whenever you want
 an update. The models refresh every 6 hours, so running it more often than
 that won't change much. Calibration data is cached for 6 hours under
 `data/cache/`.
+
+### What makes it more accurate than one model
+
+1. **Many models, weighted by local skill:** five global physics models, NOAA's
+   NBM and HRRR (US), and two AI models (ECMWF AIFS, NOAA AIGFS). Each model's
+   weight comes from how well it has done *at this place*.
+2. **Local bias correction:** each model's typical error against the nearest
+   good station is removed, per variable and per day ahead.
+3. **Weather-pattern corrections:** once ~90 days of history is stored, errors
+   are also learned per pattern (wind direction, high/low pressure, rising or
+   falling pressure, season), but only for variables where this proved better
+   on held-out weeks. Tap a day in the app to see its pattern and what lies upwind.
+4. **Live reading:** the latest reading at the station nudges the next ~12 hours.
+
+### Backfill and backtest
+
+```
+weather-engine backfill "Primm, NV"     # download a year of past model runs (a few minutes, once)
+weather-engine backtest "Primm, NV"     # replay the last 60 days: error of raw ECMWF vs each correction step
+```
+
+The backtest corrects each past forecast using only what was known when it
+was issued, so its numbers are an honest estimate of real accuracy at that place.
 
 ### Accuracy check
 

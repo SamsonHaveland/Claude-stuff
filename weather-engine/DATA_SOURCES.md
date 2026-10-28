@@ -1,15 +1,16 @@
 # Data Sources
 
-Status as of 2026-10-27. Licensing terms change, so re-check them before any
+Status as of 2026-10-28. Licensing terms change, so re-check them before any
 commercial use.
 
 ## Model forecasts (inputs)
 
 | Source | What | Coverage | Update cadence | Access | Licence / cost |
 |---|---|---|---|---|---|
-| **Open-Meteo Forecast API** | ECMWF IFS, GFS, ICON, others, plus "best match" blend | Global | Each model run | JSON HTTP API | Free for non-commercial use (<10k calls/day); paid plan for commercial; CC BY 4.0 attribution |
+| **Open-Meteo Forecast API** | Used by the engine: ECMWF IFS, GFS, ICON, GEM, UKMO (global); NOAA NBM (2.5 km, NOAA's own calibrated blend) and HRRR (3 km, ~2 days) for the US; AI models ECMWF AIFS and NOAA AIGFS | Global / US | Each model run | JSON HTTP API | Free for non-commercial use (600/min, 5,000/hour, 10,000/day; heavy requests count as several calls); paid plan for commercial; CC BY 4.0 attribution |
+| **Open-Meteo Elevation API** | Ground height on rings around a place (terrain wording) | Global | Static | JSON HTTP API | As above; fetched once per place |
 | **Open-Meteo Ensemble API** | Ensemble members (ECMWF ENS, GFS ensemble, ICON-EPS) | Global | Each run | JSON HTTP API | As above |
-| **Open-Meteo Previous Runs / Historical Forecast APIs** | Past forecasts as originally issued | Global | — | JSON HTTP API | As above. **This is the source for training data on day one.** |
+| **Open-Meteo Previous Runs / Historical Forecast APIs** | Past forecasts as originally issued (leads 1–7 days; most models archived from January 2024) | Global | — | JSON HTTP API | As above. **This is the source for training data on day one.** The engine keeps its own permanent copy per place (up to a year) so it only downloads new days. |
 | ECMWF Open Data (direct) | IFS + ENS, AIFS, 0.25° GRIB2 | Global | 4 runs/day | HTTPS / GRIB2 | Real-time catalogue CC BY 4.0 since 1 Oct 2025; free subset, charges for high-volume/custom delivery |
 | NOAA GFS / GEFS (NOMADS, AWS Open Data) | GFS deterministic + ensemble | Global | 4 runs/day | GRIB2 | Public domain |
 | NOAA NBM / HRRR | Blended US guidance / high-res short range | US only | Hourly | GRIB2 | Public domain; optional for US locations |
@@ -17,6 +18,13 @@ commercial use.
 **Plan:** use Open-Meteo for everything at first, because it removes all GRIB
 handling. Keep an ingestion interface so we can switch to direct ECMWF/NOAA
 feeds if usage becomes commercial or call limits bind.
+
+## Live readings (next-hours correction)
+
+| Source | What | Access | Licence / cost |
+|---|---|---|---|
+| NWS API `stations/{id}/observations/latest` | Latest airport (ASOS/AWOS) reading | JSON, no key (User-Agent required) | Public domain |
+| Synoptic `stations/timeseries?recent=120` | Latest reading at any network station | JSON, free token | Free tier, attribution |
 
 ## Observations (ground truth for training + verification)
 

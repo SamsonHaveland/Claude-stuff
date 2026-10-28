@@ -34,7 +34,14 @@ USER_AGENT = os.environ.get(
 )
 
 # Deterministic models blended by the engine (Open-Meteo model ids).
-MODELS = ["ecmwf_ifs025", "gfs_seamless", "icon_seamless", "gem_seamless"]
+# Global physics models, NOAA's US-only ones (NBM: NOAA's own calibrated blend, 2.5 km;
+# HRRR: 3 km, first ~2 days only), and two AI models (ECMWF AIFS, NOAA AIGFS).
+# Models a place isn't covered by are skipped with a note; each model's weight
+# in the blend is learned from how well it has done at that place.
+MODELS = [
+    "ecmwf_ifs025", "gfs_seamless", "icon_seamless", "gem_seamless", "ukmo_seamless",
+    "ncep_nbm_conus", "ncep_hrrr_conus", "ecmwf_aifs025_single", "ncep_aigfs025",
+]
 # Ensembles used for rain probability.
 ENSEMBLE_MODELS = ["ecmwf_ifs025", "gfs025"]
 # Model reported alongside the blend as the baseline to beat.
@@ -49,7 +56,8 @@ GROUP_LABELS = {"temp": "temperature", "wind": "wind", "precip": "rain"}
 
 FORECAST_DAYS = 8  # today + 7
 MAX_LEAD = 7
-TRAIN_WINDOW_DAYS = 60
+TRAIN_WINDOW_DAYS = 60  # recent window for the overall bias of each model
+HISTORY_DAYS = 365  # how far back past runs are archived, for weather-pattern corrections (regime.py)
 MIN_TRAIN_SAMPLES = 5  # fewer days -> corrections are shrunk, see calibrate.fit
 FULL_HISTORY_DAYS = 20  # below this, the forecast notes that history is still building
 RAIN_THRESHOLD_IN = 0.01

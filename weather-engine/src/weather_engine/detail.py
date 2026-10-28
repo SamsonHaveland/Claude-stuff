@@ -87,7 +87,8 @@ def blend_hourly(per_model: pd.DataFrame) -> pd.DataFrame:
     numeric = ["temp", "feels", "humidity", "cloud", "precip", "snow", "cape", "wind", "gust"]
     out = g[numeric].mean()
     out["wind_dir"] = g.apply(lambda h: _vector_mean_dir(h["wind"], h["wind_dir"]), include_groups=False)
-    kinds = per_model.assign(kind=per_model["code"].map(precip_kind))
+    coded = per_model[per_model["code"].notna()]  # not every model provides a weather code
+    kinds = coded.assign(kind=coded["code"].map(precip_kind))
     out["kind"] = kinds.groupby("time")["kind"].apply(_vote)
     return out.reset_index()
 

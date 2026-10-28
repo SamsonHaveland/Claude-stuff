@@ -94,6 +94,7 @@ Rules:
 - Temperatures are °F, rain is inches, wind and gusts are mph. "rain_prob" is a percent chance from ensemble forecasts.
 - When the low/high range for a day is wide, or the forecast is uncalibrated, say the forecast is less certain. Days 5-7 are inherently less certain than days 1-2.
 - Mention rain amounts only when a day's chance is 30% or more. Each day's "detail" gives rain timing windows, precipitation type, thunder risk, wind direction and gust peak time; use them when they matter for planning.
+- Each day's "pattern" describes the weather pattern the models forecast (wind direction, high or low pressure, rising or falling pressure) and what the wind crosses before arriving (mountains, lower ground, open water). When it explains notable weather (e.g. pressure falling fast ahead of a rain day, wind coming down off mountains on a warm, gusty day), say so in a few words. "shifts" means the engine adjusted that day using similar past days at this place; mention it only if it is large. Don't speculate beyond what the fields say.
 - No greeting, no headings, no bullet points."""
 
 
@@ -103,9 +104,12 @@ def _summary_payload(forecast: dict) -> str:
         "calibrated": forecast.get("calibrated"),
         "status": forecast.get("status"),
         "days": [
-            {k: d.get(k) for k in ("date", "lead", "tmax", "tmin", "precip", "rain_prob", "wind", "gust", "detail")}
+            {k: d.get(k) for k in ("date", "lead", "tmax", "tmin", "precip", "rain_prob", "wind", "gust", "detail",
+                                   "pattern")}
             for d in forecast.get("days", [])
         ],
+        "place_setting": (forecast.get("patterns") or {}).get("setting"),
+        "latest_readings": forecast.get("nowcast", []),
         "notes": forecast.get("notes", [])[:10],
     }
     return json.dumps(keep, default=str)
@@ -120,7 +124,7 @@ def summarize(forecast: dict) -> str:
 
 # --- analysis report ---------------------------------------------------------
 
-ANALYZE_SYSTEM = """You are a forecast-verification analyst reviewing a personal weather engine. The engine blends global models (ECMWF, GFS, ICON, GEM), bias-corrects each model per location against nearby station observations (rolling window, corrections shrunk when history is short), and logs every forecast. You receive tables the engine computed. Your report helps its owner decide what to change.
+ANALYZE_SYSTEM = """You are a forecast-verification analyst reviewing a personal weather engine. The engine blends physics models (ECMWF, GFS, ICON, GEM, UKMO; for the US also NOAA's NBM and the 3 km HRRR) and AI models (ECMWF AIFS, NOAA AIGFS), bias-corrects each model per location against nearby station observations (rolling window, corrections shrunk when history is short), optionally adds weather-pattern corrections (analog days with similar wind direction, pressure and season; switched on per variable only when blocked cross-validation shows a gain), and logs every forecast. You receive tables the engine computed. Your report helps its owner decide what to change.
 
 Rules for accuracy:
 - Quote numbers exactly as given in the tables. Do not compute new statistics beyond simple differences between two numbers that appear in the tables, and say when you do.
@@ -180,6 +184,12 @@ def build_context(scores: pd.DataFrame) -> str:
                    .round(3).reset_index())
         parts.append("## Latest calibration per location (averaged over lead days; bias = correction applied, "
                      "in variable units; ratio = rain multiplier; mae_* are in-sample)\n" + _csv(summary))
+
+    pattern = store.read_pattern_tests()
+    if not pattern.empty:
+        parts.append("## Weather-pattern correction tests per location (blocked cross-validation on held-out weeks; "
+                     "mae_plain = plain bias correction, mae_pattern = with pattern correction, k = inf means off)\n"
+                     + _csv(pattern.round(3)))
 
     coverage = store.archive_coverage()
     if not coverage.empty:

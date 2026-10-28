@@ -73,10 +73,15 @@ than the inputs change adds cost, not accuracy.
 | `weather_engine/sources/observations.py` | Nearest station + observation history |
 | `weather_engine/store.py` | CSV cache and forecast log |
 | `weather_engine/calibrate.py` | Bias correction and skill-weighted blending |
+| `weather_engine/history.py` | Permanent archive of each model's past runs per place (incremental downloads) |
+| `weather_engine/regime.py` | Weather-pattern (analog) corrections: wind direction, pressure, pressure change, season |
+| `weather_engine/nowcast.py` | Nudges the next ~12 hours toward the station's latest reading |
+| `weather_engine/terrain.py` | Ground around the place: what the wind crosses (mountains, lower ground, water) |
+| `weather_engine/backtest.py` | Replays past days without peeking to measure each correction step |
 | `weather_engine/verify.py` | Scoring and baseline comparisons |
 | `weather_engine/forecast.py` | End-to-end pipeline |
 | `weather_engine/report.py` | Terminal and HTML output |
-| `weather_engine/cli.py` | `forecast`, `stations`, `verify`, `serve` commands |
+| `weather_engine/cli.py` | `forecast`, `stations`, `verify`, `analyze`, `backfill`, `backtest`, `serve` commands |
 | `weather_engine/server.py` | JSON API + static web app |
 | `weather_engine/web/` | Web app (HTML/CSS/JS, PWA manifest, service worker) |
 
@@ -95,6 +100,33 @@ because a poorly matched station makes corrections worse, not better.
 | 1 | Per-model bias correction, equal-weight blend | Simple, robust |
 | 2 | EMOS (calibrated mean + spread), skill weights; censored/logistic model for rain | Proper probabilities |
 | 3 | Gradient boosting, pooled across locations/lead times | Only once there is enough data; per-location ML overfits |
+
+### Weather-pattern corrections (added 2026-10-28)
+
+A model's error at a place depends on the pattern: wind off a mountain range,
+storms arriving from the sea, a deep low passing. For each forecast day
+`regime.py` describes the pattern each model forecast (daily wind direction,
+sea-level pressure versus normal, 24-hour pressure change, day of year), finds
+past days where that model forecast a similar pattern, and measures how wrong
+the model was on them here (an analog method, Delle Monache et al. 2013). The
+pattern-specific error is blended with the plain 60-day bias by
+n_eff/(n_eff+k).
+
+Guardrails against overfitting: it needs 90+ days of history; k is chosen per
+variable by cross-validation that holds out whole weeks (errors on nearby days
+are correlated) and compares against what the plain correction would have
+done with only the 60 days before each held-out week; the pattern correction
+is used only if it cuts error by at least 2%. `weather-engine backtest`
+measures the true out-of-sample gain.
+
+The pressure *pattern 100 miles away* is not sampled separately: the models
+already simulate approaching highs and lows, and their effect shows up in the
+local wind direction, pressure level and pressure tendency used here. The
+terrain ring (25/80/160 km) is used to *describe* what the wind crosses.
+
+Not done yet (see reports/Weather forecast accuracy upgrades.md): pooling
+across similar locations, logistic calibration of rain chance, radar
+nowcasting, a machine-learning model trained across many stations.
 
 Models are pooled across lead times and seasons where possible. Rolling
 training windows let the engine adapt when an upstream model is upgraded.

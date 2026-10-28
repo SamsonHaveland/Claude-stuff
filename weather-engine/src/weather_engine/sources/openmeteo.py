@@ -96,7 +96,11 @@ HOURLY_DETAIL = {
     "wind_speed_10m": "wind",
     "wind_direction_10m": "wind_dir",
     "wind_gusts_10m": "gust",
+    "pressure_msl": "pressure",
 }
+
+# Extra past-run series that describe the weather pattern of each day (see regime.py).
+REGIME_HOURLY = ["wind_direction_10m", "pressure_msl"]
 
 
 def parse_hourly(payload: dict) -> pd.DataFrame:
@@ -145,6 +149,10 @@ def _hourly_name(base: str, lead: int) -> str:
     return base if lead == 0 else f"{base}_previous_day{lead}"
 
 
+def _past_run_vars() -> list[str]:
+    return sorted({v[1] for v in VARIABLES.values()} | set(REGIME_HOURLY))
+
+
 def parse_previous_runs_hourly(payload: dict, leads: range = range(1, MAX_LEAD + 1)) -> pd.DataFrame:
     """Hourly *_previous_dayN series -> long hourly table (time, lead, hvar, value).
 
@@ -154,7 +162,7 @@ def parse_previous_runs_hourly(payload: dict, leads: range = range(1, MAX_LEAD +
     hourly = payload["hourly"]
     times = pd.to_datetime(hourly["time"])
     frames = []
-    for hvar in sorted({v[1] for v in VARIABLES.values()}):
+    for hvar in _past_run_vars():
         for lead in leads:
             key = _hourly_name(hvar, lead)
             if key in hourly:
@@ -199,8 +207,45 @@ def parse_previous_runs(payload: dict, leads: range = range(1, MAX_LEAD + 1), mi
     return aggregate_windows(parse_previous_runs_hourly(payload, leads), 24, min_hours)
 
 
+def previous_runs_wide(payload: dict) -> pd.DataFrame:
+    """Previous-runs payload -> wide table (index time, one column per API series), for archiving."""
+    hourly = dict(payload["hourly"])
+    times = pd.to_datetime(hourly.pop("time"))
+    wide = pd.DataFrame({k: pd.to_numeric(pd.Series(v), errors="coerce").values for k, v in hourly.items()},
+                        index=pd.DatetimeIndex(times, name="time"))
+    return wide
+
+
+def wide_to_long(wide: pd.DataFrame) -> pd.DataFrame:
+    """Inverse of previous_runs_wide -> long hourly table (time, lead, hvar, value), like parse_previous_runs_hourly."""
+    frames = []
+    for hvar in _past_run_vars():
+        for lead in range(1, MAX_LEAD + 1):
+            key = _hourly_name(hvar, lead)
+            if key in wide:
+                frames.append(pd.DataFrame({"time": wide.index, "lead": lead, "hvar": hvar,
+                                            "value": wide[key].to_numpy(dtype=float)}))
+    if not frames:
+        return pd.DataFrame(columns=["time", "lead", "hvar", "value"])
+    return pd.concat(frames, ignore_index=True).dropna(subset=["value"])
+
+
+def fetch_previous_runs_range(loc: Location, model: str, start, end) -> pd.DataFrame:
+    """Past runs for local dates start..end (inclusive) as a wide table (see previous_runs_wide)."""
+    params = {
+        "latitude": loc.latitude,
+        "longitude": loc.longitude,
+        "hourly": ",".join(_hourly_name(h, lead) for h in _past_run_vars() for lead in range(1, MAX_LEAD + 1)),
+        "models": model,
+        "start_date": start.isoformat(),
+        "end_date": end.isoformat(),
+        **UNIT_PARAMS,
+    }
+    return previous_runs_wide(http.get_json(PREVIOUS_RUNS_URL, params))
+
+
 def fetch_previous_runs(loc: Location, model: str, past_days: int) -> pd.DataFrame:
-    hourly_vars = sorted({v[1] for v in VARIABLES.values()})
+    hourly_vars = _past_run_vars()
     params = {
         "latitude": loc.latitude,
         "longitude": loc.longitude,

@@ -138,9 +138,31 @@ function hoursTable(h) {
   ));
 }
 
+const SHIFT_LABEL = { tmax: "high", tmin: "low", wind: "wind", gust: "gusts", precip: "rain" };
+
+function shiftText(shifts) {
+  return Object.entries(shifts).map(([v, x]) => {
+    const sign = x > 0 ? "+" : "−";
+    const n = Math.abs(x);
+    const unit = v === "precip" ? "″" : v === "tmax" || v === "tmin" ? "°" : " mph";
+    return `${SHIFT_LABEL[v]} ${sign}${v === "precip" ? n.toFixed(2) : Math.round(n)}${unit}`;
+  }).join(", ");
+}
+
+function patternNote(p) {
+  if (!p || !(p.summary || p.upwind)) return null;
+  const text = [p.summary, p.upwind].filter(Boolean).join(", ");
+  const words = text[0].toUpperCase() + text.slice(1);
+  const adj = Object.keys(p.shifts || {}).length
+    ? ` Adjusted ${shiftText(p.shifts)} based on ~${p.similar_days} similar past days here.` : "";
+  return el("p", { class: "pattern small" }, el("strong", {}, "Pattern: "), words + "." + adj);
+}
+
 function dayPanel(d) {
   const panel = el("div", { class: "day-panel" });
   if (d.detail) panel.append(dayFacts(d.detail));
+  const note = patternNote(d.pattern);
+  if (note) panel.append(note);
   if (d.hours) {
     panel.append(hoursTable(d.hours));
     panel.append(el("p", { class: "muted small hours-note" },
@@ -159,6 +181,30 @@ function renderCalibration(rows) {
       el("td", {}, r.shift),
       el("td", {}, `${r.error_before} → ${r.error_after} ${r.unit}`),
     )));
+}
+
+function renderPatterns(data) {
+  const box = $("#patterns");
+  const p = data.patterns || {};
+  const items = [];
+  if (p.setting) items.push(`This place: ${p.setting}.`);
+  for (const n of data.nowcast || []) {
+    const unit = n.var === "temp" ? "°" : " mph";
+    items.push(`Right now at ${n.station} (${n.time.slice(11)}): ${n.var === "temp" ? "temperature" : "wind"} ` +
+      `${Math.round(n.observed)}${unit}, models had ${Math.round(n.model)}${unit}. The next hours are nudged toward ` +
+      `the reading, fading out over about 12 hours.`);
+  }
+  if (p.active?.length) {
+    items.push("Weather-pattern corrections are on for " + p.active.map((a) =>
+      `${a.label.toLowerCase()} (${a.gain_pct}% smaller error on held-out past days)`).join(", ") +
+      ". Each day's corrections depend on its wind direction, pressure pattern and season.");
+  } else if (p.tested) {
+    items.push("Weather-pattern corrections were tested here but didn't beat the plain correction yet, so they're off.");
+  } else if (data.calibrated) {
+    items.push("Weather-pattern corrections switch on once about 90 days of history is stored for this place.");
+  }
+  box.hidden = items.length === 0;
+  box.querySelector("ul").replaceChildren(...items.map((t) => el("li", {}, t)));
 }
 
 function renderOverride(data) {
@@ -227,6 +273,7 @@ function render(data) {
   renderStrip(data);
   renderCharts(data);
   renderDays(data.days);
+  renderPatterns(data);
   renderCalibration(data.calibration);
   $("#notes").replaceChildren(...data.notes.map((n) => el("li", {}, n)));
   $("#attribution").textContent = data.attribution;

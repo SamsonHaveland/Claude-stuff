@@ -19,6 +19,8 @@ PROCESSED_DIR = DATA_DIR / "processed"
 FORECAST_LOG = PROCESSED_DIR / "forecast_log.csv"
 ARCHIVE_DIR = PROCESSED_DIR / "obs_archive"
 CALIBRATION_LOG = PROCESSED_DIR / "calibration_latest.csv"
+PATTERN_LOG = PROCESSED_DIR / "pattern_tests_latest.csv"
+RUNS_DIR = PROCESSED_DIR / "runs_archive"  # models' past runs per place (see history.py)
 
 # The web server handles requests in parallel threads; serialise file writes.
 _write_lock = threading.Lock()
@@ -56,6 +58,16 @@ def read_log(path: Path | None = None) -> pd.DataFrame:
     return df
 
 
+def read_archive(name: str) -> pd.DataFrame | None:
+    """A station's archived daily observations (index date), or None."""
+    path = ARCHIVE_DIR / f"{name}.csv"
+    if not path.exists():
+        return None
+    df = pd.read_csv(path)
+    df["date"] = pd.to_datetime(df["date"]).dt.date
+    return df.set_index("date")
+
+
 def merge_archive(name: str, new: pd.DataFrame) -> pd.DataFrame:
     """Merge daily observations (index = date) into a permanent per-station archive.
 
@@ -89,6 +101,20 @@ def save_calibration(location: str, stats: pd.DataFrame) -> None:
         merged.to_csv(CALIBRATION_LOG, index=False)
 
 
+def save_pattern_tests(location: str, cv: pd.DataFrame) -> None:
+    """Latest weather-pattern cross-validation results per location (for `analyze`)."""
+    with _write_lock:
+        old = pd.read_csv(PATTERN_LOG) if PATTERN_LOG.exists() else pd.DataFrame()
+        if not old.empty:
+            old = old[old["location"] != location]
+        PATTERN_LOG.parent.mkdir(parents=True, exist_ok=True)
+        pd.concat([old, cv.assign(location=location)], ignore_index=True).to_csv(PATTERN_LOG, index=False)
+
+
+def read_pattern_tests() -> pd.DataFrame:
+    return pd.read_csv(PATTERN_LOG) if PATTERN_LOG.exists() else pd.DataFrame()
+
+
 def read_calibration() -> pd.DataFrame:
     return pd.read_csv(CALIBRATION_LOG) if CALIBRATION_LOG.exists() else pd.DataFrame()
 
@@ -105,3 +131,38 @@ def archive_coverage() -> pd.DataFrame:
             row[f"days_{col}"] = int(df[col].notna().sum()) if col in df else 0
         rows.append(row)
     return pd.DataFrame(rows)
+
+
+def read_runs(name: str) -> pd.DataFrame | None:
+    """Archived past runs (wide: index time, one column per API series), or None.
+
+    Stored as a compressed pandas pickle: several times faster to load than CSV.
+    These files are written only by this app into its own private storage; an
+    unreadable one (e.g. after a pandas upgrade) is treated as missing and rebuilt.
+    """
+    path = RUNS_DIR / f"{name}.pkl.gz"
+    if not path.exists():
+        return None
+    try:
+        return pd.read_pickle(path)
+    except Exception:
+        return None
+
+
+def runs_mtime(name: str) -> float | None:
+    path = RUNS_DIR / f"{name}.pkl.gz"
+    return path.stat().st_mtime if path.exists() else None
+
+
+def merge_runs(name: str, new: pd.DataFrame, keep_days: int, old: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Merge freshly downloaded past runs into the archive (new values win), dropping very old hours."""
+    path = RUNS_DIR / f"{name}.pkl.gz"
+    with _write_lock:
+        merged = new.combine_first(old) if old is not None else new.copy()
+        merged = merged[~merged.index.duplicated(keep="first")].sort_index()
+        merged = merged[merged.index >= merged.index.max() - pd.Timedelta(days=keep_days)].astype("float32")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(f"{name}.{threading.get_ident()}.tmp")
+        merged.to_pickle(tmp, compression={"method": "gzip", "compresslevel": 1})
+        os.replace(tmp, path)
+    return merged

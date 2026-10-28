@@ -1,4 +1,4 @@
-"""Command line: `weather-engine forecast|stations|check-station|verify|analyze|serve`."""
+"""Command line: `weather-engine forecast|stations|check-station|verify|analyze|backfill|backtest|serve`."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import argparse
 import logging
 import os
 import sys
+from datetime import date, timedelta
 from pathlib import Path
 
 from .config import DEFAULT_LOCATIONS, Location, resolve_location
@@ -62,8 +63,6 @@ def cmd_stations(args: argparse.Namespace) -> None:
 
 
 def cmd_check_station(args: argparse.Namespace) -> None:
-    from datetime import date, timedelta
-
     from .sources import synoptic
 
     end = date.today() - timedelta(days=1)
@@ -95,6 +94,64 @@ def cmd_analyze(args: argparse.Namespace) -> None:
         sys.exit(str(e))
     print(text)
     print(f"\nSaved to {path}")
+
+
+def _prepare(loc: Location) -> None:
+    """Fill in timezone/elevation (needed for station matching) from one quick model call."""
+    from .sources import openmeteo
+
+    meta = openmeteo.fetch_forecast(loc, "gfs_seamless", days=1)[1]
+    loc.timezone = loc.timezone or meta.get("timezone")
+    loc.elevation = loc.elevation if loc.elevation is not None else meta.get("elevation")
+
+
+def _backfill(loc: Location) -> None:
+    import time
+
+    from . import history, store
+    from .config import HISTORY_DAYS, MAX_LEAD, MODELS
+
+    end = date.today() - timedelta(days=1)
+    start = end - timedelta(days=HISTORY_DAYS + MAX_LEAD)
+    print(f"Filling in {HISTORY_DAYS} days of past model runs for {loc.name} "
+          f"(paced to stay inside Open-Meteo's free limits; a few minutes the first time)...")
+    for i, model in enumerate(MODELS):
+        try:
+            history.update(loc, model, start, end, backfill_chunks=10)
+            have = store.read_runs(history.archive_name(loc, model))
+            days = 0 if have is None else have.index.normalize().nunique()
+            print(f"  {model:<22} {days} days")
+        except Exception as e:
+            print(f"  {model:<22} unavailable ({e})")
+        if i < len(MODELS) - 1:
+            time.sleep(12)
+
+
+def cmd_backfill(args: argparse.Namespace) -> None:
+    loc = _resolve(args)
+    _prepare(loc)
+    _backfill(loc)
+
+
+def cmd_backtest(args: argparse.Namespace) -> None:
+    from . import backtest, report
+    from .config import MODELS
+    from .forecast import training_data
+
+    loc = _resolve(args)
+    _prepare(loc)
+    if not args.no_backfill:
+        _backfill(loc)
+    notes: list[str] = []
+    print("Matching past forecasts with station observations...")
+    td = training_data(loc, MODELS, date.today(), notes, backfill_chunks=0)
+    if td.pairs.empty:
+        sys.exit("No forecast/observation history to test with:\n  " + "\n  ".join(notes))
+    stations = ", ".join(f"{g}: {s.id}" for g, s in td.sel.chosen.items())
+    print(f"Stations: {stations}. History: {td.pairs['date'].nunique()} days.")
+    print(f"Replaying the last {args.days} days as if forecasting live (about a minute)...")
+    results = backtest.run(td.pairs, td.feats, date.today(), days=args.days)
+    print(report.backtest_to_text(backtest.summarize(results)))
 
 
 def cmd_serve(args: argparse.Namespace) -> None:
@@ -137,6 +194,17 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("analyze", help="Claude reviews verification, calibration and station data and recommends changes")
     p.add_argument("--show-data", action="store_true", help="print exactly what would be sent, without calling Claude")
     p.set_defaults(func=cmd_analyze)
+
+    p = sub.add_parser("backfill", help="download a year of past model runs for a place (speeds up and improves its forecasts)")
+    place_args(p)
+    p.set_defaults(func=cmd_backfill)
+
+    p = sub.add_parser("backtest", help="replay recent days to measure how much each correction helps at a place")
+    place_args(p)
+    p.add_argument("--station", help="test against this station")
+    p.add_argument("--days", type=int, default=60, help="how many recent days to replay (default 60)")
+    p.add_argument("--no-backfill", action="store_true", help="skip downloading older model runs first")
+    p.set_defaults(func=cmd_backtest)
 
     p = sub.add_parser("serve", help="run the web app (forecasts run only when you search)")
     p.add_argument("--host", default="127.0.0.1",

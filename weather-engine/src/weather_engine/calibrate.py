@@ -12,6 +12,7 @@ from datetime import date, timedelta
 import numpy as np
 import pandas as pd
 
+from . import regime
 from .config import MAX_LEAD, MIN_TRAIN_SAMPLES, TRAIN_WINDOW_DAYS
 
 KEYS = ["model", "lead", "var"]
@@ -73,8 +74,12 @@ def fit(
     return stats
 
 
-def apply(raw: pd.DataFrame, stats: pd.DataFrame | None) -> pd.DataFrame:
-    """Correct raw forecasts (date, lead, model, var, value) -> adds value_cal, mae_cal."""
+def apply(raw: pd.DataFrame, stats: pd.DataFrame | None, pattern=None, feats: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Correct raw forecasts (date, lead, model, var, value) -> adds value_cal, mae_cal.
+
+    With a fitted regime.RegimeModel (`pattern`) and the forecast's daily pattern
+    features, each model's correction also depends on the day's weather pattern.
+    """
     df = raw.copy()
     df["stats_lead"] = df["lead"].clip(1, MAX_LEAD)
     if stats is None or stats.empty:
@@ -82,6 +87,8 @@ def apply(raw: pd.DataFrame, stats: pd.DataFrame | None) -> pd.DataFrame:
         return df.drop(columns="stats_lead")
     s = stats.rename(columns={"lead": "stats_lead"})[["model", "stats_lead", "var", "bias", "ratio", "mae_cal"]]
     df = df.merge(s, on=["model", "stats_lead", "var"], how="left")
+    if pattern is not None and feats is not None:
+        df = regime.adjust(pattern, df, feats)
     df["value_cal"] = df["value"] * df["ratio"].fillna(1.0) - df["bias"].fillna(0.0)
     df.loc[df["var"] == "precip", "value_cal"] = df["value_cal"].clip(lower=0)
     return df.drop(columns=["stats_lead", "bias", "ratio"])
@@ -91,6 +98,10 @@ def blend(corrected: pd.DataFrame) -> pd.DataFrame:
     """Skill-weighted mean across models per (date, lead, var), with model range."""
     rows = []
     for (d, lead, var), g in corrected.dropna(subset=["value_cal"]).groupby(["date", "lead", "var"]):
+        if g["mae_cal"].notna().sum() >= 2:
+            # Models with a local track record outvote ones without (e.g. a model whose
+            # history couldn't be downloaded): an unknown bias shouldn't dilute known-good ones.
+            g = g[g["mae_cal"].notna()]
         w = 1.0 / g["mae_cal"].clip(lower=0.1) ** 2
         w = w.fillna(w.mean() if w.notna().any() else 1.0)
         rows.append({

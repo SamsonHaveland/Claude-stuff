@@ -89,7 +89,12 @@
         <h3>7-day forecast</h3>
         <ol id="days" class="days"></ol>
       </section>
-      <p class="muted small">Where the corrected models disagree, the day shows their range for the high — a wider range means less certainty. Rain chance comes from the ECMWF and GFS ensembles.</p>
+      <p class="muted small">Where the corrected models disagree, the day shows their range for the high — a wider range means less certainty. Rain chance comes from the ECMWF and GFS ensembles. Tap a day for its hours and weather pattern.</p>
+
+      <details id="patterns" class="card" open>
+        <summary>Weather pattern &amp; live readings</summary>
+        <ul class="plain-list"></ul>
+      </details>
 
       <details id="calibration" class="card">
         <summary>How much calibration helped here</summary>

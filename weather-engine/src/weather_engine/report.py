@@ -111,6 +111,79 @@ def calibration_summary(result: ForecastResult) -> list[str]:
     return lines
 
 
+def pattern_rows(result: ForecastResult) -> dict:
+    """Per date: the weather pattern in words, what lies upwind, and what the pattern correction changed."""
+    p = result.patterns
+    if p is None or p.empty:
+        return {}
+    out = {}
+    for d, row in p.iterrows():
+        shifts = {}
+        for var in VARIABLES:
+            v = row.get(f"shift_{var}")
+            if v is not None and pd.notna(v) and abs(v) >= (0.005 if var == "precip" else 0.3):
+                shifts[var] = round(float(v), 2 if var == "precip" else 1)
+        n = row.get("similar_days")
+        out[d] = {"summary": row["summary"], "upwind": row.get("upwind") or "",
+                  "shifts": shifts, "similar_days": None if n is None or pd.isna(n) else int(round(n))}
+    return out
+
+
+def pattern_status(result: ForecastResult) -> dict:
+    """Which variables get weather-pattern corrections here, and how much they helped in testing."""
+    from . import terrain
+
+    pm = result.pattern
+    info = {"setting": terrain.setting(result.terrain), "active": [], "tested": False}
+    if pm is not None and not pm.cv.empty:
+        info["tested"] = True
+        for r in pm.cv.itertuples():
+            if pm.active(r.var):
+                info["active"].append({"var": r.var, "label": LABELS.get(r.var, r.var),
+                                       "gain_pct": round(100 * r.gain), "days": int(r.days)})
+    return info
+
+
+def _shift_text(shifts: dict) -> str:
+    parts = []
+    for var, v in shifts.items():
+        if var == "precip":
+            parts.append(f"rain {v:+.2f} in")
+        else:
+            parts.append(f"{LABELS[var].lower()} {v:+.0f}{'°' if var in ('tmax', 'tmin') else ' mph'}")
+    return ", ".join(parts)
+
+
+def pattern_summary(result: ForecastResult) -> list[str]:
+    rows, status = pattern_rows(result), pattern_status(result)
+    if not rows:
+        return []
+    lines = ["Weather pattern by day" + (f" (this place: {status['setting']})" if status["setting"] else "") + ":"]
+    for d, r in rows.items():
+        line = f"  {d:%a %b %d}: {r['summary'] or 'pattern unclear'}"
+        if r["upwind"]:
+            line += f", {r['upwind']}"
+        if r["shifts"]:
+            line += f" → adjusted {_shift_text(r['shifts'])} (from ~{r['similar_days']} similar past days here)"
+        lines.append(line)
+    if status["active"]:
+        lines.append("  Pattern corrections on for " + ", ".join(
+            f"{a['label'].lower()} ({a['gain_pct']}% smaller error in testing)" for a in status["active"]))
+    elif status["tested"]:
+        lines.append("  Pattern corrections tested here but didn't beat the plain correction yet, so they're off.")
+    return lines
+
+
+def nowcast_summary(result: ForecastResult) -> list[str]:
+    lines = []
+    for a in result.nowcast:
+        unit = "°F" if a["var"] == "temp" else " mph"
+        what = "temperature" if a["var"] == "temp" else "wind"
+        lines.append(f"Right now at {a['station']} ({a['time'][11:]}): {what} {a['observed']:g}{unit} vs models "
+                     f"{a['model']:g}{unit}; the next hours are nudged toward the reading, fading over ~12 h.")
+    return lines
+
+
 def to_text(result: ForecastResult) -> str:
     loc = result.location
     lines = [
@@ -133,9 +206,9 @@ def to_text(result: ForecastResult) -> str:
         lines += ["", "Details:"]
         for d, info in details.items():
             lines.append(f"  {d:%a %b %d}: {_detail_line(info)}")
-    summary = calibration_summary(result)
-    if summary:
-        lines += [""] + summary
+    for block in (pattern_summary(result), nowcast_summary(result), calibration_summary(result)):
+        if block:
+            lines += [""] + block
     if result.notes:
         lines += ["", "Notes:"] + [f"  - {n}" for n in result.notes]
     lines += ["", attribution(result)]
@@ -209,6 +282,28 @@ def scores_to_text(scores: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
+def backtest_to_text(summary: pd.DataFrame) -> str:
+    """Backtest table: error of each method per variable and lead band, plus the improvement."""
+    if summary.empty:
+        return "Not enough history to backtest yet."
+    names = {"ecmwf": "ECMWF raw", "mean": "All-model avg", "plain": "Bias-corrected", "pattern": "+ Pattern"}
+    lines = ["Mean absolute error on replayed days (lower is better):"]
+    order = [v for v in LABELS if v in set(summary["var"])]
+    for var in order:
+        g = summary[summary["var"] == var]
+        unit = UNITS.get(var, "")
+        lines.append(f"\n{LABELS.get(var, var)} ({unit})")
+        lines.append(f"  {'lead':<9}{'days':>5}" + "".join(f"{names[m]:>16}" for m in names) + f"{'vs ECMWF':>11}")
+        for _, r in g.iterrows():
+            gain = f"{(1 - r['pattern'] / r['ecmwf']) * 100:>+10.0f}%" if r["ecmwf"] > 1e-6 else f"{'—':>11}"
+            digits = 3 if var == "precip" else 1
+            lines.append(f"  {r['leads']:<9}{r['n']:>5}" + "".join(f"{r[m]:>16.{digits}f}" for m in names) + gain)
+    lines.append("\n'vs ECMWF' = how much smaller the engine's error is than the raw ECMWF model's.")
+    if (summary["pattern_days"] == 0).all():
+        lines.append("Pattern corrections weren't active yet (they need about 90 days of history at this place).")
+    return "\n".join(lines)
+
+
 def _detail(result: ForecastResult) -> tuple[dict, dict]:
     """(per-date day details, per-date hourly timeline) or empty dicts without hourly data."""
     if result.hourly is None or result.hourly.empty:
@@ -249,7 +344,9 @@ def to_dict(result: ForecastResult) -> dict:
     """JSON-ready forecast for the web app."""
     loc, stn = result.location, result.station
     details, hours = _detail(result)
-    days = [{**r, "date": r["date"].isoformat(), "detail": details.get(r["date"]), "hours": hours.get(r["date"])}
+    patterns = pattern_rows(result)
+    days = [{**r, "date": r["date"].isoformat(), "detail": details.get(r["date"]), "hours": hours.get(r["date"]),
+             "pattern": patterns.get(r["date"])}
             for r in _rows(result)]
     return {
         "location": {"name": loc.name, "latitude": loc.latitude, "longitude": loc.longitude,
@@ -268,6 +365,8 @@ def to_dict(result: ForecastResult) -> dict:
         "units": UNITS,
         "days": days,
         "calibration": calibration_rows(result),
+        "patterns": pattern_status(result),
+        "nowcast": result.nowcast,
         "notes": result.notes,
         "baseline_model": BASELINE_MODEL,
         "attribution": attribution(result),

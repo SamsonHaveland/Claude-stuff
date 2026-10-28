@@ -286,3 +286,7 @@ input[type=password] {
 .issued-row #issued { margin: 0; }
 .updating { font-size: .8rem; font-weight: 600; color: var(--accent); }
 .issued-row .link { padding: 0; font-size: .85rem; }
+
+.pattern { margin: 0 0 12px; line-height: 1.45; }
+.plain-list { margin: 8px 0 0; padding-left: 18px; }
+.plain-list li { margin: 4px 0; line-height: 1.45; }

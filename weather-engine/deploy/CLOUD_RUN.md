@@ -120,9 +120,11 @@ Speed:
   minutes (tap **Refresh** to force a new one).
 - **First open after a quiet spell:** a few extra seconds while Google starts
   the app (startup CPU boost is on to shorten this).
-- **A brand-new place:** the slowest case, because it searches stations and
-  downloads their history. Downloads run in parallel, and history is kept in
-  the bucket so later visits skip it.
+- **A brand-new place:** the slowest case (expect 15–40 seconds), because it
+  searches stations and downloads about 4 months of past runs from 9 models
+  plus a year of station history. Everything is kept in the bucket, so later
+  visits only fetch what's new, and each visit adds 2 more months of model
+  history (up to a year) for the weather-pattern corrections.
 
 To see where time goes: **Cloud Run → weather-engine → Logs**. Each forecast
 logs a line like `forecast 'Primm, Nevada': 6.2s (models 1.1, calibration 4.8, ...)`.

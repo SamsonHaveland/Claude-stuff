@@ -219,6 +219,10 @@ def fake_api(monkeypatch, tmp_path):
 
     monkeypatch.setattr(store, "CACHE_DIR", tmp_path / "cache")
     monkeypatch.setattr(store, "ARCHIVE_DIR", tmp_path / "archive")
+    monkeypatch.setattr(store, "RUNS_DIR", tmp_path / "runs")
+    monkeypatch.setattr(store, "PATTERN_LOG", tmp_path / "processed" / "pattern_tests_latest.csv")
+    from weather_engine import forecast
+    monkeypatch.setattr(forecast, "HISTORY_DAYS", 120)  # enough for pattern corrections, keeps tests quick
     monkeypatch.setattr(store, "CALIBRATION_LOG", tmp_path / "processed" / "calibration_latest.csv")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
@@ -238,12 +242,17 @@ def fake_api(monkeypatch, tmp_path):
                 assert "vars" not in params, "a variable filter hides rain gauges"
                 return {"SUMMARY": {"RESPONSE_CODE": 1}, "STATION": SYNOPTIC_STATIONS}
             if url.endswith("/timeseries"):
+                if "recent" in params:  # latest readings: the last two hours of the fake day
+                    return synoptic_timeseries(params["stid"], "202610270400", "202610270600")
                 return synoptic_timeseries(params["stid"], params["start"], params["end"])
             if url.endswith("/precipitation"):
                 return synoptic_precip(params["start"], params["end"])
         if "previous-runs" in url:
+            if "start_date" in params:
+                start, end = date.fromisoformat(params["start_date"]), date.fromisoformat(params["end_date"])
+                return previous_runs_payload(start, (end - start).days + 1, biases.get(params["models"], 0.5))
             past = params["past_days"]
-            return previous_runs_payload(TODAY - timedelta(days=past), past, biases[params["models"]])
+            return previous_runs_payload(TODAY - timedelta(days=past), past, biases.get(params["models"], 0.5))
         if "ensemble" in url:
             return ensemble_payload()
         if "geocoding" in url:
@@ -253,11 +262,19 @@ def fake_api(monkeypatch, tmp_path):
         if "weather.gov/points" in url:
             assert params == {}, "NWS rejects unknown query parameters"
             return {"properties": {"observationStations": "https://api.weather.gov/gridpoints/BOU/62,60/stations"}}
+        if "weather.gov/stations/" in url and url.endswith("/observations/latest"):
+            return {"properties": {"timestamp": "2026-10-27T18:00:00+00:00",
+                                   "temperature": {"unitCode": "wmoUnit:degC", "value": 20.0},
+                                   "windSpeed": {"unitCode": "wmoUnit:km_h-1", "value": 16.09344}}}
         if "weather.gov/gridpoints" in url:
             assert params == {}
             return NWS_STATIONS
+        if url.endswith("/v1/elevation"):  # a valley: 1609 m here, 2000 m peaks to the W, plains to the E
+            lons = [float(x) for x in params["longitude"].split(",")]
+            return {"elevation": [1609.0 if abs(x + 104.99) < 1e-6 else 2400.0 if x < -104.99 else 1300.0
+                                  for x in lons]}
         if "api.open-meteo.com" in url:
-            return daily_payload(warm_bias=biases[params["models"]])
+            return daily_payload(warm_bias=biases.get(params["models"], 0.5))
         raise AssertionError(f"unexpected URL {url}")
 
     def get_text(url, params=None):
