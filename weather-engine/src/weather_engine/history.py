@@ -144,8 +144,11 @@ def fill(loc: Location, models: list[str], start: date, end: date, budget_s: flo
             if not older:
                 continue
             a, b = older[0]
-            store.merge_runs(name, openmeteo.fetch_previous_runs_range(loc, model, a, b),
-                             keep_days=HISTORY_DAYS + 30, old=have)
+            try:
+                chunk = openmeteo.fetch_previous_runs_range(loc, model, a, b)
+            except Exception as e:  # e.g. the free daily limit: keep what's stored, try again later
+                return {**coverage(loc, models, start, end), "error": str(e)[:300]}
+            store.merge_runs(name, chunk, keep_days=HISTORY_DAYS + 30, old=have)
             progress = True
             time.sleep(pause_s)
     return coverage(loc, models, start, end)

@@ -244,6 +244,10 @@ async function buildHistory(params) {
       break;
     }
     if (line) line.textContent = historyText(h);
+    if (h.error) {  // e.g. Open-Meteo's free daily limit: try again on a later visit
+      if (line) line.textContent = historyText(h) + " Paused: the weather service is limiting requests; it continues next time.";
+      break;
+    }
   }
   if (historyKey === key) historyKey = null;
 }

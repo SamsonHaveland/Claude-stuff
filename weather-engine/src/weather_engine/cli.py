@@ -118,6 +118,9 @@ def _backfill(loc: Location) -> None:
     while True:
         h = history.fill(loc, MODELS, start, end, budget_s=60)
         print(f"  {h['stored_days']} of {h['target_days']} days stored")
+        if h.get("error"):
+            print(f"  stopped: {h['error']}\n  (what's stored is kept; run this again later to continue)")
+            break
         if h["complete"] or h["stored_days"] == last:  # done, or a model can't go further back
             break
         last = h["stored_days"]
