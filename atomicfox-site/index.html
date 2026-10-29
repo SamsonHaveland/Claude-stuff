@@ -1208,8 +1208,11 @@ a:hover .arrow, button:hover .arrow { transform: translateX(4px); }
         status.textContent = 'Thanks, your idea is on its way to Samson. You’ll hear back within one business day.';
         if (window.gtag) gtag('event', 'generate_lead', { project_type: payload.project_type });
       })
-      .catch(function () {
-        status.textContent = 'That didn’t send. Please email ' + EMAIL + ' or call 917-375-6736, and we’ll pick it up from there.';
+      .catch(function (err) {
+        if (window.console) console.warn('Inquiry not sent:', err && err.message);
+        status.textContent = /activat/i.test(err && err.message || '')
+          ? 'This form is waiting to be activated. Check ' + EMAIL + ' for the FormSubmit activation email, click Activate Form, then send again.'
+          : 'That didn’t send. Please email ' + EMAIL + ' or call 917-375-6736, and we’ll pick it up from there.';
       })
       .then(function () { button.disabled = false; });
   });
