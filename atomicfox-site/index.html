@@ -4,16 +4,21 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!--ARTIFACT-START-->
-<title>Atomic Fox Media | Las Vegas Production Company — Commercial, Branded Content &amp; Film</title>
+<title>Las Vegas Commercial &amp; Film Production | Atomic Fox Media</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <!--HEAD-ONLY-START-->
-<meta name="description" content="Atomic Fox Media is an open-door Las Vegas production company. Commercials, music videos, branded content, film and TV, made with 25 years of studio experience. Bring us any idea.">
+<meta name="description" content="Las Vegas production company for commercials, music videos, branded content and film. Silver Telly winner, 25 years of studio experience.">
 <link rel="canonical" href="https://atomicfoxmedia.com/">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://atomicfoxmedia.com/">
 <meta property="og:title" content="Atomic Fox Media | Bring us any idea">
 <meta property="og:description" content="Commercials, music videos, branded content, film and TV from Las Vegas, with 25 years of studio experience.">
-<meta property="og:image" content="https://atomicfoxmedia.com/assets/desert-grave-poster.jpg">
+<meta property="og:image" content="https://atomicfoxmedia.com/assets/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Atomic Fox Media, Las Vegas production company">
+<meta property="og:site_name" content="Atomic Fox Media">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#160f2e">
 <link rel="icon" href="assets/fox-mark-copper.png" type="image/png">
 <!-- Google tag (gtag.js): same IDs as the previous site -->
@@ -28,17 +33,40 @@
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": ["LocalBusiness", "ProfessionalService"],
-  "@id": "https://atomicfoxmedia.com/#organization",
-  "name": "Atomic Fox Media",
-  "description": "Las Vegas production company for commercials, music videos, branded content, film and TV.",
-  "url": "https://atomicfoxmedia.com",
-  "logo": "https://atomicfoxmedia.com/assets/logo-copper.png",
-  "telephone": "+1-917-375-6736",
-  "email": "samson@filmlv.com",
-  "address": { "@type": "PostalAddress", "addressLocality": "Las Vegas", "addressRegion": "NV", "addressCountry": "US" },
-  "areaServed": ["Las Vegas, NV", "Nevada", "United States"],
-  "serviceType": ["Commercial Production", "Music Video Production", "Branded Content Production", "Film Production", "Television Production"]
+  "@graph": [
+    {
+      "@type": ["LocalBusiness", "ProfessionalService"],
+      "@id": "https://atomicfoxmedia.com/#organization",
+      "name": "Atomic Fox Media",
+      "description": "Las Vegas production company for commercials, music videos, branded content, film and TV.",
+      "url": "https://atomicfoxmedia.com/",
+      "logo": "https://atomicfoxmedia.com/assets/logo-copper.png",
+      "image": "https://atomicfoxmedia.com/assets/og-image.jpg",
+      "telephone": "+1-917-375-6736",
+      "email": "samson@filmlv.com",
+      "address": { "@type": "PostalAddress", "addressLocality": "Las Vegas", "addressRegion": "NV", "addressCountry": "US" },
+      "areaServed": ["Las Vegas, NV", "Nevada", "United States"],
+      "serviceType": ["Commercial Production", "Music Video Production", "Branded Content Production", "Film Production", "Television Production", "Production Services"],
+      "award": ["Silver Telly Award, Local TV: Promotional, 45th Telly Awards (Anthem Injury Lawyers '24)", "Best Shorts Competition, Award of Merit: Desert Grave"],
+      "founder": { "@id": "https://atomicfoxmedia.com/#samson" },
+      "sameAs": ["https://filmlv.com"]
+    },
+    {
+      "@type": "Person",
+      "@id": "https://atomicfoxmedia.com/#samson",
+      "name": "Samson Haveland",
+      "jobTitle": "Producer and First Assistant Director",
+      "worksFor": { "@id": "https://atomicfoxmedia.com/#organization" },
+      "sameAs": ["https://www.imdb.com/name/nm0369732/"]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://atomicfoxmedia.com/#website",
+      "url": "https://atomicfoxmedia.com/",
+      "name": "Atomic Fox Media",
+      "publisher": { "@id": "https://atomicfoxmedia.com/#organization" }
+    }
+  ]
 }
 </script>
 <!--HEAD-ONLY-END-->
@@ -155,6 +183,8 @@ a:hover .arrow, button:hover .arrow { transform: translateX(4px); }
   radial-gradient(1px 1px at 8% 50%, #fff5, transparent), radial-gradient(1.5px 1.5px at 55% 8%, #fff6, transparent); }
 .hero .wrap { position: relative; display: grid; gap: 1.6rem; justify-items: center; text-align: center; }
 .hero .kicker { color: var(--gold); }
+.h1-kicker { display: block; margin-bottom: 1.6rem; letter-spacing: 0.12em; text-wrap: balance; }
+.nowrap { white-space: nowrap; }
 .hero h1 { font-size: var(--giant); line-height: 0.92; letter-spacing: -0.045em; }
 .rotator { display: block; position: relative; height: 1.12em; line-height: 1.12; overflow: hidden; }
 .rotator span { display: block; width: fit-content; max-width: 100%; margin-inline: auto; background: var(--sunset); -webkit-background-clip: text; background-clip: text; color: transparent; transition: transform 520ms var(--ios), opacity 300ms ease-out; }
@@ -438,8 +468,8 @@ a:hover .arrow, button:hover .arrow { transform: translateX(4px); }
       <g><ellipse cx="600" cy="400" rx="430" ry="95" transform="rotate(-62 600 400)"/></g>
     </svg>
     <div class="wrap">
-      <p class="kicker">Atomic Fox Media · Las Vegas</p>
       <h1 id="hero-title">
+        <span class="kicker h1-kicker">Atomic Fox Media · <span class="nowrap">Las Vegas</span> production company</span>
         We make
         <span class="rotator" id="rotator" aria-live="off">
           <span>commercials.</span>
