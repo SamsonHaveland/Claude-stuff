@@ -156,10 +156,10 @@ a:hover .arrow, button:hover .arrow { transform: translateX(4px); }
 .hero .wrap { position: relative; display: grid; gap: 1.6rem; justify-items: center; text-align: center; }
 .hero .kicker { color: var(--gold); }
 .hero h1 { font-size: var(--giant); line-height: 0.92; letter-spacing: -0.045em; }
-.rotator { display: block; position: relative; height: 1.02em; overflow: hidden; }
-.rotator span { display: block; transition: transform 600ms var(--ios), opacity 400ms; }
-.rotator span.out { transform: translateY(-105%); opacity: 0; }
-.rotator span.in { transform: translateY(105%); opacity: 0; }
+.rotator { display: block; position: relative; height: 1.12em; line-height: 1.12; overflow: hidden; }
+.rotator span { display: block; width: fit-content; max-width: 100%; margin-inline: auto; background: var(--sunset); -webkit-background-clip: text; background-clip: text; color: transparent; transition: transform 520ms var(--ios), opacity 300ms ease-out; }
+.rotator span.out { transform: translateY(-60%); opacity: 0; transition: transform 260ms ease-in, opacity 220ms ease-in; }
+.rotator span.in { transform: translateY(70%); opacity: 0; }
 .hero .lead { max-width: 40rem; color: rgb(255 228 200 / 0.86); }
 .hero .lead b { color: #fff; font-weight: 700; }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 0.9rem; justify-content: center; margin-top: 0.4rem; }
@@ -222,9 +222,10 @@ a:hover .arrow, button:hover .arrow { transform: translateX(4px); }
   position: fixed; left: 0; top: 0; z-index: 50; width: 92px; height: 92px; margin: -46px 0 0 -46px; border-radius: 50%;
   display: grid; place-items: center; pointer-events: none; background: var(--gold); color: var(--ink);
   font: 800 0.9375rem/1 var(--display); letter-spacing: 0.02em;
-  transform: translate3d(-200px, -200px, 0) scale(0); transition: scale 220ms var(--ios);
+  transform: translate3d(-200px, -200px, 0); scale: 0; opacity: 0; visibility: hidden;
+  transition: scale 220ms var(--ios), opacity 160ms, visibility 0s 220ms;
 }
-.cursor.show { scale: 1; }
+.cursor.show { scale: 1; opacity: 1; visibility: visible; transition: scale 220ms var(--ios), opacity 120ms, visibility 0s; }
 
 /* Pitch builder */
 .pitch { background: var(--gold); position: relative; overflow: hidden; }
@@ -424,7 +425,7 @@ a:hover .arrow, button:hover .arrow { transform: translateX(4px); }
       <p class="kicker">Atomic Fox Media · Las Vegas</p>
       <h1 id="hero-title">
         We make
-        <span class="rotator grad-text" id="rotator" aria-live="off">
+        <span class="rotator" id="rotator" aria-live="off">
           <span>commercials.</span>
         </span>
       </h1>
@@ -760,7 +761,7 @@ a:hover .arrow, button:hover .arrow { transform: translateX(4px); }
   </div>
 </footer>
 
-<div class="cursor" id="cursor" aria-hidden="true">Play</div>
+<div class="cursor" id="cursor" aria-hidden="true" hidden>Play</div>
 
 <dialog class="player" id="player" aria-label="Video player">
   <div class="player-frame" id="player-frame"></div>
@@ -788,20 +789,20 @@ a:hover .arrow, button:hover .arrow { transform: translateX(4px); }
     rot.firstElementChild.textContent = 'your idea.';
   } else {
     var i = 0;
+    // One word at a time: the current word lifts away, then the next rises in. They never overlap.
     setInterval(function () {
       if (document.hidden) return;
       var cur = rot.firstElementChild;
       i = (i + 1) % words.length;
-      var next = document.createElement('span');
-      next.textContent = words[i];
-      next.className = 'in';
-      next.style.position = 'absolute'; next.style.left = '0'; next.style.right = '0'; next.style.top = '0';
-      rot.appendChild(next);
-      requestAnimationFrame(function () { requestAnimationFrame(function () {
-        cur.className = 'out'; next.className = '';
-      }); });
-      setTimeout(function () { cur.remove(); next.style.position = ''; }, 650);
-    }, 2300);
+      cur.className = 'out';
+      setTimeout(function () {
+        var next = document.createElement('span');
+        next.textContent = words[i];
+        next.className = 'in';
+        rot.replaceChildren(next);
+        requestAnimationFrame(function () { requestAnimationFrame(function () { next.className = ''; }); });
+      }, 270);
+    }, 2400);
   }
 
   // In-page links: offset for the sticky header
@@ -825,6 +826,7 @@ a:hover .arrow, button:hover .arrow { transform: translateX(4px); }
     el.addEventListener('pointerleave', function () { cursor.classList.remove('show'); });
   }
   if (finePointer.matches) {
+    cursor.hidden = false;
     window.addEventListener('pointermove', function (e) { cursor.style.transform = 'translate3d(' + e.clientX + 'px,' + e.clientY + 'px,0)'; }, { passive: true });
     document.querySelectorAll('.video, .film-poster').forEach(bindCursor);
   }
