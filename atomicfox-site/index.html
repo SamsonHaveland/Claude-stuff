@@ -457,7 +457,7 @@ a:hover .arrow, button:hover .arrow { transform: translateX(4px); }
   </div>
 
   <!-- WORK. To add a video, copy one <button class="video"> block and change data-video
-       (YouTube ID or Google Drive file ID), data-source ("youtube" or "drive"), the thumbnail and the text.
+       (YouTube ID, Google Drive file ID, or Bunny Stream "LIBRARY_ID/VIDEO_ID"), data-source ("youtube", "drive" or "bunny"), the thumbnail and the text.
        Drive files must be shared as "Anyone with the link". -->
   <section class="section" id="work" aria-labelledby="work-title">
     <div class="wrap">
@@ -873,6 +873,8 @@ a:hover .arrow, button:hover .arrow { transform: translateX(4px); }
   var ext = document.getElementById('player-ext');
   var origin = null, anim = null;
   function sources(id, src) {
+    // Bunny Stream: data-video is "LIBRARY_ID/VIDEO_ID"
+    if (src === 'bunny') return { embed: 'https://iframe.mediadelivery.net/embed/' + id + '?autoplay=true&preload=true&responsive=true', page: 'https://iframe.mediadelivery.net/play/' + id, label: 'Open full screen ↗' };
     if (src === 'drive') return { embed: 'https://drive.google.com/file/d/' + id + '/preview', page: 'https://drive.google.com/file/d/' + id + '/view', label: 'Open in Google Drive ↗' };
     return { embed: 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&rel=0&modestbranding=1&playsinline=1', page: 'https://www.youtube.com/watch?v=' + id, label: 'Open on YouTube ↗' };
   }
