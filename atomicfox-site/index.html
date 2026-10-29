@@ -477,11 +477,11 @@ a:hover .arrow, button:hover .arrow { transform: translateX(4px); }
             <li>4× Nominee</li>
             <li><details><summary>See all 13 honours</summary><p>Award of Merit, Special Mention: Best Shorts Competition. Semi-finalist: Berlin Shorts Award, Los Angeles Silver Screen Film Festival, ICEBERG Film Awards, Lonely Wolf (LWIFF), Caçador de Filmes, Pražské filmové ceny IndieMania, Film Revolution, Moondust. Nominee: AREA51 FilmFest, DARK-LAND, Creator X Awards, YETI FilmFest.</p></details></li>
           </ul>
-          <button class="btn btn--sun" type="button" data-video="1tTpDSUj6QDJcGo0fLGLlguqOOMMwxZnK" data-source="drive" data-title="Desert Grave" data-origin="#film-poster">
+          <button class="btn btn--sun" type="button" data-video="793891/dc82e64b-effe-4567-88f0-cede46d008ea" data-source="bunny" data-title="Desert Grave" data-origin="#film-poster">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z"/></svg>Watch the film
           </button>
         </div>
-        <button class="film-poster" id="film-poster" type="button" data-video="1tTpDSUj6QDJcGo0fLGLlguqOOMMwxZnK" data-source="drive" data-title="Desert Grave" data-cursor="Watch" aria-label="Play Desert Grave">
+        <button class="film-poster" id="film-poster" type="button" data-video="793891/dc82e64b-effe-4567-88f0-cede46d008ea" data-source="bunny" data-title="Desert Grave" data-cursor="Watch" aria-label="Play Desert Grave">
           <img src="assets/desert-grave-poster.jpg" alt="Desert Grave poster: a man's silhouette over a desert grave, a dog at his side" width="664" height="924">
         </button>
       </article>
@@ -874,7 +874,7 @@ a:hover .arrow, button:hover .arrow { transform: translateX(4px); }
   var origin = null, anim = null;
   function sources(id, src) {
     // Bunny Stream: data-video is "LIBRARY_ID/VIDEO_ID"
-    if (src === 'bunny') return { embed: 'https://iframe.mediadelivery.net/embed/' + id + '?autoplay=true&preload=true&responsive=true', page: 'https://iframe.mediadelivery.net/play/' + id, label: 'Open full screen ↗' };
+    if (src === 'bunny') return { embed: 'https://player.mediadelivery.net/embed/' + id + '?autoplay=true&loop=false&muted=false&preload=true&responsive=true', page: 'https://player.mediadelivery.net/play/' + id, label: 'Open full screen ↗' };
     if (src === 'drive') return { embed: 'https://drive.google.com/file/d/' + id + '/preview', page: 'https://drive.google.com/file/d/' + id + '/view', label: 'Open in Google Drive ↗' };
     return { embed: 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&rel=0&modestbranding=1&playsinline=1', page: 'https://www.youtube.com/watch?v=' + id, label: 'Open on YouTube ↗' };
   }
