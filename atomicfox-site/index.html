@@ -7,7 +7,7 @@
 <title>Atomic Fox Media | Las Vegas Production Company — Commercial, Branded Content &amp; Film</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <!--HEAD-ONLY-START-->
-<meta name="description" content="Atomic Fox Media is an open, forward-thinking Las Vegas production company. Commercials, branded content, film and TV, produced with 25 years of industry experience.">
+<meta name="description" content="Atomic Fox Media is an open, forward-thinking Las Vegas production company. Commercials, branded content, film and TV, produced with 25 years of industry experience and 46 IMDb credits.">
 <link rel="canonical" href="https://atomicfoxmedia.com/">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://atomicfoxmedia.com/">
@@ -224,6 +224,16 @@ h1, h2, h3 { font-weight: 600; text-wrap: balance; }
 .studios { margin: clamp(2.5rem, 2rem + 2vw, 3.5rem) auto 0; text-align: center; color: var(--text-2); font-size: 1.0625rem; max-width: 46rem; display: grid; gap: 1.25rem; justify-items: center; }
 .studios b { color: var(--text); font-weight: 600; }
 
+.path { list-style: none; margin: clamp(3rem, 2rem + 3vw, 4.5rem) 0 0; padding: 0; display: grid; gap: 1rem; }
+@media (min-width: 720px) { .path { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1040px) { .path { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.75rem; } }
+.path li { background: var(--card); border-radius: var(--radius-sm); box-shadow: var(--shadow); padding: 1.25rem 1.2rem 1.4rem; display: grid; gap: 0.35rem; align-content: start; min-width: 0; }
+.path span { font-size: 0.875rem; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
+.path b { font-size: 1.0625rem; font-weight: 600; letter-spacing: -0.016em; line-height: 1.25; }
+.path small { color: var(--text-2); font-size: 0.875rem; line-height: 1.4; }
+.path li:last-child { background: var(--accent); color: #fff; }
+.path li:last-child span, .path li:last-child small { color: rgb(255 255 255 / 0.85); }
+
 /* What we make */
 .services { display: grid; gap: 1.25rem; }
 @media (min-width: 640px) { .services { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -263,6 +273,8 @@ h1, h2, h3 { font-weight: 600; text-wrap: balance; }
 .credit-cols h4 { margin: 0 0 0.6rem; font-size: 0.875rem; font-weight: 600; color: var(--text-2); }
 .credit-cols ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; font-size: 0.9375rem; }
 .credit-cols li span { color: var(--text-2); }
+.credit-cols h4.gap { margin-top: 1.5rem; }
+.credit-note { padding-bottom: 1.5rem; color: var(--text-2); font-size: 0.9375rem; }
 
 /* Contact */
 .contact { display: grid; gap: 1.25rem; }
@@ -449,16 +461,24 @@ h1, h2, h3 { font-weight: 600; text-wrap: balance; }
     <div class="wrap">
       <div class="statement">
         <p class="eyebrow">Experience</p>
-        <h2 id="experience-title">From Hollywood sets to Las Vegas campaigns.</h2>
-        <p>Samson Haveland has worked as First AD, producer and crew on studio features in the UK and US, network television, and hundreds of commercials.</p>
+        <h2 id="experience-title">From runner on Harry Potter to First AD and producer.</h2>
+        <p>Samson Haveland has spent 25 years learning every department of a production, from locations and set runs on studio features to running sets as First AD and producing.</p>
       </div>
       <div class="proof">
         <div><b>25</b><span>years in the industry</span></div>
+        <div><b>46</b><span>film and TV credits on IMDb</span></div>
         <div><b>100s</b><span>of commercials</span></div>
-        <div><b>40+</b><span>film and TV credits</span></div>
       </div>
+      <ol class="path" aria-label="Career path">
+        <li><span>2001</span><b>Locations</b><small>In Deep, Yes, Gladiatress, Edge of Tomorrow</small></li>
+        <li><span>2004</span><b>Runner &amp; set PA</b><small>Harry Potter, In Bruges, United 93, Mr. Bean's Holiday, Jason Bourne</small></li>
+        <li><span>2008</span><b>Third AD</b><small>This Is England '88, Pirate Radio, Tamara Drewe, Me and Orson Welles</small></li>
+        <li><span>2012</span><b>Unit management</b><small>Maleficent, Snow White and the Huntsman</small></li>
+        <li><span>2015</span><b>First AD &amp; associate director</b><small>The Sound, The Christmas Spark, Unsolved Mysteries, Avant Guard</small></li>
+        <li><span>Now</span><b>Producer</b><small>Co-producer, Vegas: A Love Story (in post-production)</small></li>
+      </ol>
       <div class="studios">
-        <p>Including <b>Edge of Tomorrow</b>, <b>Harry Potter</b>, <b>Maleficent</b>, <b>In Bruges</b>, <b>Jason Bourne</b>, <b>The Family Plan</b>, <b>Unsolved Mysteries</b> and campaigns for <b>MGM</b>, <b>Lexus</b>, <b>RAM</b>, <b>Gymshark</b>, <b>WHOOP</b>, <b>LVCVA</b> and the <b>Vegas Golden Knights</b>.</p>
+        <p>Commercial campaigns as 1st AD and producer for <b>MGM</b>, <b>Lexus</b>, <b>RAM</b>, <b>Gymshark</b>, <b>WHOOP</b>, <b>Cuervo × UFC</b>, <b>LVCVA</b>, <b>Allegiant Stadium</b> and the <b>Vegas Golden Knights</b>.</p>
         <div class="actions">
           <a class="more" href="https://www.imdb.com/name/nm0369732/" target="_blank" rel="noopener">See Samson on IMDb</a>
           <a class="more" href="#credits">Full credits list</a>
@@ -512,73 +532,87 @@ h1, h2, h3 { font-weight: 600; text-wrap: balance; }
           <summary>Samson Haveland's full credits</summary>
           <div class="credit-cols">
             <div>
-              <h4>United States: film &amp; TV</h4>
+              <h4>Producer</h4>
               <ul>
-                <li>Christmas at Engine No.9 <span>2025</span></li>
-                <li>Get Him Back for Christmas <span>Lifetime, 2024</span></li>
-                <li>Once Upon a Christmas Wish <span>Lifetime, 2024</span></li>
-                <li>The Sound <span>2023</span></li>
-                <li>The Family Plan <span>Apple TV+, 2023</span></li>
+                <li>Vegas: A Love Story <span>co-producer, in post-production</span></li>
+                <li>Hot Water <span>associate producer, 2021</span></li>
+              </ul>
+              <h4 class="gap">First AD &amp; associate director</h4>
+              <ul>
+                <li>Avant Guard <span>2026</span></li>
+                <li>The Christmas Spark <span>2025</span></li>
+                <li>The Sound <span>2025</span></li>
                 <li>Steppin' Into the Holiday <span>Lifetime, 2022</span></li>
-                <li>Poker Face <span>2022</span></li>
-                <li>Unsolved Mysteries <span>Netflix, 2022</span></li>
-                <li>Prisoner's Daughter <span>2021</span></li>
-                <li>Mistletoe in Montana <span>Lifetime, 2021</span></li>
-                <li>Holiday in Santa Fe <span>Lifetime, 2021</span></li>
-                <li>Once Upon a Main Street <span>Lifetime, 2020</span></li>
-                <li>Feliz NaviDAD <span>Lifetime, 2020</span></li>
+                <li>Unsolved Mysteries <span>Netflix, associate director, 2022</span></li>
+                <li>Holiday in Santa Fe <span>2021</span></li>
+                <li>Once Upon a Main Street <span>2020</span></li>
                 <li>Smiley Face Killers <span>2020</span></li>
-                <li>Dear Christmas <span>2019</span></li>
-                <li>Divorzio Las Vegas <span>2019</span></li>
-                <li>The Downtown Las Vegas Reality Show <span>2019</span></li>
-                <li>Farewell Las Vegas <span>TV, 2018</span></li>
-                <li>Hot Water <span>2018</span></li>
-                <li>First Light <span>2016</span></li>
-                <li>Jason Bourne <span>LV unit, 2016</span></li>
+                <li>Feliz NaviDAD <span>2020</span></li>
+                <li>Sweat <span>2015</span></li>
+              </ul>
+              <h4 class="gap">Second AD</h4>
+              <ul>
+                <li>Vegas: A Love Story <span>in post-production</span></li>
+                <li>The Family Plan <span>Apple TV+, additional 2nd AD, 2023</span></li>
+                <li>Farewell Las Vegas <span>2018</span></li>
+                <li>Showreel <span>2011</span></li>
               </ul>
             </div>
             <div>
-              <h4>United Kingdom: features</h4>
+              <h4>Third AD</h4>
               <ul>
-                <li>Edge of Tomorrow <span>2014</span></li>
-                <li>Maleficent <span>2013</span></li>
-                <li>Snow White and the Huntsman <span>2011</span></li>
-                <li>Pirates of the Caribbean: On Stranger Tides <span>2010</span></li>
-                <li>Tamara Drewe <span>2010</span></li>
-                <li>Brighton Rock <span>2009</span></li>
-                <li>Harry Potter and the Deathly Hallows: Pt. 1 <span>2009</span></li>
-                <li>The Boat That Rocked <span>2008</span></li>
-                <li>Cemetery Junction <span>2008</span></li>
+                <li>This Is England '88 <span>3 episodes, 2011</span></li>
+                <li>Late Bloomers <span>2011</span></li>
+                <li>Brighton Rock <span>second unit, 2010</span></li>
+                <li>Tamara Drewe <span>additional photography, 2010</span></li>
+                <li>Cemetery Junction <span>2010</span></li>
+                <li>Pirate Radio <span>second unit, 2009</span></li>
+                <li>Free Agents <span>6 episodes, 2009</span></li>
+                <li>Last Chance Harvey <span>2008</span></li>
+                <li>Me and Orson Welles <span>2008</span></li>
+              </ul>
+              <h4 class="gap">Unit management &amp; locations</h4>
+              <ul>
+                <li>Maleficent <span>assistant unit manager, 2014</span></li>
+                <li>Snow White and the Huntsman <span>assistant unit manager, 2012</span></li>
+                <li>Edge of Tomorrow <span>location assistant, 2014</span></li>
+                <li>Yes <span>assistant location manager, 2004</span></li>
+                <li>Gladiatress <span>assistant location manager, 2004</span></li>
+                <li>In Deep <span>location assistant, 2001</span></li>
+              </ul>
+            </div>
+            <div>
+              <h4>Production department &amp; crew</h4>
+              <ul>
+                <li>Jason Bourne <span>set PA, Las Vegas unit, 2016</span></li>
+                <li>Edge of Tomorrow <span>set PA, 2014</span></li>
+                <li>Pirates of the Caribbean: On Stranger Tides <span>key PA, 2011</span></li>
+                <li>Jasim <span>2009</span></li>
+                <li>How to Lose Friends &amp; Alienate People <span>2008</span></li>
+                <li>Miss Pettigrew Lives for a Day <span>2008</span></li>
                 <li>In Bruges <span>2008</span></li>
-                <li>Me and Orson Welles <span>2007</span></li>
-                <li>Harry Potter and the Order of the Phoenix <span>2007</span></li>
+                <li>Harry Potter and the Order of the Phoenix <span>key set PA, second unit, 2007</span></li>
+                <li>Death Defying Acts <span>2007</span></li>
+                <li>Mr. Bean's Holiday <span>2007</span></li>
                 <li>Stormbreaker <span>2006</span></li>
                 <li>United 93 <span>2006</span></li>
-                <li>Alexander <span>2nd unit, 2004</span></li>
+                <li>Nanny McPhee <span>2005</span></li>
+                <li>Alexander <span>second unit, 2004</span></li>
               </ul>
-            </div>
-            <div>
-              <h4>Commercial: 1st AD / producer</h4>
+              <h4 class="gap">Commercials: 1st AD / producer</h4>
               <ul>
-                <li>MGM / Park MGM, Mandalay, Mastercard, Beau Rivage</li>
-                <li>Gymshark / Modesty Wear</li>
-                <li>Frank's Hot Sauce × Jason Kelce</li>
-                <li>WHOOP × Alex Honnold</li>
-                <li>Cuervo × UFC</li>
-                <li>Lexus Engineers</li>
-                <li>Tacoma '24 Launch, Hawai'i</li>
-                <li>RAM, Hemi Boys</li>
+                <li>MGM: Park MGM, Mandalay, Mastercard, Beau Rivage</li>
+                <li>Gymshark · WHOOP × Alex Honnold</li>
+                <li>Frank's Hot Sauce × Jason Kelce · Cuervo × UFC</li>
+                <li>Lexus · Toyota Tacoma · RAM</li>
                 <li>LVCVA · Allegiant Stadium · Aria Sky Suites</li>
-                <li>Walburgers · RE/MAX × Kyle Lowry</li>
-                <li>Boyd Gaming / Raiders · SIXT</li>
-                <li>NV Energy Power Moves 3.0</li>
-                <li>Summerlin · USAF</li>
-                <li>Queer Eye S9 <span>Netflix</span></li>
-                <li>TUMI × McLaren · PTS Las Vegas</li>
-                <li>Anthem Injury Lawyers · Flipper Skating Disco</li>
+                <li>Boyd Gaming / Raiders · RE/MAX · SIXT · TUMI × McLaren</li>
+                <li>NV Energy · Summerlin · USAF · Queer Eye S9</li>
+                <li>Anthem Injury Lawyers · and hundreds more</li>
               </ul>
             </div>
           </div>
+          <p class="credit-note">Film and TV credits as listed on <a class="more" href="https://www.imdb.com/name/nm0369732/" target="_blank" rel="noopener">IMDb</a></p>
         </details>
         <details><summary>Is any project too small, too big or too unusual?</summary><p>No. We've worked on everything from two-person shoots to studio features. Tell us the idea and we'll tell you honestly how we'd make it.</p></details>
         <details><summary>Do you work with agencies and out-of-state brands?</summary><p>Yes. We act as a full production partner for agencies and brands coming into Las Vegas: pre-production, scouting, crew, equipment and post-production handoff.</p></details>
