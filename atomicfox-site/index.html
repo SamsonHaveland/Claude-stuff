@@ -190,10 +190,20 @@ a:hover .arrow, button:hover .arrow { transform: translateX(4px); }
 .honours { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .honours li { padding: 0.45rem 0.9rem; border-radius: 980px; background: rgb(255 255 255 / 0.08); font-size: 0.9375rem; box-shadow: inset 0 0 0 1px rgb(255 228 200 / 0.2); }
 .honours li.win { background: var(--gold); color: var(--ink); font-weight: 700; box-shadow: none; }
-.honours details { width: 100%; font-size: 0.9375rem; color: rgb(255 228 200 / 0.75); }
-.honours summary { cursor: pointer; color: var(--gold); list-style: none; font-weight: 500; }
-.honours summary::-webkit-details-marker { display: none; }
-.honours details p { margin-top: 0.4rem; max-width: 32rem; }
+.honours-all { width: 100%; color: rgb(255 228 200 / 0.85); }
+.honours-all summary { cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 0.45rem; color: var(--gold); font-weight: 600; font-size: 0.9375rem; }
+.honours-all summary::-webkit-details-marker { display: none; }
+.honours-all summary::after { content: ""; width: 7px; height: 7px; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: translateY(-2px) rotate(45deg); transition: transform 250ms var(--ios); }
+.honours-all[open] summary::after { transform: translateY(1px) rotate(-135deg); }
+.honours-all dl { margin: 0.9rem 0 0; display: grid; gap: 1rem; padding-top: 1rem; border-top: 1px solid rgb(255 228 200 / 0.15); }
+.honours-all dl > div { display: grid; gap: 0.4rem; }
+.honours-all dt { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); }
+.honours-all dd { margin: 0; }
+.honours-all ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem 1.5rem; font-size: 0.9375rem; }
+@media (min-width: 560px) { .honours-all ul { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.honours-all li { position: relative; padding-left: 0.9rem; }
+.honours-all li::before { content: ""; position: absolute; left: 0; top: 0.65em; width: 4px; height: 4px; border-radius: 50%; background: var(--coral); }
+.honours-all dl > div:first-child ul { grid-template-columns: 1fr; }
 .film-poster { position: relative; display: block; width: 100%; max-width: 360px; justify-self: center; padding: 0; border: 0; background: none; cursor: pointer; border-radius: 18px; transform: rotate(2.5deg); transition: transform 400ms var(--ios); }
 .film-poster:hover { transform: rotate(0deg) scale(1.02); }
 .film-poster:active { transform: scale(0.97); transition-duration: 80ms; }
@@ -475,8 +485,20 @@ a:hover .arrow, button:hover .arrow { transform: translateX(4px); }
             <li class="win">Winner · Best Shorts Competition</li>
             <li>8× Semi-finalist</li>
             <li>4× Nominee</li>
-            <li><details><summary>See all 13 honours</summary><p>Award of Merit, Special Mention: Best Shorts Competition. Semi-finalist: Berlin Shorts Award, Los Angeles Silver Screen Film Festival, ICEBERG Film Awards, Lonely Wolf (LWIFF), Caçador de Filmes, Pražské filmové ceny IndieMania, Film Revolution, Moondust. Nominee: AREA51 FilmFest, DARK-LAND, Creator X Awards, YETI FilmFest.</p></details></li>
           </ul>
+          <details class="honours-all">
+            <summary>See all 13 honours</summary>
+            <dl>
+              <div><dt>Winner</dt><dd><ul><li>Best Shorts Competition: Award of Merit, Special Mention</li></ul></dd></div>
+              <div><dt>Semi-finalist · 8</dt><dd><ul>
+                <li>Berlin Shorts Award</li><li>Los Angeles Silver Screen Film Festival</li><li>ICEBERG Film Awards</li><li>Lonely Wolf (LWIFF)</li>
+                <li>Caçador de Filmes</li><li>Pražské filmové ceny IndieMania</li><li>Film Revolution</li><li>Moondust</li>
+              </ul></dd></div>
+              <div><dt>Nominee · 4</dt><dd><ul>
+                <li>AREA51 FilmFest</li><li>DARK-LAND</li><li>Creator X Awards</li><li>YETI FilmFest</li>
+              </ul></dd></div>
+            </dl>
+          </details>
           <button class="btn btn--sun" type="button" data-video="793891/dc82e64b-effe-4567-88f0-cede46d008ea" data-source="bunny" data-title="Desert Grave" data-origin="#film-poster">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z"/></svg>Watch the film
           </button>
