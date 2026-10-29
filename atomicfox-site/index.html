@@ -561,6 +561,8 @@ a:hover .arrow, button:hover .arrow { transform: translateX(4px); }
 .field .err { font-size: 0.8125rem; color: #c4001a; }
 .form-foot { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; margin-top: 0.3rem; }
 .form-foot p { font-size: 0.875rem; color: var(--muted); max-width: 22rem; }
+.hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.form button[disabled] { opacity: 0.6; cursor: progress; }
 .status { font-size: 0.9375rem; padding: 0.9rem 1rem; border-radius: 14px; background: rgb(255 185 56 / 0.25); }
 
 /* Footer */
@@ -956,9 +958,10 @@ a:hover .arrow, button:hover .arrow { transform: translateX(4px); }
             </select>
           </div>
         </div>
+        <input type="text" name="_honey" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
         <div class="field"><label for="f-msg">Your idea</label><textarea id="f-msg" name="message" placeholder="What you'd like to make, when, and where" required></textarea><span class="err" hidden>Add a line or two about your idea.</span></div>
         <div class="form-foot">
-          <p>Opens your email app with everything filled in.</p>
+          <p>Goes straight to Samson. We reply within one business day.</p>
           <button class="btn btn--sun" type="submit">Send <span class="arrow" aria-hidden="true">→</span></button>
         </div>
         <p class="status" id="form-status" role="status" hidden></p>
@@ -1156,8 +1159,10 @@ a:hover .arrow, button:hover .arrow { transform: translateX(4px); }
     if (window.gtag) gtag('event', 'pitch_built', { what: picks.what, feel: picks.feel, where: picks.where });
   });
 
-  // Inquiry form: validates each field as people leave it, then opens their email app pre-filled
+  // Inquiry form: validates each field as people leave it, then sends through FormSubmit without leaving the page.
+  // After FormSubmit activation, swap the address in FORM_ENDPOINT for the random alias FormSubmit emails you.
   var EMAIL = 'samson@filmlv.com';
+  var FORM_ENDPOINT = 'https://formsubmit.co/ajax/' + EMAIL;
   var form = document.getElementById('inquiry');
   var status = document.getElementById('form-status');
   var checks = {
@@ -1181,12 +1186,32 @@ a:hover .arrow, button:hover .arrow { transform: translateX(4px); }
     var bad = Object.keys(checks).filter(function (id) { return !validate(id); });
     if (bad.length) { document.getElementById(bad[0]).focus(); return; }
     var d = new FormData(form);
-    var subject = 'New idea: ' + d.get('type') + (d.get('company') ? ' (' + d.get('company') + ')' : '');
-    var body = 'Name: ' + d.get('name') + '\nCompany: ' + (d.get('company') || '-') + '\nEmail: ' + d.get('email') + '\nProject type: ' + d.get('type') + '\n\n' + d.get('message');
-    window.location.href = 'mailto:' + EMAIL + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+    if (d.get('_honey')) return; // spam bots fill the hidden field
+    var button = form.querySelector('button[type="submit"]');
+    var payload = {
+      name: d.get('name'), email: d.get('email'), company: d.get('company') || '-',
+      project_type: d.get('type'), message: d.get('message'),
+      _subject: 'New idea: ' + d.get('type') + (d.get('company') ? ' (' + d.get('company') + ')' : ''),
+      _replyto: d.get('email'), _template: 'table', _captcha: 'false'
+    };
+    button.disabled = true;
     status.hidden = false;
-    status.textContent = 'Your email app should open with the message ready to send. If it didn’t, email ' + EMAIL + ' or call 917-375-6736.';
-    if (window.gtag) gtag('event', 'generate_lead', { project_type: d.get('type') });
+    status.textContent = 'Sending…';
+    fetch(FORM_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+      .then(function (res) {
+        if (!res.ok || String(res.body.success) !== 'true') throw new Error(res.body.message || 'Not sent');
+        form.reset();
+        status.textContent = 'Thanks, your idea is on its way to Samson. You’ll hear back within one business day.';
+        if (window.gtag) gtag('event', 'generate_lead', { project_type: payload.project_type });
+      })
+      .catch(function () {
+        status.textContent = 'That didn’t send. Please email ' + EMAIL + ' or call 917-375-6736, and we’ll pick it up from there.';
+      })
+      .then(function () { button.disabled = false; });
   });
 })();
 </script>
