@@ -7,15 +7,15 @@
 <title>Atomic Fox Media | Las Vegas Production Company — Commercial, Branded Content &amp; Film</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <!--HEAD-ONLY-START-->
-<meta name="description" content="Atomic Fox Media is a Las Vegas-based production company specializing in cinematic commercials, branded content, and film/TV work for brands, agencies, and original productions.">
+<meta name="description" content="Atomic Fox Media is an open, forward-thinking Las Vegas production company. Commercials, branded content, film and TV, produced with 25 years of industry experience.">
 <link rel="canonical" href="https://atomicfoxmedia.com/">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://atomicfoxmedia.com/">
-<meta property="og:title" content="Atomic Fox Media | Las Vegas Production Company">
-<meta property="og:description" content="Cinematic commercials, branded content, and film/TV work. Filmmaker-led. Las Vegas-based.">
+<meta property="og:title" content="Atomic Fox Media | Bring us any idea. We'll produce it.">
+<meta property="og:description" content="Commercials, branded content, film and TV from Las Vegas, backed by 25 years of industry experience.">
 <meta property="og:image" content="https://atomicfoxmedia.com/assets/desert-grave-poster.jpg">
-<meta name="theme-color" content="#000000">
-<link rel="icon" href="assets/fox-mark.png" type="image/png">
+<meta name="theme-color" content="#ffffff">
+<link rel="icon" href="assets/fox-mark-copper.png" type="image/png">
 <!-- Google tag (gtag.js): same IDs as the previous site -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-675YPQFQX5"></script>
 <script>
@@ -31,8 +31,9 @@
   "@type": ["LocalBusiness", "ProfessionalService"],
   "@id": "https://atomicfoxmedia.com/#organization",
   "name": "Atomic Fox Media",
-  "description": "Las Vegas production company specializing in cinematic commercials, branded content, and film/TV projects.",
+  "description": "Las Vegas production company for commercials, branded content, film and TV.",
   "url": "https://atomicfoxmedia.com",
+  "logo": "https://atomicfoxmedia.com/assets/logo-copper.png",
   "telephone": "+1-917-375-6736",
   "email": "samson@filmlv.com",
   "address": { "@type": "PostalAddress", "addressLocality": "Las Vegas", "addressRegion": "NV", "addressCountry": "US" },
@@ -42,30 +43,34 @@
 </script>
 <!--HEAD-ONLY-END-->
 <style>
-/* Layout: an Apple-style product page where the product is the work.
-   Centered statements, large rounded media tiles, one accent used only for actions. Dark-only, like a cinema. */
+/* Layout: an open, light Apple-style page. White and warm-grey bands alternate; the logo leads;
+   the work sits in large rounded tiles; copper (from the logo) marks only what you can act on.
+   Deliberately light-only: the brief is open, inviting and fresh. */
 :root {
-  --bg: #000;              /* page */
-  --tile: #161617;         /* raised tiles */
-  --tile-2: #1d1d1f;       /* inputs, nested surfaces */
-  --text: #f5f5f7;         /* primary */
-  --text-2: #a1a1a6;       /* secondary */
-  --line: #2c2c2e;         /* separators */
-  --accent: #d4955f;       /* the logo's copper; actions and links only */
-  --accent-press: #b97a4a;
+  --bg: #ffffff;           /* page */
+  --band: #f6f5f3;         /* alternate sections, warm grey */
+  --card: #ffffff;         /* tiles on a band */
+  --text: #1d1d1f;         /* primary */
+  --text-2: #6e6e73;       /* secondary */
+  --line: #e3e1de;         /* separators */
+  --accent: #a85f2e;       /* logo copper, deepened for 4.8:1 on white */
+  --accent-hover: #8f4f24;
+  --accent-soft: #f7ede4;  /* chips, focus halos */
+  --cinema: #120d0a;       /* the one dark tile: the film */
 
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif;
 
-  --hero: clamp(2.75rem, 1.6rem + 5.2vw, 5.5rem);
+  --hero: clamp(2.6rem, 1.5rem + 5vw, 5.25rem);
   --h2: clamp(2rem, 1.3rem + 3vw, 3.5rem);
-  --h3: clamp(1.375rem, 1.1rem + 1vw, 1.75rem);
+  --h3: clamp(1.3rem, 1.1rem + 0.8vw, 1.6rem);
   --lead: clamp(1.1875rem, 1.05rem + 0.6vw, 1.5rem);
 
   --wrap: 68rem;
   --radius: 28px;
   --radius-sm: 18px;
-  --ios: cubic-bezier(0.32, 0.72, 0, 1);   /* iOS sheet curve: fast start, critically damped settle */
-  color-scheme: dark;
+  --shadow: 0 2px 6px rgb(0 0 0 / 0.04), 0 12px 32px rgb(0 0 0 / 0.07);
+  --ios: cubic-bezier(0.32, 0.72, 0, 1);
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -80,7 +85,7 @@ img { max-width: 100%; display: block; }
 [hidden] { display: none !important; }
 a { color: inherit; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
-h1, h2, h3, p { margin: 0; }
+h1, h2, h3, h4, p { margin: 0; }
 h1, h2, h3 { font-weight: 600; text-wrap: balance; }
 
 .wrap {
@@ -88,134 +93,158 @@ h1, h2, h3 { font-weight: 600; text-wrap: balance; }
   padding-left: max(20px, env(safe-area-inset-left, 0px));
   padding-right: max(20px, env(safe-area-inset-right, 0px));
 }
-.section { padding-block: clamp(5rem, 3.5rem + 6vw, 9rem); }
-.section--tight { padding-top: 0; }
-.statement { display: grid; gap: 1rem; justify-items: center; max-width: 46rem; margin: 0 auto clamp(2.5rem, 2rem + 3vw, 4.5rem); text-align: center; }
+.section { padding-block: clamp(4.5rem, 3rem + 6vw, 8.5rem); }
+.band { background: var(--band); }
+.statement { display: grid; gap: 1rem; justify-items: center; max-width: 46rem; margin: 0 auto clamp(2.5rem, 2rem + 3vw, 4rem); text-align: center; }
 .statement h2 { font-size: var(--h2); line-height: 1.07; letter-spacing: -0.028em; }
 .statement p { font-size: var(--lead); color: var(--text-2); line-height: 1.38; letter-spacing: -0.016em; }
 .eyebrow { font-size: 1.0625rem; font-weight: 600; color: var(--accent); letter-spacing: -0.01em; }
 
-/* Actions: pill buttons and chevron links, the two Apple affordances */
+/* Actions */
 .pill {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
-  min-height: 44px; padding: 0 1.4rem; border-radius: 980px; border: 0; cursor: pointer;
-  background: var(--accent); color: #000; font: 500 1.0625rem/1 var(--font); letter-spacing: -0.01em; text-decoration: none;
+  min-height: 46px; padding: 0 1.45rem; border-radius: 980px; border: 0; cursor: pointer;
+  background: var(--accent); color: #fff; font: 500 1.0625rem/1 var(--font); letter-spacing: -0.01em; text-decoration: none;
   transition: transform 120ms ease-out, background-color 150ms;
 }
-.pill:hover { background: #e2a674; }
-.pill:active { transform: scale(0.96); background: var(--accent-press); transition-duration: 60ms; }
+.pill:hover { background: var(--accent-hover); }
+.pill:active { transform: scale(0.96); transition-duration: 60ms; }
 .pill svg { width: 14px; height: 14px; fill: currentColor; }
 .more { color: var(--accent); text-decoration: none; font-size: 1.0625rem; display: inline-flex; align-items: center; gap: 0.15em; }
 .more::after { content: "›"; font-size: 1.25em; line-height: 1; transform: translateY(-0.04em); }
 .more:hover { text-decoration: underline; text-underline-offset: 3px; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 1rem 1.6rem; }
 
-/* Header: a translucent material; the edge appears only once content scrolls under it */
+/* Header: light translucent material; the edge appears once content scrolls under it */
 .site-header {
   position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
-  background: rgb(0 0 0 / 0.72);
+  background: rgb(255 255 255 / 0.78);
   backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
-  box-shadow: 0 1px 0 rgb(255 255 255 / 0); transition: box-shadow 200ms;
+  box-shadow: 0 1px 0 rgb(0 0 0 / 0); transition: box-shadow 200ms;
 }
-.site-header.scrolled { box-shadow: 0 1px 0 rgb(255 255 255 / 0.1); }
-.header-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 52px; }
-.brand { display: inline-flex; align-items: center; gap: 0.55rem; text-decoration: none; font-weight: 600; font-size: 1.0625rem; letter-spacing: -0.02em; white-space: nowrap; }
-.brand img { width: 30px; height: auto; }
-.nav { display: flex; align-items: center; gap: 1.75rem; font-size: 0.875rem; }
-.nav a { text-decoration: none; color: rgb(245 245 247 / 0.8); transition: color 150ms; }
+.site-header.scrolled { box-shadow: 0 1px 0 rgb(0 0 0 / 0.08); }
+.header-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 72px; }
+.brand { display: inline-flex; align-items: center; text-decoration: none; flex: none; }
+.brand img { height: 50px; width: auto; }
+.nav { display: flex; align-items: center; gap: 1.75rem; font-size: 0.9375rem; }
+.nav a { text-decoration: none; color: var(--text-2); transition: color 150ms; }
 .nav a:hover { color: var(--text); }
-.nav .pill { min-height: 32px; padding: 0 0.95rem; font-size: 0.875rem; color: #000; }
-@media (max-width: 640px) { .nav a:not(.pill) { display: none; } }
+.nav .pill { min-height: 36px; padding: 0 1.05rem; font-size: 0.9375rem; color: #fff; }
+@media (max-width: 720px) { .nav a:not(.pill) { display: none; } .brand img { height: 40px; } }
 
-/* Hero */
-.hero { padding-block: clamp(4rem, 3rem + 6vw, 8rem) clamp(3rem, 2rem + 4vw, 5.5rem); text-align: center; }
-.hero .wrap { display: grid; gap: 1.4rem; justify-items: center; }
-.hero h1 { font-size: var(--hero); line-height: 1.03; letter-spacing: -0.035em; font-weight: 700; }
-.hero p.lead { font-size: var(--lead); line-height: 1.38; color: var(--text-2); max-width: 36rem; letter-spacing: -0.016em; }
+/* Hero: the logo, large, then the promise */
+.hero {
+  padding-block: clamp(3.5rem, 2.5rem + 5vw, 7rem) clamp(3.5rem, 2.5rem + 4vw, 6rem); text-align: center;
+  background: radial-gradient(70% 60% at 50% 0%, #fbf1e8 0%, rgb(251 241 232 / 0) 70%), var(--bg);
+}
+.hero .wrap { display: grid; gap: 1.5rem; justify-items: center; }
+.hero-logo { width: min(460px, 82vw); height: auto; margin-bottom: clamp(0.5rem, 0.2rem + 1.5vw, 1.5rem); }
+.hero h1 { font-size: var(--hero); line-height: 1.04; letter-spacing: -0.035em; font-weight: 700; }
+.hero p.lead { font-size: var(--lead); line-height: 1.4; color: var(--text-2); max-width: 40rem; letter-spacing: -0.016em; }
 .hero p.lead b { color: var(--text); font-weight: 600; }
-.hero .actions { margin-top: 0.6rem; }
+.hero .actions { margin-top: 0.5rem; }
 
-/* Tiles: the work, large and rounded */
-.tile { background: var(--tile); border-radius: var(--radius); overflow: hidden; }
+/* Ethos: three open promises */
+.ethos { display: grid; gap: 1.25rem; }
+@media (min-width: 860px) { .ethos { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.ethos .card { padding: clamp(1.75rem, 1.3rem + 1.5vw, 2.5rem); display: grid; gap: 0.75rem; align-content: start; }
+.ethos .icon { width: 44px; height: 44px; border-radius: 12px; background: var(--accent-soft); display: grid; place-items: center; margin-bottom: 0.4rem; }
+.ethos .icon svg { width: 22px; height: 22px; stroke: var(--accent); stroke-width: 1.8; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.ethos h3 { font-size: var(--h3); letter-spacing: -0.022em; line-height: 1.15; }
+.ethos p { color: var(--text-2); }
+
+/* Cards */
+.card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+
+/* Work */
 .film {
-  position: relative; display: grid; align-items: center; gap: 2rem;
-  padding: clamp(2rem, 1.2rem + 3.5vw, 4rem);
+  position: relative; display: grid; align-items: center; gap: 2rem; color: #f5f5f7;
+  padding: clamp(2rem, 1.2rem + 3.5vw, 4rem); border-radius: var(--radius); overflow: hidden;
   background:
-    radial-gradient(90% 120% at 85% 40%, rgb(212 149 95 / 0.28), transparent 60%),
-    linear-gradient(180deg, #1a120c, #0b0806);
+    radial-gradient(90% 120% at 85% 40%, rgb(214 140 80 / 0.32), transparent 60%),
+    linear-gradient(180deg, #1c130d, var(--cinema));
+  box-shadow: var(--shadow);
 }
 @media (min-width: 820px) { .film { grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr); gap: 3.5rem; } }
 .film-copy { display: grid; gap: 1.1rem; justify-items: start; min-width: 0; }
+.film-copy .eyebrow { color: #e3a877; }
 .film-copy h3 { font-size: clamp(2.5rem, 1.6rem + 3.6vw, 4.25rem); line-height: 1.02; letter-spacing: -0.035em; font-weight: 700; }
-.film-copy > p { color: var(--text-2); font-size: 1.1875rem; line-height: 1.42; max-width: 30rem; }
-.honours { list-style: none; padding: 0; margin: 0.4rem 0 0; display: grid; gap: 0.55rem; font-size: 1rem; }
+.film-copy > p { color: #c7c2bc; font-size: 1.1875rem; line-height: 1.42; max-width: 30rem; }
+.honours { list-style: none; padding: 0; margin: 0.4rem 0 0; display: grid; gap: 0.55rem; font-size: 1rem; color: #e8e4df; }
 .honours li { display: flex; gap: 0.6rem; align-items: baseline; }
-.honours b { font-weight: 600; }
-.honours .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; transform: translateY(-2px); }
-.honours details summary { cursor: pointer; color: var(--accent); list-style: none; display: inline; }
+.honours b { font-weight: 600; color: #fff; }
+.honours .dot { width: 6px; height: 6px; border-radius: 50%; background: #e3a877; flex: none; transform: translateY(-2px); }
+.honours details summary { cursor: pointer; color: #e3a877; list-style: none; display: inline; }
 .honours details summary::-webkit-details-marker { display: none; }
-.honours details p { color: var(--text-2); font-size: 0.9375rem; margin-top: 0.4rem; max-width: 30rem; }
+.honours details p { color: #c7c2bc; font-size: 0.9375rem; margin-top: 0.4rem; max-width: 30rem; }
 .film-copy .actions { justify-content: flex-start; margin-top: 0.6rem; }
+.film .pill { background: #e3a877; color: #1d1d1f; }
+.film .pill:hover { background: #f0bb8e; }
+.film .more { color: #e3a877; }
 .film-poster {
   position: relative; display: block; width: 100%; max-width: 380px; justify-self: center;
-  padding: 0; border: 0; background: none; cursor: pointer; border-radius: var(--radius-sm);
-  transition: transform 120ms ease-out;
+  padding: 0; border: 0; background: none; cursor: pointer; border-radius: var(--radius-sm); transition: transform 120ms ease-out;
 }
-.film-poster img { width: 100%; height: auto; border-radius: var(--radius-sm); box-shadow: 0 30px 80px rgb(0 0 0 / 0.55), 0 0 0 1px rgb(255 255 255 / 0.06); }
+.film-poster img { width: 100%; height: auto; border-radius: var(--radius-sm); box-shadow: 0 30px 80px rgb(0 0 0 / 0.5); }
 .film-poster:active, .video:active { transform: scale(0.98); transition-duration: 60ms; }
 
 .videos { display: grid; gap: 1.25rem; margin-top: 1.25rem; }
 @media (min-width: 720px) { .videos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .video {
-  display: grid; gap: 0; padding: 0; border: 0; text-align: left; color: inherit; font: inherit; cursor: pointer;
-  background: var(--tile); border-radius: var(--radius); overflow: hidden; transition: transform 120ms ease-out;
+  display: grid; padding: 0; border: 0; text-align: left; color: inherit; font: inherit; cursor: pointer;
+  background: var(--card); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
+  transition: transform 120ms ease-out, box-shadow 200ms;
 }
+.video:hover { box-shadow: 0 2px 6px rgb(0 0 0 / 0.05), 0 18px 44px rgb(0 0 0 / 0.11); }
 .video-media {
   position: relative; display: block; aspect-ratio: 16 / 9; max-width: 100%; overflow: hidden;
-  background: radial-gradient(70% 90% at 50% 40%, #2a2420, #111 70%);
+  background: linear-gradient(160deg, #fbf3ec, #efe6de);
 }
 .video-media::before { /* the fox mark, shown whenever a thumbnail isn't available */
-  content: ""; position: absolute; inset: 0; background: url("assets/fox-mark.png") center 42% / 64px auto no-repeat; opacity: 0.35;
+  content: ""; position: absolute; inset: 0; background: url("assets/fox-mark-copper.png") center 45% / 72px auto no-repeat; opacity: 0.45;
 }
 .video-media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 500ms var(--ios); }
 .video:hover .video-media img { transform: scale(1.03); }
 .play {
   position: absolute; right: 16px; bottom: 16px; width: 44px; height: 44px; border-radius: 50%;
-  display: grid; place-items: center; background: rgb(255 255 255 / 0.18);
+  display: grid; place-items: center; background: rgb(255 255 255 / 0.82); box-shadow: 0 4px 14px rgb(0 0 0 / 0.12);
   backdrop-filter: blur(12px) saturate(160%); -webkit-backdrop-filter: blur(12px) saturate(160%);
 }
-.play svg { width: 16px; height: 16px; fill: #fff; margin-left: 2px; }
+.play svg { width: 16px; height: 16px; fill: var(--text); margin-left: 2px; }
 .video-copy { display: grid; gap: 0.25rem; padding: 1.25rem 1.5rem 1.5rem; }
 .video-copy small { color: var(--text-2); font-size: 0.875rem; }
 .video-copy b { font-size: var(--h3); font-weight: 600; letter-spacing: -0.022em; line-height: 1.15; }
+.work-foot { margin-top: 2rem; text-align: center; color: var(--text-2); }
 
-/* Proof: three numbers, once */
+/* Experience */
 .proof { display: grid; gap: 2.5rem; text-align: center; }
 @media (min-width: 720px) { .proof { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.proof b { display: block; font-size: clamp(3rem, 2rem + 4vw, 4.5rem); font-weight: 700; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+.proof b { display: block; font-size: clamp(2.75rem, 1.9rem + 3.6vw, 4.25rem); font-weight: 700; letter-spacing: -0.04em; line-height: 1; color: var(--text); }
 .proof span { display: block; margin-top: 0.6rem; color: var(--text-2); font-size: 1.0625rem; }
-.studios { margin-top: clamp(2.5rem, 2rem + 2vw, 3.5rem); text-align: center; color: var(--text-2); font-size: 1.0625rem; max-width: 44rem; margin-inline: auto; }
+.studios { margin: clamp(2.5rem, 2rem + 2vw, 3.5rem) auto 0; text-align: center; color: var(--text-2); font-size: 1.0625rem; max-width: 46rem; display: grid; gap: 1.25rem; justify-items: center; }
 .studios b { color: var(--text); font-weight: 600; }
 
-/* Services: short tiles, scannable */
+/* What we make */
 .services { display: grid; gap: 1.25rem; }
 @media (min-width: 640px) { .services { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 980px) { .services { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.service { padding: 2rem 1.75rem; display: grid; gap: 0.6rem; align-content: start; min-width: 0; }
+.service { padding: 2rem 1.75rem; display: grid; gap: 0.55rem; align-content: start; min-width: 0; }
 .service h3 { font-size: 1.3125rem; letter-spacing: -0.02em; line-height: 1.2; }
 .service p { color: var(--text-2); font-size: 1rem; }
+.services-note { margin-top: 2rem; text-align: center; font-size: var(--lead); color: var(--text-2); letter-spacing: -0.016em; }
+.services-note b { color: var(--text); font-weight: 600; }
 
 /* Las Vegas */
 .vegas { display: grid; gap: 1.25rem; }
 @media (min-width: 860px) { .vegas { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); } }
-.vegas .tile { padding: clamp(2rem, 1.4rem + 2.5vw, 3.25rem); display: grid; gap: 1.1rem; align-content: start; }
+.vegas .card { padding: clamp(2rem, 1.4rem + 2.5vw, 3.25rem); display: grid; gap: 1.1rem; align-content: start; }
 .vegas h3 { font-size: clamp(1.75rem, 1.3rem + 1.8vw, 2.5rem); line-height: 1.08; letter-spacing: -0.03em; }
 .vegas p { color: var(--text-2); }
 .chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.chips li { padding: 0.45rem 0.9rem; border-radius: 980px; background: var(--tile-2); font-size: 0.9375rem; }
+.chips li { padding: 0.45rem 0.9rem; border-radius: 980px; background: var(--accent-soft); color: #6b3a17; font-size: 0.9375rem; }
 .vegas-quote { font-size: clamp(1.375rem, 1.1rem + 1.1vw, 1.875rem); line-height: 1.25; letter-spacing: -0.022em; font-weight: 600; }
 
-/* Credits and FAQ: one level deeper, behind disclosure */
+/* Credits and FAQ */
 .disclosure { border-top: 1px solid var(--line); max-width: 52rem; margin-inline: auto; }
 .disclosure > details { border-bottom: 1px solid var(--line); }
 .disclosure summary {
@@ -250,28 +279,28 @@ h1, h2, h3 { font-weight: 600; text-wrap: balance; }
 .field label { font-size: 0.875rem; color: var(--text-2); }
 .field input, .field select, .field textarea {
   width: 100%; min-height: 48px; padding: 0.8rem 1rem; border-radius: 12px;
-  background: var(--tile-2); color: var(--text); border: 1px solid transparent;
-  font: 400 1.0625rem/1.35 var(--font); letter-spacing: -0.012em; transition: border-color 150ms, box-shadow 150ms;
+  background: var(--band); color: var(--text); border: 1px solid transparent;
+  font: 400 1.0625rem/1.35 var(--font); letter-spacing: -0.012em; transition: border-color 150ms, box-shadow 150ms, background-color 150ms;
 }
 .field textarea { min-height: 8.5rem; resize: vertical; }
-.field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px rgb(212 149 95 / 0.2); }
-.field [aria-invalid="true"] { border-color: #ff6961; }
-.field .err { font-size: 0.8125rem; color: #ff8a80; }
+.field input:focus, .field select:focus, .field textarea:focus { outline: none; background: #fff; border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.field [aria-invalid="true"] { border-color: #d70015; }
+.field .err { font-size: 0.8125rem; color: #c4001a; }
 .form-foot { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; margin-top: 0.4rem; }
 .form-foot p { font-size: 0.875rem; color: var(--text-2); max-width: 22rem; }
-.status { font-size: 0.9375rem; padding: 0.9rem 1rem; border-radius: 12px; background: var(--tile-2); }
+.status { font-size: 0.9375rem; padding: 0.9rem 1rem; border-radius: 12px; background: var(--accent-soft); }
 
-/* Footer, with the FilmLV sister-company link */
-.site-footer { border-top: 1px solid var(--line); padding-block: 2.25rem 2.5rem; color: var(--text-2); font-size: 0.8125rem; }
+/* Footer */
+.site-footer { background: var(--band); border-top: 1px solid var(--line); padding-block: 2.5rem; color: var(--text-2); font-size: 0.8125rem; }
 .footer-top { display: flex; flex-wrap: wrap; gap: 1.5rem; justify-content: space-between; align-items: center; padding-bottom: 1.75rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--line); }
-.filmlv { display: inline-flex; align-items: center; gap: 0.9rem; text-decoration: none; color: var(--text); padding: 0.7rem 1.1rem 0.7rem 0.8rem; border-radius: 16px; background: var(--tile); transition: background-color 150ms, transform 120ms ease-out; }
-.filmlv:hover { background: var(--tile-2); }
+.footer-top .brand img { height: 48px; }
+.filmlv { display: inline-flex; align-items: center; gap: 0.9rem; text-decoration: none; color: var(--text); padding: 0.7rem 1.1rem 0.7rem 0.8rem; border-radius: 16px; background: var(--card); box-shadow: var(--shadow); transition: transform 120ms ease-out; }
 .filmlv:active { transform: scale(0.97); }
 .filmlv-mark { /* text lockup until the FilmLV logo file is supplied */
-  display: grid; place-items: center; height: 40px; padding: 0 0.7rem; border-radius: 10px;
-  background: var(--text); color: #000; font-weight: 800; font-size: 1.125rem; letter-spacing: -0.03em; white-space: nowrap;
+  display: grid; place-items: center; height: 40px; padding: 0 0.7rem; border-radius: 10px; white-space: nowrap;
+  background: var(--text); color: #fff; font-weight: 800; font-size: 1.125rem; letter-spacing: -0.03em;
 }
-.filmlv-mark i { font-style: normal; color: var(--accent-press); }
+.filmlv-mark i { font-style: normal; color: #e3a877; }
 .filmlv small { display: block; color: var(--text-2); font-size: 0.8125rem; }
 .filmlv strong { display: block; font-size: 0.9375rem; font-weight: 600; letter-spacing: -0.01em; }
 .footer-row { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; justify-content: space-between; align-items: center; }
@@ -280,26 +309,28 @@ h1, h2, h3 { font-weight: 600; text-wrap: balance; }
 .footer-row a:hover { color: var(--text); text-decoration: underline; }
 
 /* Player: grows out of the tile that opened it and returns into it */
-.player { width: min(100% - 32px, 70rem); max-width: none; max-height: none; padding: 0; border: 0; border-radius: 22px; overflow: hidden; background: #000; color: var(--text); }
-.player::backdrop { background: rgb(0 0 0 / 0.82); }
+.player { width: min(100% - 32px, 70rem); max-width: none; max-height: none; padding: 0; border: 0; border-radius: 22px; overflow: hidden; background: #000; color: #f5f5f7; }
+.player::backdrop { background: rgb(20 16 12 / 0.6); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 .player-frame { position: relative; aspect-ratio: 16 / 9; max-width: 100%; background: #000; }
 .player-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-.player-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem 1.25rem; padding: 0.9rem 1.1rem 0.9rem 1.4rem; background: var(--tile); }
+.player-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem 1.25rem; padding: 0.9rem 1.1rem 0.9rem 1.4rem; background: #1d1d1f; }
 .player-bar strong { font-weight: 600; letter-spacing: -0.016em; }
 .player-bar .actions { gap: 0.75rem 1.25rem; }
-.player-close { width: 36px; height: 36px; border-radius: 50%; border: 0; cursor: pointer; background: rgb(255 255 255 / 0.12); color: var(--text); display: grid; place-items: center; transition: transform 120ms ease-out, background-color 150ms; }
-.player-close:hover { background: rgb(255 255 255 / 0.2); }
+.player-bar .more { color: #e3a877; }
+.player-close { width: 36px; height: 36px; border-radius: 50%; border: 0; cursor: pointer; background: rgb(255 255 255 / 0.14); color: #fff; display: grid; place-items: center; transition: transform 120ms ease-out, background-color 150ms; }
+.player-close:hover { background: rgb(255 255 255 / 0.22); }
 .player-close:active { transform: scale(0.92); }
 .player-close svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 2.2; fill: none; }
 
 /* Accessibility settings */
 @media (prefers-reduced-transparency: reduce) {
-  .site-header { background: #000; backdrop-filter: none; -webkit-backdrop-filter: none; }
-  .play { background: rgb(40 40 40); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .site-header { background: #fff; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .play { background: #fff; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .player::backdrop { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgb(20 16 12 / 0.85); }
 }
 @media (prefers-contrast: more) {
-  :root { --text-2: #d2d2d7; --line: #6e6e73; }
-  .tile, .video { box-shadow: inset 0 0 0 1px #6e6e73; }
+  :root { --text-2: #424245; --line: #86868b; }
+  .card, .video { box-shadow: inset 0 0 0 1px #86868b; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0ms !important; }
@@ -311,13 +342,13 @@ h1, h2, h3 { font-weight: 600; text-wrap: balance; }
 <!--ARTIFACT-BODY-START-->
 <header class="site-header" id="site-header">
   <div class="wrap header-row">
-    <a class="brand" href="#top"><img src="assets/fox-mark.png" alt="" width="30" height="25">Atomic Fox Media</a>
+    <a class="brand" href="#top" aria-label="Atomic Fox Media, back to top"><img src="assets/logo-copper.png" alt="Atomic Fox Media" width="143" height="50"></a>
     <nav class="nav" aria-label="Main">
       <a href="#work">Work</a>
-      <a href="#services">Services</a>
+      <a href="#make">What we make</a>
+      <a href="#experience">Experience</a>
       <a href="#las-vegas">Las Vegas</a>
-      <a href="#about">About</a>
-      <a class="pill" href="#contact">Start a project</a>
+      <a class="pill" href="#contact">Let's talk</a>
     </nav>
   </div>
 </header>
@@ -325,14 +356,38 @@ h1, h2, h3 { font-weight: 600; text-wrap: balance; }
 <main id="top">
   <section class="hero" aria-labelledby="hero-title">
     <div class="wrap">
-      <p class="eyebrow">Las Vegas production company</p>
-      <h1 id="hero-title">Story first.<br> Production always.</h1>
-      <p class="lead">Commercials, branded content and film, led by <b>Samson Haveland</b>, a First AD with 20 years on sets for Warner Bros, Disney, Netflix and Apple TV+.</p>
+      <img class="hero-logo" src="assets/logo-copper.png" alt="Atomic Fox Media" width="762" height="267">
+      <h1 id="hero-title">Bring us any idea.<br> We'll produce it.</h1>
+      <p class="lead">Atomic Fox Media is an open, forward-thinking production company in Las Vegas. Commercials, branded content, film or TV: whatever you want to make, <b>Samson Haveland</b> brings 25 years of industry experience to making it as well as it can be made.</p>
       <div class="actions">
-        <button class="pill" type="button" data-video="1tTpDSUj6QDJcGo0fLGLlguqOOMMwxZnK" data-source="drive" data-title="Desert Grave" data-origin="#film-poster">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z"/></svg>Watch Desert Grave
-        </button>
-        <a class="more" href="#contact">Start a project</a>
+        <a class="pill" href="#contact">Tell us your idea</a>
+        <a class="more" href="#work">See the work</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section band" id="ethos" aria-labelledby="ethos-title">
+    <div class="wrap">
+      <div class="statement">
+        <p class="eyebrow">How we work</p>
+        <h2 id="ethos-title">Free&#8209;thinking. Forward&#8209;looking.<br> Built on experience.</h2>
+      </div>
+      <div class="ethos">
+        <div class="card">
+          <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12h16M12 4v16"/></svg></span>
+          <h3>Open to anything</h3>
+          <p>A 30-second spot, a branded series, a music video, a feature. Big, small or unusual, if you can imagine it, we'll find a way to produce it.</p>
+        </div>
+        <div class="card">
+          <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h12M13 6l6 6-6 6"/></svg></span>
+          <h3>Always looking forward</h3>
+          <p>New formats, new tools, new ways to tell a story. We look for the fresh approach, not the safe one, and we stay flexible as your idea grows.</p>
+        </div>
+        <div class="card">
+          <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z"/></svg></span>
+          <h3>25 years you can lean on</h3>
+          <p>Studio features, network television and hundreds of commercials. That experience goes into every frame, every schedule and every budget.</p>
+        </div>
       </div>
     </div>
   </section>
@@ -340,9 +395,13 @@ h1, h2, h3 { font-weight: 600; text-wrap: balance; }
   <!-- WORK. To add a video, copy one <button class="video"> block and change data-video
        (YouTube ID or Google Drive file ID), data-source ("youtube" or "drive"), the thumbnail and the text.
        Drive files must be shared as "Anyone with the link". -->
-  <section id="work" aria-label="Work">
+  <section class="section" id="work" aria-labelledby="work-title">
     <div class="wrap">
-      <article class="tile film" aria-labelledby="film-title">
+      <div class="statement">
+        <p class="eyebrow">The work</p>
+        <h2 id="work-title">See what we've made.</h2>
+      </div>
+      <article class="film" aria-labelledby="film-title">
         <div class="film-copy">
           <p class="eyebrow">Short film</p>
           <h3 id="film-title">Desert Grave</h3>
@@ -357,7 +416,6 @@ h1, h2, h3 { font-weight: 600; text-wrap: balance; }
             <button class="pill" type="button" data-video="1tTpDSUj6QDJcGo0fLGLlguqOOMMwxZnK" data-source="drive" data-title="Desert Grave" data-origin="#film-poster">
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z"/></svg>Watch the film
             </button>
-            <a class="more" href="https://www.imdb.com/name/nm0369732/" target="_blank" rel="noopener">IMDb</a>
           </div>
         </div>
         <button class="film-poster" id="film-poster" type="button" data-video="1tTpDSUj6QDJcGo0fLGLlguqOOMMwxZnK" data-source="drive" data-title="Desert Grave" aria-label="Play Desert Grave">
@@ -387,51 +445,58 @@ h1, h2, h3 { font-weight: 600; text-wrap: balance; }
     </div>
   </section>
 
-  <section class="section" id="about" aria-labelledby="about-title">
+  <section class="section band" id="experience" aria-labelledby="experience-title">
     <div class="wrap">
       <div class="statement">
-        <p class="eyebrow">Why Atomic Fox</p>
-        <h2 id="about-title">Studio discipline. Las Vegas speed.</h2>
-        <p>Every project is approached from a director's chair first, crewed to the scope, and run with the paperwork and communication agencies expect.</p>
+        <p class="eyebrow">Experience</p>
+        <h2 id="experience-title">From Hollywood sets to Las Vegas campaigns.</h2>
+        <p>Samson Haveland has worked as First AD, producer and crew on studio features in the UK and US, network television, and hundreds of commercials.</p>
       </div>
       <div class="proof">
-        <div><b>20+</b><span>years on studio and indie sets</span></div>
-        <div><b>40+</b><span>film, TV and commercial credits</span></div>
-        <div><b>UK&nbsp;·&nbsp;US</b><span>features, network TV and campaigns</span></div>
+        <div><b>25</b><span>years in the industry</span></div>
+        <div><b>100s</b><span>of commercials</span></div>
+        <div><b>40+</b><span>film and TV credits</span></div>
       </div>
-      <p class="studios">Credits include <b>Edge of Tomorrow</b>, <b>Harry Potter</b>, <b>Maleficent</b>, <b>In Bruges</b>, <b>The Family Plan</b> and campaigns for <b>MGM</b>, <b>Lexus</b>, <b>RAM</b>, <b>Gymshark</b>, <b>LVCVA</b> and the <b>Vegas Golden Knights</b>.</p>
+      <div class="studios">
+        <p>Including <b>Edge of Tomorrow</b>, <b>Harry Potter</b>, <b>Maleficent</b>, <b>In Bruges</b>, <b>Jason Bourne</b>, <b>The Family Plan</b>, <b>Unsolved Mysteries</b> and campaigns for <b>MGM</b>, <b>Lexus</b>, <b>RAM</b>, <b>Gymshark</b>, <b>WHOOP</b>, <b>LVCVA</b> and the <b>Vegas Golden Knights</b>.</p>
+        <div class="actions">
+          <a class="more" href="https://www.imdb.com/name/nm0369732/" target="_blank" rel="noopener">See Samson on IMDb</a>
+          <a class="more" href="#credits">Full credits list</a>
+        </div>
+      </div>
     </div>
   </section>
 
-  <section class="section section--tight" id="services" aria-labelledby="services-title">
+  <section class="section" id="make" aria-labelledby="make-title">
     <div class="wrap">
       <div class="statement">
-        <p class="eyebrow">What we do</p>
-        <h2 id="services-title">From first idea to final cut.</h2>
+        <p class="eyebrow">What we make</p>
+        <h2 id="make-title">Whatever you have in mind.</h2>
       </div>
       <div class="services">
-        <div class="tile service"><h3>Commercials</h3><p>Broadcast and digital spots, from concept to camera to cut.</p></div>
-        <div class="tile service"><h3>Branded content</h3><p>Story-led films and series for brands that want more than a product video.</p></div>
-        <div class="tile service"><h3>Creative development</h3><p>Concept, script, visual direction and production design before a camera turns on.</p></div>
-        <div class="tile service"><h3>Production services</h3><p>Crew, locations, permits and equipment for agencies shooting in Las Vegas.</p></div>
-        <div class="tile service"><h3>Directing</h3><p>A point of view behind the lens, not just a production resource.</p></div>
-        <div class="tile service"><h3>Film &amp; TV development</h3><p>Narrative projects with producers, writers and content partners.</p></div>
+        <div class="card service"><h3>Commercials</h3><p>Broadcast, digital and social spots, from concept to camera to cut.</p></div>
+        <div class="card service"><h3>Branded content</h3><p>Story-led films and series for brands that want more than a product video.</p></div>
+        <div class="card service"><h3>Film &amp; TV</h3><p>Shorts, features and series, scripted or unscripted, from development to delivery.</p></div>
+        <div class="card service"><h3>Music videos</h3><p>Visuals with a point of view, made to match the track and the artist.</p></div>
+        <div class="card service"><h3>Creative development</h3><p>Concept, script and visual direction, shaped before a camera turns on.</p></div>
+        <div class="card service"><h3>Production services</h3><p>Crew, locations, permits and equipment for anyone shooting in Las Vegas.</p></div>
       </div>
+      <p class="services-note">Something that isn't on the list? <b>Ask us.</b> We say yes to good ideas.</p>
     </div>
   </section>
 
-  <section class="section section--tight" id="las-vegas" aria-labelledby="vegas-title">
+  <section class="section band" id="las-vegas" aria-labelledby="vegas-title">
     <div class="wrap vegas">
-      <div class="tile">
+      <div class="card">
         <p class="eyebrow">Shooting in Las Vegas</p>
         <h3 id="vegas-title">We know the locations, the light and the logistics.</h3>
-        <p>For visiting brands and local companies alike: scouting, permits, local crew and vendors, from resort luxury to raw Mojave desert.</p>
+        <p>For visiting brands and local companies alike: scouting, permits, local crew and vendors, from resort luxury to the open Mojave desert.</p>
         <ul class="chips">
           <li>Resorts &amp; hotels</li><li>Desert &amp; Mojave</li><li>Modern interiors</li><li>Nightlife</li>
           <li>Permits</li><li>Local crew</li><li>Agency support</li><li>Lean or full crews</li>
         </ul>
       </div>
-      <div class="tile">
+      <div class="card">
         <p class="vegas-quote">Las Vegas has more visual range than most cities twice its size.</p>
         <p>Need a location first? Browse verified Las Vegas film locations at FilmLV.</p>
         <a class="more" href="https://filmlv.com" target="_blank" rel="noopener">FilmLV.com</a>
@@ -439,9 +504,9 @@ h1, h2, h3 { font-weight: 600; text-wrap: balance; }
     </div>
   </section>
 
-  <section class="section section--tight" aria-labelledby="faq-title">
+  <section class="section" aria-labelledby="faq-title">
     <div class="wrap">
-      <div class="statement"><h2 id="faq-title">Questions.</h2></div>
+      <div class="statement"><h2 id="faq-title">Good questions.</h2></div>
       <div class="disclosure">
         <details id="credits">
           <summary>Samson Haveland's full credits</summary>
@@ -515,44 +580,44 @@ h1, h2, h3 { font-weight: 600; text-wrap: balance; }
             </div>
           </div>
         </details>
-        <details><summary>Do you work with agencies and out-of-state brands?</summary><p>Yes. Much of our work is with agencies and brands coming into Las Vegas. We act as a full production partner: pre-production, scouting, crew, equipment and post-production handoff.</p></details>
+        <details><summary>Is any project too small, too big or too unusual?</summary><p>No. We've worked on everything from two-person shoots to studio features. Tell us the idea and we'll tell you honestly how we'd make it.</p></details>
+        <details><summary>Do you work with agencies and out-of-state brands?</summary><p>Yes. We act as a full production partner for agencies and brands coming into Las Vegas: pre-production, scouting, crew, equipment and post-production handoff.</p></details>
         <details><summary>Can you handle crews, permits and locations in Las Vegas?</summary><p>Yes. Local crew, resort, architectural, desert and urban locations, permitting support and vendor coordination.</p></details>
-        <details><summary>Do you take on film and TV projects?</summary><p>Yes. We develop original film and TV alongside commercial work and support scripted and unscripted productions in Las Vegas.</p></details>
-        <details><summary>How do we start?</summary><p>Send the form below or email samson@filmlv.com with what you're making, your timeline and scope. We reply within one business day.</p></details>
+        <details><summary>How do we start?</summary><p>Send the form below or email samson@filmlv.com with your idea, timeline and rough budget. We reply within one business day.</p></details>
       </div>
     </div>
   </section>
 
-  <section class="section section--tight" id="contact" aria-labelledby="contact-title">
+  <section class="section band" id="contact" aria-labelledby="contact-title">
     <div class="wrap">
       <div class="statement">
-        <h2 id="contact-title">Let's make something.</h2>
-        <p>Tell us what you're making. We reply to every serious inquiry within one business day.</p>
+        <h2 id="contact-title">Say hello.</h2>
+        <p>Tell us what you'd like to make. Every idea gets a real reply within one business day.</p>
       </div>
       <div class="contact">
-        <div class="tile direct">
+        <div class="card direct">
           <div><small>Email</small><a href="mailto:samson@filmlv.com">samson@filmlv.com</a></div>
           <div><small>Phone</small><a href="tel:+19173756736">917-375-6736</a></div>
           <div><small>Based in</small><span>Las Vegas, Nevada</span></div>
         </div>
-        <form class="tile form" id="inquiry" novalidate aria-label="Project inquiry">
+        <form class="card form" id="inquiry" novalidate aria-label="Project inquiry">
           <div class="row">
             <div class="field"><label for="f-name">Name</label><input id="f-name" name="name" autocomplete="name" required><span class="err" hidden>Add your name.</span></div>
             <div class="field"><label for="f-email">Email</label><input id="f-email" name="email" type="email" autocomplete="email" required><span class="err" hidden>Use an address like name@company.com.</span></div>
           </div>
           <div class="row">
             <div class="field"><label for="f-company">Company (optional)</label><input id="f-company" name="company" autocomplete="organization"></div>
-            <div class="field"><label for="f-type">Project type</label>
+            <div class="field"><label for="f-type">What are you making?</label>
               <select id="f-type" name="type">
                 <option>Commercial</option><option>Branded content</option><option>Film / TV</option><option>Music video</option>
-                <option>Production services in Las Vegas</option><option>Agency support</option><option>Something else</option>
+                <option>Production services in Las Vegas</option><option>Something new</option>
               </select>
             </div>
           </div>
-          <div class="field"><label for="f-msg">About the project</label><textarea id="f-msg" name="message" placeholder="What you're making, when, and where" required></textarea><span class="err" hidden>Add a line or two about the project.</span></div>
+          <div class="field"><label for="f-msg">Your idea</label><textarea id="f-msg" name="message" placeholder="What you'd like to make, when, and where" required></textarea><span class="err" hidden>Add a line or two about your idea.</span></div>
           <div class="form-foot">
             <p>Opens your email app with everything filled in.</p>
-            <button class="pill" type="submit">Send inquiry</button>
+            <button class="pill" type="submit">Send</button>
           </div>
           <p class="status" id="form-status" role="status" hidden></p>
         </form>
@@ -564,7 +629,7 @@ h1, h2, h3 { font-weight: 600; text-wrap: balance; }
 <footer class="site-footer">
   <div class="wrap">
     <div class="footer-top">
-      <a class="brand" href="#top"><img src="assets/fox-mark.png" alt="" width="30" height="25">Atomic Fox Media</a>
+      <a class="brand" href="#top" aria-label="Atomic Fox Media, back to top"><img src="assets/logo-copper.png" alt="Atomic Fox Media" width="137" height="48"></a>
       <!-- Replace .filmlv-mark with <img src="assets/filmlv-logo.png" alt="FilmLV" height="40"> once the logo file is added -->
       <a class="filmlv" href="https://filmlv.com" target="_blank" rel="noopener" aria-label="FilmLV: Las Vegas film locations (opens filmlv.com)">
         <span class="filmlv-mark" aria-hidden="true">Film<i>LV</i></span>
@@ -574,7 +639,7 @@ h1, h2, h3 { font-weight: 600; text-wrap: balance; }
     <div class="footer-row">
       <p>© <span id="year">2026</span> Atomic Fox Media LLC · Las Vegas, Nevada</p>
       <nav aria-label="Footer">
-        <a href="#work">Work</a><a href="#services">Services</a><a href="#credits">Credits</a>
+        <a href="#work">Work</a><a href="#make">What we make</a><a href="#credits">Credits</a>
         <a href="https://www.imdb.com/name/nm0369732/" target="_blank" rel="noopener">IMDb</a>
         <a href="https://filmlv.com" target="_blank" rel="noopener">FilmLV.com</a>
       </nav>
@@ -614,7 +679,7 @@ h1, h2, h3 { font-weight: 600; text-wrap: balance; }
       e.preventDefault();
       if (target.tagName === 'DETAILS') target.open = true;
       var y = target.getBoundingClientRect().top + window.scrollY - header.offsetHeight - 12;
-      window.scrollTo({ top: y, behavior: reduce.matches ? 'auto' : 'smooth' });
+      window.scrollTo({ top: id === '#top' ? 0 : y, behavior: reduce.matches ? 'auto' : 'smooth' });
     });
   });
 
@@ -702,7 +767,7 @@ h1, h2, h3 { font-weight: 600; text-wrap: balance; }
     var bad = Object.keys(checks).filter(function (id) { return !validate(id); });
     if (bad.length) { document.getElementById(bad[0]).focus(); return; }
     var d = new FormData(form);
-    var subject = 'Project inquiry: ' + d.get('type') + (d.get('company') ? ' (' + d.get('company') + ')' : '');
+    var subject = 'New idea: ' + d.get('type') + (d.get('company') ? ' (' + d.get('company') + ')' : '');
     var body = 'Name: ' + d.get('name') + '\nCompany: ' + (d.get('company') || '-') + '\nEmail: ' + d.get('email') + '\nProject type: ' + d.get('type') + '\n\n' + d.get('message');
     window.location.href = 'mailto:' + EMAIL + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
     status.hidden = false;
