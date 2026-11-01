@@ -87,7 +87,7 @@
       const dests = this.selected ? this.destsFn(this.selected) : [];
       const html = this._squares().map((sq, i) => {
         const f = FILES.indexOf(sq[0]), rank = +sq[1];
-        const light = (f + rank) % 2 === 1;
+        const light = (f + rank) % 2 === 0; // a1 (f=0, rank=1) is dark; h1 is light
         const cls = ['sq', light ? 'light' : 'dark'];
         if (this.lastMove && this.lastMove.includes(sq)) cls.push('last');
         if (this.selected === sq) cls.push('sel');
