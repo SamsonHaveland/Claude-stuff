@@ -89,3 +89,111 @@ var WHY_NOT = {
     'b5': 'After 8...b5? 9.axb5 axb5?? 10.Rxa8 the a-file opens onto Black’s undefended rook (the c8-bishop blocks the queen). That’s why Black plays ...Bd7 first.'
   }
 };
+
+/* More notes: at least one per opening, aimed at positions the drills actually reach. */
+(function () {
+  const MORE = {
+    // Italian Game
+    'e4 e5 Nf3 Nc6 Bc4 Bc5': {
+      'Ng5': 'Going after f7 too early: 4.Ng5? Qxg5 just takes the knight along the d8–g5 diagonal, and the d2-pawn stops your c1-bishop from recapturing.'
+    },
+    'e4 e5 Nf3 Nc6 Bc4 Nf6 Ng5 d5': {
+      'Bxd5': 'Wrong recapture: 5.Bxd5? Nxd5 6.exd5 Qxd5 gives up your attacking bishop for a pawn. Take with the pawn (exd5), keeping the bishop aimed at f7.'
+    },
+    // Four Knights
+    'e4 e5 Nf3 Nc6 Nc3 Nf6': {
+      'Bc4': 'It allows the “fork trick”: 4.Bc4? Nxe4! 5.Nxe4 d5 forks bishop and knight, Black regains the piece and gets the centre. That’s why 4.Bb5 or 4.d4 are played.'
+    },
+    // London System
+    'd4 Nf6 Bf4 g6 e3 Bg7 Nf3 O-O Be2 d6': {
+      'O-O': 'Not a mistake, but ...Nh5 can then hunt the f4-bishop. Playing h3 first gives the bishop a safe retreat on h2, so Black can’t trade it off.'
+    },
+    // Caro-Kann
+    'e4 c6 d4 d5 e5': {
+      'e6': 'It locks your c8-bishop behind its own pawns, so you get a French Defence where ...c6 has used up a tempo. Develop the bishop first with ...Bf5, then play ...e6.'
+    },
+    'e4 c6 d4 d5 exd5': {
+      'Qxd5': 'The queen comes out early and 4.Nc3 chases it with tempo. Recapturing with the pawn (...cxd5) keeps a pawn in the centre.'
+    },
+    'e4 c6 d4 d5 exd5 cxd5 Bd3 Nc6 c3 Nf6 Bf4 Bg4 Qb3': {
+      'e6': 'It ignores the threat to b7: 7.Qxb7 wins a pawn and attacks the c6-knight and the a8-rook. Defend b7 first with ...Qd7 or ...Qc8.'
+    },
+    'e4 c6 d4 d5 Nc3 dxe4 Nxe4 Bf5 Ng3 Bg6 h4 h6 Nf3 Nd7 h5': {
+      'Bxh5': 'h5 is defended by the h1-rook along the open h-file: 8...Bxh5?? Rxh5 loses the bishop for a pawn. Retreat with ...Bh7.'
+    },
+    // Queen's Gambit Declined
+    'd4 d5 c4': {
+      'Nf6': 'The Marshall Defence: after 3.cxd5 Nxd5 4.e4 White builds a big centre while chasing the knight. ...e6 keeps the d5-pawn solidly supported.'
+    },
+    'd4 d5 c4 e6 Nc3 Nf6 cxd5': {
+      'Nxd5': 'After 4...Nxd5 5.e4 Nxc3 6.bxc3, White gets a big pawn centre for free. Recapturing with the e-pawn keeps your share of the centre and frees the c8-bishop.'
+    },
+    'd4 d5 Bf4 c5 e3 Nc6 c3 Qb6 Qb3': {
+      'Qxb3': 'Trading helps White: after axb3 the a1-rook gets the open a-file and the b3-pawn guards c4. ...c4 gains space with tempo instead.'
+    },
+    // Queen's Gambit
+    'd4 d5 c4 e6 Nc3 Nf6 Bg5 Be7 e3 O-O Nf3 Nbd7': {
+      'Bxf6': 'It gives up the bishop pair for no reason. Black recaptures comfortably and the pressure on d5 disappears. Keep the pin and develop with Rc1 or Bd3.'
+    },
+    // Ruy Lopez
+    'e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7 Re1 b5': {
+      'Bxb5': 'The b5-pawn is protected by the a6-pawn: 7.Bxb5? axb5 gives a bishop for a pawn. Retreat to b3, where the bishop still eyes f7.'
+    },
+    'e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7 Re1 b5 Bb3 d6 c3 O-O h3 Na5': {
+      'Nxe5': 'e5 is defended by the d6-pawn: 10.Nxe5? dxe5 loses a knight for a pawn. Keep the bishop with Bc2 and prepare d4.'
+    },
+    // French Defence
+    'e4 e6 d4 d5 Nd2 Nf6 e5 Nfd7 Bd3 c5 c3 Nc6 Ne2 cxd4 cxd4': {
+      'Nxd4': 'The d4-pawn is defended by the e2-knight: 9...Nxd4? 10.Nxd4 gives up a knight for a pawn, and tricks like ...Qb6 don\u2019t win it back. Keep up the pressure on d4 and challenge the head of the chain with ...f6.'
+    },
+    'e4 e6 d4 d5 Nc3 Nf6 Bg5 Be7 e5': {
+      'Ng4': 'The knight goes offside: once the bishops come off (6.Bxe7 Qxe7), White’s queen can take on g4. ...Nfd7 keeps it safe and ready to hit e5 with ...c5 and ...f6.'
+    },
+    // King's Indian
+    'd4 Nf6 c4 g6 Nc3 Bg7 e4': {
+      'Nxe4': 'e4 is defended by the c3-knight: 4...Nxe4? 5.Nxe4 loses a knight for a pawn. The KID lets White have the centre now and attacks it later with ...e5.'
+    },
+    'd4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2': {
+      'Nxe4': 'Still defended by the c3-knight: 6...Nxe4? 7.Nxe4 just loses a piece. Strike with ...e5 instead.'
+    },
+    // English
+    'c4 e5 Nc3 Nf6 Nf3 Nc6 g3 d5 cxd5 Nxd5 Bg2 Nb6 O-O Be7': {
+      'Nxe5': 'e5 is defended by the c6-knight: 8.Nxe5? Nxe5 gives a knight for a pawn. Play d3 and prepare a3/b4 on the queenside.'
+    },
+    'c4 c5 Nc3 Nc6 g3 g6 Bg2 Bg7 Nf3 Nf6 O-O O-O d4 cxd4': {
+      'Qxd4': 'The queen recaptures where the c6-knight attacks it: 8.Qxd4?? Nxd4 loses the queen. Recapture with the knight.'
+    },
+    // Sicilian Najdorf
+    'e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3': {
+      'Nxe4': 'e4 is defended by the c3-knight: 5...Nxe4? 6.Nxe4 loses a piece for a pawn. 5...a6 is the Najdorf move.'
+    },
+    'e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6 Be3 e5 Nb3 Be6 f3 Be7 Qd2 O-O O-O-O': {
+      'Nxe4': 'e4 is defended twice (f3-pawn and c3-knight): 10...Nxe4? loses a knight for a pawn. Prepare ...b5–b4 to attack the c3-knight first.'
+    },
+    'e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6 Bg5 e6 f4 Qb6 Qd2 Qxb2 Rb1': {
+      'Qxc3': 'The c3-knight is defended by the queen on d2: 9...Qxc3?? 10.Qxc3 loses the queen. Retreat with ...Qa3.'
+    },
+    // Nimzo-Indian
+    'd4 Nf6 c4 e6 Nc3 Bb4 e3': {
+      'Bxc3+': 'Not losing, but premature: in the Rubinstein Black usually keeps the pin until White spends a move on a3, so the doubling costs White a tempo. Castle first.'
+    },
+    'd4 Nf6 c4 e6 Nc3 Bb4 e3 O-O Bd3 d5 Nf3 c5 O-O Nc6 a3 Bxc3 bxc3 dxc4 Bxc4': {
+      'Qxd4': 'The d4-pawn is defended three times (e3, c3 and the f3-knight): 10...Qxd4?? loses the queen. ...Qc7 prepares ...e5 instead.'
+    },
+    // Grünfeld
+    'd4 Nf6 c4 g6 Nc3 d5 cxd5 Nxd5 e4': {
+      'Nf6': 'Retreating lets 6.e5 hit the knight again, so Black loses time while White gains space. 5...Nxc3 trades first and then attacks the centre.'
+    },
+    'd4 Nf6 c4 g6 Nc3 d5 cxd5 Nxd5 e4 Nxc3 bxc3 Bg7 Nf3 c5 Rb1 O-O Be2 cxd4 cxd4 Qa5+ Bd2': {
+      'Qxd2+': 'The d2-bishop is defended by the queen and the f3-knight: 11...Qxd2+?? 12.Qxd2 gives the queen for a bishop. Take the a2-pawn instead.'
+    },
+    'd4 Nf6 c4 g6 Nc3 d5 cxd5 Nxd5 e4 Nxc3 bxc3 Bg7 Bc4 c5 Ne2 Nc6 Be3': {
+      'Bxd4': 'd4 is defended three times (c3-pawn, e2-knight, e3-bishop): after 9...Bxd4? 10.cxd4 cxd4, Black has only two pawns for the bishop and has lost the key defender of the king. Castle and keep building pressure.'
+    },
+    // Scandinavian
+    'e4 d5 exd5 Qxd5 Nc3 Qa5 d4 Nf6 Nf3 c6 Bc4 Bf5 Bd2': {
+      'Bxc2': 'c2 is defended by the queen: 7...Bxc2?? Qxc2 loses the bishop for a pawn. ...e6 completes the solid setup.'
+    }
+  };
+  for (const k of Object.keys(MORE)) WHY_NOT[k] = Object.assign(WHY_NOT[k] || {}, MORE[k]);
+})();
