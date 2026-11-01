@@ -1,0 +1,46 @@
+# Chess Academy
+
+A step-by-step chess course in the browser: rules, tactics, opening theory and a starter opening repertoire with spaced-repetition drills. It needs no install, no build step and no internet connection.
+
+**Run it:** open `index.html` in any modern browser. Progress (XP, streak, lessons done, drill schedule) is saved in that browser's `localStorage`.
+
+## What's inside
+
+| Area | What it does | Modelled on |
+|---|---|---|
+| **Learn** | A path of 7 units and 22 short lessons. Each lesson mixes explanation cards, quizzes and hands-on board exercises. | Duolingo's lesson path; Chess.com Lessons |
+| **Board exercises** | Star-collecting games for each piece, a coordinate drill, puzzles with scripted replies, mate-in-one with any mating move accepted, and K+Q vs K played against the engine. | Lichess *Learn* and *Practice* |
+| **Openings** | Five studies: Italian Game, London System, Caro-Kann, Queen's Gambit Declined, and Traps to Avoid. Each one covers why to play it, the typical plans, the history, and lines with a reason given for every move. | Chessable course layout |
+| **Drill** | Play your side of each line from memory. Uses Leitner-box spaced repetition with reviews after 1, 3, 7, 14, 30 and 60 days; a mistake resets the line. | Chessable MoveTrainer |
+| **Practice** | Play a bot at three levels, from the starting position or from the end of any opening line. An optional **Coach** warns you when a move gives away material, and there are Hint and Take-back buttons. | Chess.com / Lichess analysis aids |
+| **Library** | Study method, a glossary and further reading. | — |
+
+Unit outline: (1) Board & pieces → (2) Rules: check, castling, en passant, promotion, draws → (3) Checkmate patterns → (4) Tactics: checks/captures/threats, fork, pin, skewer, discovery → (5) Opening principles, opening sins and the history of opening theory → (6) Choosing a repertoire → (7) Endgames: K+Q vs K, rule of the square, opposition.
+
+## Repertoire choice
+
+| Role | Opening | Why |
+|---|---|---|
+| White (main) | Italian Game | It is the opening principles in action. The quiet c3/d3 main line teaches plans rather than traps. |
+| White (alt.) | London System | One setup against almost everything, so there is little to memorise. |
+| Black vs 1.e4 | Caro-Kann | Solid; the light-squared bishop gets out before …e6. |
+| Black vs 1.d4 | Queen's Gambit Declined | Classical. It teaches the core ideas of 1.d4 positions. |
+
+These are among the most commonly recommended choices for developing players. There is no single "best" opening.
+
+## Files
+
+```
+index.html            app shell
+css/style.css         styling (responsive)
+js/vendor/chess.js    chess.js 0.13.4 (BSD-2-Clause), move legality
+js/board.js           interactive board (drag or click, arrows, promotion picker)
+js/engine.js          small alpha-beta engine (bot, hints, blunder coach)
+js/curriculum.js      all lesson content
+js/openings.js        opening lines + per-move explanations
+js/library.js         reference pages
+js/app.js             router, views, progress / spaced repetition
+tests/validate.js     checks every FEN, solution, mate and opening move for legality
+```
+
+To add a lesson or an opening line, edit `curriculum.js` or `openings.js`, then run `node tests/validate.js`.

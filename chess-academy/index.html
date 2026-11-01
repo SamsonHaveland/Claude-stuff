@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chess Academy — learn chess step by step</title>
+  <meta name="description" content="Learn chess step by step: rules, tactics, opening principles, a starter repertoire with spaced-repetition drills, and endgames.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="top">
+    <a href="#/learn" class="brand"><span class="logo">♞</span> Chess Academy</a>
+    <nav>
+      <a href="#/learn" data-tab="learn">Learn</a>
+      <a href="#/openings" data-tab="openings">Openings <span id="due-badge" class="badge" hidden></span></a>
+      <a href="#/play" data-tab="play">Practice</a>
+      <a href="#/library" data-tab="library">Library</a>
+    </nav>
+    <div id="stats" class="stats"></div>
+  </header>
+  <main id="app"></main>
+  <footer>Progress is saved in this browser only. Chess logic by chess.js (BSD-2-Clause).</footer>
+  <script src="js/vendor/chess.js"></script>
+  <script src="js/board.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/curriculum.js"></script>
+  <script src="js/openings.js"></script>
+  <script src="js/library.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
