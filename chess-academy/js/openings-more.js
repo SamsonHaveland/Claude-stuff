@@ -32,7 +32,7 @@
         ['Bc4', 'The bishop takes its active diagonal; castling comes next.']
       ]},
       { name: 'Scotch Four Knights (4...Nf6)', moves: [
-        ['e4', ''], ['e5', ''], ['Nf3', ''], ['Nc6', ''], ['d4', ''], ['exd4', ''], ['Nxd4', ''],
+        ['e4', 'Occupies the centre and opens lines for the queen and the f1-bishop.'], ['e5', 'Black stakes an equal claim in the centre.'], ['Nf3', 'Develops with a threat: the e5-pawn is attacked.'], ['Nc6', 'Develops and defends e5 — the most natural reply.'], ['d4', 'The Scotch: challenge e5 immediately and open the centre.'], ['exd4', 'Black takes; holding e5 with ...d6 is passive.'], ['Nxd4', 'Recapture with a piece in the centre.'],
         ['Nf6', 'Counterattacks e4 instead.'],
         ['Nc3', 'Defends e4 with development.'],
         ['Bb4', 'Pins the knight, renewing pressure on e4.'],
@@ -61,7 +61,7 @@
     plans: '<p><b>Typical plan:</b> Bb5, castle, d3, then Bg5 to pin the f6-knight. Look for Nd5 jumps and the d3–d4 break.</p>',
     lines: [
       { name: 'Spanish Four Knights (4.Bb5)', moves: [
-        ['e4', ''], ['e5', ''], ['Nf3', ''], ['Nc6', ''],
+        ['e4', 'Occupies the centre and opens lines for the queen and the f1-bishop.'], ['e5', 'Black stakes an equal claim in the centre.'], ['Nf3', 'Develops with a threat: the e5-pawn is attacked.'], ['Nc6', 'Develops and defends e5 — the most natural reply.'],
         ['Nc3', 'Develop the second knight before committing the bishop.'],
         ['Nf6', 'Black mirrors: four knights on the board.'],
         ['Bb5', 'Pins the c6-knight, adding indirect pressure on e5.'],
@@ -73,7 +73,7 @@
         ['Bg5', 'Pins the f6-knight; Nd5 ideas follow.']
       ]},
       { name: 'Scotch Four Knights (4.d4)', moves: [
-        ['e4', ''], ['e5', ''], ['Nf3', ''], ['Nc6', ''], ['Nc3', ''], ['Nf6', ''],
+        ['e4', 'Occupies the centre and opens lines for the queen and the f1-bishop.'], ['e5', 'Black stakes an equal claim in the centre.'], ['Nf3', 'Develops with a threat: the e5-pawn is attacked.'], ['Nc6', 'Develops and defends e5 — the most natural reply.'], ['Nc3', 'Develop the second knight before committing the bishop.'], ['Nf6', 'Black mirrors: four knights on the board.'],
         ['d4', 'Open the centre immediately.'],
         ['exd4', 'Black takes.'],
         ['Nxd4', 'Centralised knight.'],
@@ -103,7 +103,7 @@
     plans: '<p><b>Typical plan:</b> Nc3 and Nf3 pile up on d5. Bg5 pins, e3 and Bd3 develop, and the rooks come to c1/d1. Look for the cxd5 exchange followed by a queenside minority attack (b4–b5).</p>',
     lines: [
       { name: 'vs Declined (2...e6)', moves: [
-        ['d4', ''], ['d5', ''],
+        ['d4', 'Claims the centre; the queen protects d4.'], ['d5', 'Black mirrors.'],
         ['c4', 'The gambit: attack d5 from the side.'],
         ['e6', 'Declined: Black supports d5.'],
         ['Nc3', 'More pressure on d5.'],
@@ -119,7 +119,7 @@
         ['Bd3', 'Develops; castling follows.']
       ]},
       { name: 'vs Accepted (2...dxc4)', moves: [
-        ['d4', ''], ['d5', ''], ['c4', ''],
+        ['d4', 'Claims the centre; the queen protects d4.'], ['d5', 'Black mirrors.'], ['c4', 'The Queen’s Gambit: White offers a wing pawn to deflect d5.'],
         ['dxc4', 'Accepted: Black takes but can’t hold the pawn for long.'],
         ['e4', 'Grab the whole centre while Black’s pawn is offside.'],
         ['e5', 'Black strikes back immediately, the principled answer.'],
@@ -130,7 +130,7 @@
         ['O-O', 'Castle; White has an easy lead in development.']
       ]},
       { name: 'vs Slav (2...c6)', moves: [
-        ['d4', ''], ['d5', ''], ['c4', ''],
+        ['d4', 'Claims the centre; the queen protects d4.'], ['d5', 'Black mirrors.'], ['c4', 'The Queen’s Gambit: White offers a wing pawn to deflect d5.'],
         ['c6', 'The Slav: supports d5 while keeping the c8-bishop free.'],
         ['Nf3', 'Flexible development.'],
         ['Nf6', 'Black develops.'],
@@ -157,7 +157,7 @@
     plans: '<p><b>Typical plan:</b> recapture with the queen, put it on a5 or d6, then play ...Nf6, ...c6, ...Bf5 (or ...Bg4) and ...e6, and castle. It is a solid Caro-Kann-like structure.</p>',
     lines: [
       { name: 'Main line: 3...Qa5', moves: [
-        ['e4', ''],
+        ['e4', 'Occupies the centre and opens lines for the queen and the f1-bishop.'],
         ['d5', 'Challenge e4 immediately.'],
         ['exd5', 'White accepts.'],
         ['Qxd5', 'Recapture. The queen is exposed, but White has no quick way to exploit it.'],
@@ -173,7 +173,7 @@
         ['e6', 'Solid; ...Bb4 and castling follow.']
       ]},
       { name: 'Modern: 3...Qd6', moves: [
-        ['e4', ''], ['d5', ''], ['exd5', ''], ['Qxd5', ''], ['Nc3', ''],
+        ['e4', 'Occupies the centre and opens lines for the queen and the f1-bishop.'], ['d5', 'Challenge e4 immediately.'], ['exd5', 'White accepts.'], ['Qxd5', 'Recapture. The queen is exposed, but White has no quick way to exploit it.'], ['Nc3', 'Develops with tempo on the queen.'],
         ['Qd6', 'The queen sits safely in the centre, ready for ...a6 and ...Nf6.'],
         ['d4', 'Centre.'],
         ['Nf6', 'Develop.'],
@@ -201,7 +201,7 @@
     plans: '<p><b>Typical plan (Closed):</b> castle, Re1, c3, h3 and d4. Re-route the b1-knight to g3 and keep the light-squared bishop on the b1–h7 or a2–g8 diagonal. Black aims for ...c5 and queenside space.</p>',
     lines: [
       { name: 'Closed Ruy Lopez (Chigorin)', moves: [
-        ['e4', ''], ['e5', ''], ['Nf3', ''], ['Nc6', ''],
+        ['e4', 'Occupies the centre and opens lines for the queen and the f1-bishop.'], ['e5', 'Black stakes an equal claim in the centre.'], ['Nf3', 'Develops with a threat: the e5-pawn is attacked.'], ['Nc6', 'Develops and defends e5 — the most natural reply.'],
         ['Bb5', 'Pressure on the defender of e5.'],
         ['a6', 'The Morphy Defence: ask the bishop immediately.'],
         ['Ba4', 'Keep the pin-like pressure; Bxc6 can wait.'],
@@ -222,7 +222,7 @@
         ['Qc7', 'Black keeps e5 well defended. A rich, classical middlegame.']
       ]},
       { name: 'Berlin Defence', moves: [
-        ['e4', ''], ['e5', ''], ['Nf3', ''], ['Nc6', ''], ['Bb5', ''],
+        ['e4', 'Occupies the centre and opens lines for the queen and the f1-bishop.'], ['e5', 'Black stakes an equal claim in the centre.'], ['Nf3', 'Develops with a threat: the e5-pawn is attacked.'], ['Nc6', 'Develops and defends e5 — the most natural reply.'], ['Bb5', 'Pressure on the defender of e5.'],
         ['Nf6', 'The Berlin: counterattack e4 right away.'],
         ['O-O', 'Castle, inviting ...Nxe4.'],
         ['Nxe4', 'Black takes the pawn.'],
@@ -250,7 +250,7 @@
     plans: '<p><b>Typical plan:</b> after White plays e5, hit the chain with <code>...c5</code> (and later <code>...f6</code>). Pile up on d4 with ...Nc6, ...Qb6 and ...Nf5/...Ne7. Avoid playing passively.</p>',
     lines: [
       { name: 'Advance (3.e5)', moves: [
-        ['e4', ''], ['e6', 'Prepares ...d5 with pawn support.'],
+        ['e4', 'Occupies the centre and opens lines for the queen and the f1-bishop.'], ['e6', 'Prepares ...d5 with pawn support.'],
         ['d4', 'Centre.'], ['d5', 'The French challenge.'],
         ['e5', 'Advance: White gains space and closes the centre.'],
         ['c5', 'Immediately attack the base of the chain.'],
@@ -264,7 +264,7 @@
         ['Na5', 'The knight heads for b3, a strong outpost.']
       ]},
       { name: 'Classical (3.Nc3 Nf6 4.Bg5)', moves: [
-        ['e4', ''], ['e6', ''], ['d4', ''], ['d5', ''],
+        ['e4', 'Occupies the centre and opens lines for the queen and the f1-bishop.'], ['e6', 'Prepares ...d5 with pawn support.'], ['d4', 'Centre.'], ['d5', 'The French challenge.'],
         ['Nc3', 'Defends e4 with development.'],
         ['Nf6', 'Classical: attack e4 again.'],
         ['Bg5', 'Pins the attacker.'],
@@ -279,7 +279,7 @@
         ['c5', 'The thematic strike at d4.']
       ]},
       { name: 'Tarrasch (3.Nd2)', moves: [
-        ['e4', ''], ['e6', ''], ['d4', ''], ['d5', ''],
+        ['e4', 'Occupies the centre and opens lines for the queen and the f1-bishop.'], ['e6', 'Prepares ...d5 with pawn support.'], ['d4', 'Centre.'], ['d5', 'The French challenge.'],
         ['Nd2', 'Tarrasch: avoids the ...Bb4 pin.'],
         ['Nf6', 'Attack e4.'],
         ['e5', 'Advance with tempo.'],
@@ -308,30 +308,30 @@
     plans: '<p><b>Typical plan (Classical):</b> after <code>...e5</code> and <code>d5</code>, the centre is locked. Black attacks on the kingside with ...Ne8/...Nd7, ...f5, ...f4 and ...g5, while White pushes on the queenside with c5. It is a race.</p>',
     lines: [
       { name: 'Classical: Mar del Plata', moves: [
-        ['d4', ''], ['Nf6', 'Flexible.'],
-        ['c4', ''], ['g6', 'Prepare the fianchetto.'],
-        ['Nc3', ''], ['Bg7', 'The bishop eyes the long diagonal.'],
+        ['d4', 'Claims the centre; the queen protects d4.'], ['Nf6', 'Flexible.'],
+        ['c4', 'Grabs more central space and prepares Nc3.'], ['g6', 'Prepare the fianchetto.'],
+        ['Nc3', 'Develops and supports a later e4.'], ['Bg7', 'The bishop eyes the long diagonal.'],
         ['e4', 'White takes the full centre.'],
         ['d6', 'Black stays compact, preparing ...e5.'],
-        ['Nf3', ''],
+        ['Nf3', 'Natural development, protecting d4 and preparing to castle.'],
         ['O-O', 'King safe first.'],
         ['Be2', 'Classical development.'],
         ['e5', 'The key strike in the centre.'],
-        ['O-O', ''],
+        ['O-O', 'White castles; the e5-pawn is safe because dxe5 dxe5 Qxd8 Rxd8 gives White nothing.'],
         ['Nc6', 'Increase pressure on d4.'],
         ['d5', 'White locks the centre and gains space.'],
         ['Ne7', 'The knight heads toward the kingside attack.'],
         ['Ne1', 'White prepares f3 and the queenside push.'],
         ['Nd7', 'Clears the f-pawn’s path.'],
-        ['Be3', ''],
+        ['Be3', 'Develops and covers the c5-square, supporting White\'s queenside push.'],
         ['f5', 'The thematic kingside lever.'],
         ['f3', 'Holds e4.'],
         ['f4', 'Gain space with tempo on the bishop.'],
-        ['Bf2', ''],
+        ['Bf2', 'The bishop steps back but keeps an eye on the queenside (c5, a7).'],
         ['g5', 'The pawn storm begins. A famous race of attacks.']
       ]},
       { name: 'Sämisch (5.f3)', moves: [
-        ['d4', ''], ['Nf6', ''], ['c4', ''], ['g6', ''], ['Nc3', ''], ['Bg7', ''], ['e4', ''], ['d6', ''],
+        ['d4', 'Claims the centre; the queen protects d4.'], ['Nf6', 'Flexible: Black doesn’t commit the d-pawn.'], ['c4', 'Grabs more central space and prepares Nc3.'], ['g6', 'Prepare the fianchetto.'], ['Nc3', 'Develops and supports a later e4.'], ['Bg7', 'The bishop eyes the long diagonal.'], ['e4', 'White takes the full centre.'], ['d6', 'Black stays compact, preparing ...e5.'],
         ['f3', 'Sämisch: White fortifies e4 and may attack with g4/h4.'],
         ['O-O', 'Castle.'],
         ['Be3', 'Develop, preparing Qd2.'],
@@ -359,28 +359,28 @@
         ['c4', 'Control d5 from the side.'],
         ['e5', 'Black takes the centre.'],
         ['Nc3', 'More control of d5.'],
-        ['Nf6', ''],
+        ['Nf6', 'Develops and prepares ...d5 to claim the centre.'],
         ['Nf3', 'Pressure on e5.'],
         ['Nc6', 'Defend.'],
         ['g3', 'Prepare the fianchetto.'],
         ['d5', 'Black grabs space.'],
         ['cxd5', 'Trade off Black’s centre pawn.'],
-        ['Nxd5', ''],
+        ['Nxd5', 'Black recaptures with the knight and holds a central pawn on e5.'],
         ['Bg2', 'The bishop pressures d5 and the long diagonal.'],
         ['Nb6', 'The knight steps away from the g2-bishop’s attack.'],
-        ['O-O', ''],
-        ['Be7', ''],
+        ['O-O', 'Castle first; the king is safe behind the fianchetto.'],
+        ['Be7', 'Solid development; Black prepares to castle.'],
         ['d3', 'Solid; next comes a3 and b4 to attack on the queenside.']
       ]},
       { name: 'Symmetrical (1...c5)', moves: [
-        ['c4', ''], ['c5', 'Black mirrors.'],
-        ['Nc3', ''], ['Nc6', ''],
-        ['g3', ''], ['g6', ''],
-        ['Bg2', ''], ['Bg7', ''],
-        ['Nf3', ''], ['Nf6', ''],
-        ['O-O', ''], ['O-O', ''],
+        ['c4', 'Control d5 from the side.'], ['c5', 'Black mirrors.'],
+        ['Nc3', 'Develops toward d5, the key square in the English.'], ['Nc6', 'Black mirrors, also eyeing d4.'],
+        ['g3', 'Prepares to fianchetto the light-squared bishop.'], ['g6', 'Black copies the plan.'],
+        ['Bg2', 'The bishop rakes the long diagonal toward b7 and the queenside.'], ['Bg7', 'Black\'s bishop does the same on the opposite diagonal.'],
+        ['Nf3', 'Develops and prepares to castle; d4 is now possible.'], ['Nf6', 'Black develops and prepares to castle too.'],
+        ['O-O', 'King to safety before opening the position.'], ['O-O', 'Black castles; both sides are fully developed on the kingside.'],
         ['d4', 'White breaks the symmetry first.'],
-        ['cxd4', ''],
+        ['cxd4', 'Black trades, so White does not gain central space with d5.'],
         ['Nxd4', 'An open position where the side with better piece play is better.']
       ]}
     ]
@@ -400,10 +400,10 @@
     plans: '<p><b>Typical plan:</b> ...e5 or ...e6, ...Be7, ...O-O and ...b5. Black attacks on the queenside and down the c-file while White often castles long and storms the kingside.</p>',
     lines: [
       { name: 'English Attack (6.Be3)', moves: [
-        ['e4', ''], ['c5', 'The Sicilian.'],
-        ['Nf3', ''], ['d6', 'Controls e5 and prepares ...Nf6.'],
+        ['e4', 'Occupies the centre and opens lines for the queen and the f1-bishop.'], ['c5', 'The Sicilian.'],
+        ['Nf3', 'Develops and prepares d4 to open the position.'], ['d6', 'Controls e5 and prepares ...Nf6.'],
         ['d4', 'Open Sicilian.'], ['cxd4', 'Trade the c-pawn for White’s d-pawn.'],
-        ['Nxd4', ''], ['Nf6', 'Attack e4.'],
+        ['Nxd4', 'White recaptures with a centralised knight and a lead in development.'], ['Nf6', 'Attack e4.'],
         ['Nc3', 'Defend.'],
         ['a6', 'The Najdorf: a flexible, useful waiting move.'],
         ['Be3', 'The English Attack: f3, Qd2, O-O-O and g4 are coming.'],
@@ -411,27 +411,27 @@
         ['Nb3', 'The knight retreats.'],
         ['Be6', 'Controls d5.'],
         ['f3', 'Supports e4 and prepares g4.'],
-        ['Be7', ''],
-        ['Qd2', ''],
-        ['O-O', ''],
+        ['Be7', 'Quiet development; Black prepares to castle.'],
+        ['Qd2', 'Connects the pieces and prepares long castling.'],
+        ['O-O', 'Black castles short, where White will soon attack with g4.'],
         ['O-O-O', 'Opposite-side castling: both sides attack.'],
         ['Nbd7', 'Black prepares ...b5–b4.']
       ]},
       { name: 'Classical (6.Be2)', moves: [
-        ['e4', ''], ['c5', ''], ['Nf3', ''], ['d6', ''], ['d4', ''], ['cxd4', ''], ['Nxd4', ''], ['Nf6', ''], ['Nc3', ''], ['a6', ''],
+        ['e4', 'Occupies the centre and opens lines for the queen and the f1-bishop.'], ['c5', 'The Sicilian.'], ['Nf3', 'Develops and prepares d4 to open the position.'], ['d6', 'Controls e5 and prepares ...Nf6.'], ['d4', 'Open Sicilian.'], ['cxd4', 'Trade the c-pawn for White’s d-pawn.'], ['Nxd4', 'White recaptures with a centralised knight and a lead in development.'], ['Nf6', 'Attack e4.'], ['Nc3', 'Defend.'], ['a6', 'The Najdorf: a flexible, useful waiting move.'],
         ['Be2', 'A calmer, positional approach.'],
         ['e5', 'Space with tempo.'],
-        ['Nb3', ''],
-        ['Be7', ''],
-        ['O-O', ''],
-        ['O-O', ''],
-        ['Be3', ''],
+        ['Nb3', 'The knight retreats to a safe square that also eyes d4 and c5.'],
+        ['Be7', 'Simple development, preparing to castle.'],
+        ['O-O', 'White castles short: a positional battle, not a race of pawn storms.'],
+        ['O-O', 'Black castles too.'],
+        ['Be3', 'Develops and fights for the d5 and b6 squares.'],
         ['Be6', 'Black fights for d5, the key square in this structure.']
       ]},
       { name: 'Poisoned Pawn (6.Bg5)', moves: [
-        ['e4', ''], ['c5', ''], ['Nf3', ''], ['d6', ''], ['d4', ''], ['cxd4', ''], ['Nxd4', ''], ['Nf6', ''], ['Nc3', ''], ['a6', ''],
+        ['e4', 'Occupies the centre and opens lines for the queen and the f1-bishop.'], ['c5', 'The Sicilian.'], ['Nf3', 'Develops and prepares d4 to open the position.'], ['d6', 'Controls e5 and prepares ...Nf6.'], ['d4', 'Open Sicilian.'], ['cxd4', 'Trade the c-pawn for White’s d-pawn.'], ['Nxd4', 'White recaptures with a centralised knight and a lead in development.'], ['Nf6', 'Attack e4.'], ['Nc3', 'Defend.'], ['a6', 'The Najdorf: a flexible, useful waiting move.'],
         ['Bg5', 'The most aggressive try.'],
-        ['e6', ''],
+        ['e6', 'Solid: covers d5 and breaks the pressure on the pinned knight later with ...Be7.'],
         ['f4', 'Threatens e5.'],
         ['Qb6', 'Hit d4 and b2.'],
         ['Qd2', 'White offers the b2-pawn.'],
@@ -454,33 +454,33 @@
     plans: '<p><b>Typical plan:</b> ...Bxc3 when it doubles White’s pawns, then blockade them with ...c5, ...d6 and ...e5, or play ...b6 and ...Bb7 to control e4. Knights love closed positions.</p>',
     lines: [
       { name: 'Rubinstein (4.e3)', moves: [
-        ['d4', ''], ['Nf6', ''], ['c4', ''], ['e6', ''],
+        ['d4', 'Claims the centre; the queen protects d4.'], ['Nf6', 'Flexible: Black doesn’t commit the d-pawn.'], ['c4', 'Grabs more central space and prepares Nc3.'], ['e6', 'Opens the f8-bishop and keeps ...d5 or ...Bb4 in reserve.'],
         ['Nc3', 'Prepares e4.'],
         ['Bb4', 'The Nimzo pin: e4 is now hard to achieve.'],
         ['e3', 'Rubinstein: solid development.'],
         ['O-O', 'Castle; keep options open.'],
-        ['Bd3', ''],
+        ['Bd3', 'Develops and prepares to castle.'],
         ['d5', 'Claim the centre.'],
-        ['Nf3', ''],
+        ['Nf3', 'Develops, supporting d4 and e5.'],
         ['c5', 'Pressure on d4.'],
-        ['O-O', ''],
-        ['Nc6', ''],
+        ['O-O', 'King safe before the centre opens.'],
+        ['Nc6', 'Develops and adds pressure on d4.'],
         ['a3', 'Ask the bishop.'],
         ['Bxc3', 'Give the bishop for the knight, doubling pawns.'],
-        ['bxc3', ''],
+        ['bxc3', 'White recaptures toward the centre and gets the bishop pair.'],
         ['dxc4', 'Trade to open lines.'],
-        ['Bxc4', ''],
+        ['Bxc4', 'Recapture; White\'s bishops are active but the c-pawns are a long-term target.'],
         ['Qc7', 'Prepares ...e5. A classic main line.']
       ]},
       { name: 'Classical (4.Qc2)', moves: [
-        ['d4', ''], ['Nf6', ''], ['c4', ''], ['e6', ''], ['Nc3', ''], ['Bb4', ''],
+        ['d4', 'Claims the centre; the queen protects d4.'], ['Nf6', 'Flexible: Black doesn’t commit the d-pawn.'], ['c4', 'Grabs more central space and prepares Nc3.'], ['e6', 'Opens the f8-bishop and keeps ...d5 or ...Bb4 in reserve.'], ['Nc3', 'Prepares e4.'], ['Bb4', 'The Nimzo pin: e4 is now hard to achieve.'],
         ['Qc2', 'Avoids doubled pawns: White recaptures with the queen.'],
-        ['O-O', ''],
+        ['O-O', 'Castle first, waiting to see where White\'s queen and bishop go.'],
         ['a3', 'Force the decision.'],
-        ['Bxc3+', ''],
+        ['Bxc3+', 'Black gives up the bishop rather than retreat and lose time.'],
         ['Qxc3', 'White has the bishop pair; Black is ahead in development.'],
         ['b6', 'Prepare ...Bb7 to control e4.'],
-        ['Bg5', ''],
+        ['Bg5', 'Pins the f6-knight, increasing control of e4.'],
         ['Bb7', 'Black fights for the light squares.']
       ]}
     ]
@@ -498,34 +498,34 @@
     plans: '<p><b>Typical plan:</b> after the exchange on c3, pressure d4 with ...Bg7, ...c5, ...Nc6, ...Bg4 and ...Qa5. Trade pieces when White over-extends; the endgames often favour Black.</p>',
     lines: [
       { name: 'Exchange: modern 8.Rb1', moves: [
-        ['d4', ''], ['Nf6', ''], ['c4', ''], ['g6', ''], ['Nc3', ''],
+        ['d4', 'Claims the centre; the queen protects d4.'], ['Nf6', 'Flexible: Black doesn’t commit the d-pawn.'], ['c4', 'Grabs more central space and prepares Nc3.'], ['g6', 'Prepare the fianchetto.'], ['Nc3', 'Develops and supports a later e4.'],
         ['d5', 'The Grünfeld: challenge the centre with a pawn.'],
         ['cxd5', 'Exchange variation.'],
-        ['Nxd5', ''],
+        ['Nxd5', 'Recapture; the knight will soon be challenged by e4.'],
         ['e4', 'Gain time and build a big centre.'],
-        ['Nxc3', ''],
+        ['Nxc3', 'Trade knights so the c3-pawn can be targeted later.'],
         ['bxc3', 'White has the classical pawn centre.'],
         ['Bg7', 'The bishop pressures c3 and d4.'],
-        ['Nf3', ''],
+        ['Nf3', 'Develops and defends d4.'],
         ['c5', 'Strike at d4.'],
         ['Rb1', 'Takes the rook off the long diagonal and eyes b7.'],
-        ['O-O', ''],
-        ['Be2', ''],
-        ['cxd4', ''],
-        ['cxd4', ''],
+        ['O-O', 'King safe first; the counterattack can wait a move.'],
+        ['Be2', 'Develops and prepares to castle.'],
+        ['cxd4', 'Releases the tension to open the c-file and prepare ...Qa5+.'],
+        ['cxd4', 'White recaptures and keeps a strong pawn centre.'],
         ['Qa5+', 'The point: a check that wins the a2-pawn.'],
-        ['Bd2', ''],
+        ['Bd2', 'Blocks the check, deliberately leaving the a2-pawn.'],
         ['Qxa2', 'Black grabs the pawn; White gets development and play against b7.'],
         ['O-O', 'A well-known, dynamically balanced position.']
       ]},
       { name: 'Exchange: classical 7.Bc4', moves: [
-        ['d4', ''], ['Nf6', ''], ['c4', ''], ['g6', ''], ['Nc3', ''], ['d5', ''], ['cxd5', ''], ['Nxd5', ''], ['e4', ''], ['Nxc3', ''], ['bxc3', ''], ['Bg7', ''],
+        ['d4', 'Claims the centre; the queen protects d4.'], ['Nf6', 'Flexible: Black doesn’t commit the d-pawn.'], ['c4', 'Grabs more central space and prepares Nc3.'], ['g6', 'Prepare the fianchetto.'], ['Nc3', 'Develops and supports a later e4.'], ['d5', 'The Grünfeld: challenge the centre with a pawn.'], ['cxd5', 'Exchange variation.'], ['Nxd5', 'Recapture; the knight will soon be challenged by e4.'], ['e4', 'Gain time and build a big centre.'], ['Nxc3', 'Trade knights so the c3-pawn can be targeted later.'], ['bxc3', 'White has the classical pawn centre.'], ['Bg7', 'The bishop pressures c3 and d4.'],
         ['Bc4', 'The classical set-up, eyeing f7.'],
         ['c5', 'Pressure on d4.'],
         ['Ne2', 'The knight on e2 supports d4 and avoids a ...Bg4 pin.'],
         ['Nc6', 'More pressure.'],
         ['Be3', 'Defends d4.'],
-        ['O-O', ''],
+        ['O-O', 'Black castles, completing kingside development.'],
         ['O-O', 'Black continues with ...Bg4 or ...Na5, hitting the centre.']
       ]}
     ]
@@ -543,14 +543,14 @@
     plans: '<p><b>Typical plan:</b> g3, Bg2, castle, Qc2 or Qa4, and regain c4. Then press on the long diagonal and the c-file, and fight against Black’s ...c5 or ...e5 freeing breaks.</p>',
     lines: [
       { name: 'Open Catalan (6...dxc4)', moves: [
-        ['d4', ''], ['Nf6', ''], ['c4', ''], ['e6', ''],
+        ['d4', 'Claims the centre; the queen protects d4.'], ['Nf6', 'Flexible: Black doesn’t commit the d-pawn.'], ['c4', 'Grabs more central space and prepares Nc3.'], ['e6', 'Opens the f8-bishop and keeps ...d5 or ...Bb4 in reserve.'],
         ['g3', 'The Catalan: fianchetto the light-squared bishop.'],
-        ['d5', ''],
+        ['d5', 'Black claims a share of the centre, Queen\'s Gambit style.'],
         ['Bg2', 'The bishop eyes d5, c6 and b7.'],
-        ['Be7', ''],
-        ['Nf3', ''],
-        ['O-O', ''],
-        ['O-O', ''],
+        ['Be7', 'Solid development, preparing to castle.'],
+        ['Nf3', 'Develops and prepares to castle.'],
+        ['O-O', 'Black castles.'],
+        ['O-O', 'White castles too, so the c4-pawn can be offered as a gambit.'],
         ['dxc4', 'Black takes the pawn.'],
         ['Qc2', 'White will regain it.'],
         ['a6', 'Prepares ...b5 to keep the pawn.'],
@@ -561,7 +561,7 @@
         ['Bf4', 'Active development; White keeps a small, lasting edge.']
       ]},
       { name: 'Closed Catalan (6...Nbd7)', moves: [
-        ['d4', ''], ['Nf6', ''], ['c4', ''], ['e6', ''], ['g3', ''], ['d5', ''], ['Bg2', ''], ['Be7', ''], ['Nf3', ''], ['O-O', ''], ['O-O', ''],
+        ['d4', 'Claims the centre; the queen protects d4.'], ['Nf6', 'Flexible: Black doesn’t commit the d-pawn.'], ['c4', 'Grabs more central space and prepares Nc3.'], ['e6', 'Opens the f8-bishop and keeps ...d5 or ...Bb4 in reserve.'], ['g3', 'The Catalan: fianchetto the light-squared bishop.'], ['d5', 'Black claims a share of the centre, Queen\'s Gambit style.'], ['Bg2', 'The bishop eyes d5, c6 and b7.'], ['Be7', 'Solid development, preparing to castle.'], ['Nf3', 'Develops and prepares to castle.'], ['O-O', 'Black castles.'], ['O-O', 'White castles too, so the c4-pawn can be offered as a gambit.'],
         ['Nbd7', 'Black keeps the centre closed.'],
         ['Qc2', 'Supports e4.'],
         ['c6', 'Solid.'],

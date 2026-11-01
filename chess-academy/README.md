@@ -10,8 +10,8 @@ A step-by-step chess course in the browser: rules, tactics, opening theory and a
 |---|---|---|
 | **Learn** | A path of 7 units and 22 short lessons. Each lesson mixes explanation cards, quizzes and hands-on board exercises. | Duolingo's lesson path; Chess.com Lessons |
 | **Board exercises** | Star-collecting games for each piece, a coordinate drill, puzzles with scripted replies, mate-in-one with any mating move accepted, and K+Q vs K played against the engine. | Lichess *Learn* and *Practice* |
-| **Openings** | 17 sound, established openings in four levels: **Beginner** (Italian, London, Scotch, Four Knights, Traps to Avoid), **Novice** (Queen's Gambit, Caro-Kann, QGD, Scandinavian), **Pro** (Ruy Lopez, English, French, King's Indian) and **Champ** (Najdorf, Nimzo-Indian, Grünfeld, Catalan). You can filter by colour, and the level matching your estimated rating is highlighted. Each one covers why to play it, the typical plans, the history, and its lines. | Chessable course layout |
-| **Drill** | Play your side of each line from memory. Uses Leitner-box spaced repetition with reviews after 1, 3, 7, 14, 30 and 60 days; a mistake resets the line. | Chessable MoveTrainer |
+| **Openings** | 17 sound, established openings in four levels: **Beginner** (Italian, London, Scotch, Four Knights, Traps to Avoid), **Novice** (Queen's Gambit, Caro-Kann, QGD, Scandinavian), **Pro** (Ruy Lopez, English, French, King's Indian) and **Champ** (Najdorf, Nimzo-Indian, Grünfeld, Catalan). You can filter by colour, and the level matching your estimated rating is highlighted. Each one covers why to play it, the typical plans, the history, and its lines, with a reason for every move. Tempting mistakes have **Why not …?** notes. | Chessable course layout |
+| **Drill** | Play your side of each line from memory. If you play a different move, the app explains why it is wrong: a written note if there is one, otherwise the engine's punishing reply, or it tells you your move is book in another opening. Uses Leitner-box spaced repetition with reviews after 1, 3, 7, 14, 30 and 60 days; a mistake resets the line. | Chessable MoveTrainer |
 | **Practice** | Play a bot at three levels, from the starting position or from the end of any opening line. An optional **Coach** warns you when a move gives away material, and there are Hint and Take-back buttons. | Chess.com / Lichess analysis aids |
 | **Rating estimate** | An Elo-style guess at your playing strength. It uses first attempts at lesson exercises (each lesson has a difficulty level) and unassisted bot games, which count 3×. It is shown with a likely range. Lesson difficulties and bot ratings (~600 / ~900 / ~1250) are uncalibrated estimates. | Chess.com / Lichess puzzle ratings |
 | **Library** | Study method, how the rating estimate works, a glossary and further reading. | — |
@@ -40,10 +40,12 @@ js/engine.js          small alpha-beta engine (bot, hints, blunder coach)
 js/curriculum.js      all lesson content
 js/openings.js        original five openings
 js/openings-more.js   twelve more openings + level (tier) for every opening
+js/whynot.js          "Why not …?" notes on tempting mistakes, keyed by position
 js/library.js         reference pages
 js/app.js             router, views, progress / spaced repetition
 tests/validate.js     checks every FEN, solution, mate and opening move for legality, and that no
-                      opening line ends with the student's side materially worse (engine check)
+                      opening line ends with the student's side materially worse (engine check),
+                      that every move is explained, and that every "why not" move is legal
 ```
 
 To add a lesson or an opening line, edit `curriculum.js` or `openings.js`, then run `node tests/validate.js`.

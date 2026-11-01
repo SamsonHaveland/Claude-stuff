@@ -271,3 +271,10 @@ table.rep th { white-space: nowrap; font-weight: 600; color: var(--muted); font-
 .side-tag { font-size: .72rem; font-weight: 600; margin: 0 0 .2rem !important; color: var(--muted) !important; }
 .side-tag.white::before { content: "\25CB  "; } .side-tag.black::before { content: "\25CF  "; }
 .mini { align-self: flex-start; aspect-ratio: 1; }
+
+/* Why not ...? */
+.whynot { margin-top: 1rem; padding: .9rem 1.05rem; border-radius: 14px; background: var(--gold-tint); }
+.whynot p { margin: .15rem 0 .55rem; color: var(--ink-2); }
+.whynot p:last-child { margin-bottom: 0; }
+.whynot-h { font-weight: 600; color: var(--ink) !important; margin-bottom: .1rem !important; }
+.fb p { margin: .25rem 0; }

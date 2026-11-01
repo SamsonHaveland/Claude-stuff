@@ -44,7 +44,7 @@ var OPENINGS = [
         ['c3', 'Prepares d4 and gives the bishop a retreat. A typical Italian middlegame begins.']
       ]},
       { name: 'Fried Liver trap (if Black errs)', moves: [
-        ['e4', ''], ['e5', ''], ['Nf3', ''], ['Nc6', ''], ['Bc4', ''], ['Nf6', 'Two Knights Defence.'],
+        ['e4', 'Occupies the centre and opens lines for the queen and the f1-bishop.'], ['e5', 'Black stakes an equal claim in the centre.'], ['Nf3', 'Develops with a threat: the e5-pawn is attacked.'], ['Nc6', 'Develops and defends e5 — the most natural reply.'], ['Bc4', 'The Italian bishop: aims at f7, the square only Black’s king defends.'], ['Nf6', 'Two Knights Defence.'],
         ['Ng5', 'The aggressive try: knight and bishop gang up on f7.'],
         ['d5', 'The only good defence: block the bishop’s diagonal.'],
         ['exd5', 'Opening the diagonal again.'],
@@ -87,7 +87,7 @@ var OPENINGS = [
         ['Bd3', 'Bishop to its best diagonal, aiming at h7. Castle next and plan Ne5 or e4.']
       ]},
       { name: 'vs King’s Indian setup (...g6)', moves: [
-        ['d4', ''], ['Nf6', 'Flexible: Black doesn’t commit the d-pawn.'],
+        ['d4', 'Claims the centre; the queen protects d4.'], ['Nf6', 'Flexible: Black doesn’t commit the d-pawn.'],
         ['Bf4', 'Same setup regardless.'],
         ['g6', 'Black prepares to fianchetto — a hypermodern approach.'],
         ['e3', 'Solid support.'],
@@ -99,7 +99,7 @@ var OPENINGS = [
         ['h3', 'A retreat square on h2 for the f4-bishop and no ...Bg4 or ...Nh5 harassment. Castle next.']
       ]},
       { name: 'The ...Qb6 test', moves: [
-        ['d4', ''], ['d5', ''], ['Bf4', ''],
+        ['d4', 'Claims the centre; the queen protects d4.'], ['d5', 'Black mirrors.'], ['Bf4', 'The London move: the bishop gets out before e3 shuts it in.'],
         ['c5', 'An active try: hit d4 immediately.'],
         ['e3', 'Calmly supports d4.'],
         ['Nc6', 'More pressure on d4.'],
@@ -122,7 +122,7 @@ var OPENINGS = [
     plans: '<p><b>Typical plan:</b> challenge with ...d5, develop the bishop to f5/g4, then ...e6, ...Nd7, ...Ngf6, castle, and later free your game with ...c5 or ...e5. Against the Advance (3.e5), attack the white chain’s base with ...c5.</p>',
     lines: [
       { name: 'Classical: 3.Nc3 dxe4 4.Nxe4 Bf5', moves: [
-        ['e4', ''], ['c6', 'Prepares ...d5 with pawn support.'],
+        ['e4', 'Occupies the centre and opens lines for the queen and the f1-bishop.'], ['c6', 'Prepares ...d5 with pawn support.'],
         ['d4', 'White builds the ideal centre.'],
         ['d5', 'Black challenges e4 at once.'],
         ['Nc3', 'Defends e4 with development.'],
@@ -143,7 +143,7 @@ var OPENINGS = [
         ['e6', 'Now ...e6 is perfect: the bishop is already gone. Black follows with ...Ngf6, ...Be7/...Bd6, ...Qc7 and castles.']
       ]},
       { name: 'Advance: 3.e5 Bf5', moves: [
-        ['e4', ''], ['c6', ''], ['d4', ''], ['d5', ''],
+        ['e4', 'Occupies the centre and opens lines for the queen and the f1-bishop.'], ['c6', 'Prepares ...d5 with pawn support.'], ['d4', 'White builds the ideal centre.'], ['d5', 'Black challenges e4 at once.'],
         ['e5', 'White gains space and closes the centre.'],
         ['Bf5', 'The bishop develops before ...e6 — the Caro-Kann’s main idea.'],
         ['Nf3', 'Short System: quiet development.'],
@@ -154,7 +154,7 @@ var OPENINGS = [
         ['Nc6', 'Increasing pressure on d4.']
       ]},
       { name: 'Exchange: 3.exd5 cxd5 4.Bd3', moves: [
-        ['e4', ''], ['c6', ''], ['d4', ''], ['d5', ''],
+        ['e4', 'Occupies the centre and opens lines for the queen and the f1-bishop.'], ['c6', 'Prepares ...d5 with pawn support.'], ['d4', 'White builds the ideal centre.'], ['d5', 'Black challenges e4 at once.'],
         ['exd5', 'White opens the position symmetrically.'],
         ['cxd5', 'Recapture toward the centre.'],
         ['Bd3', 'Prevents ...Bf5 and eyes h7.'],
@@ -181,7 +181,7 @@ var OPENINGS = [
     plans: '<p><b>Typical plan:</b> ...Nf6, ...Be7, ...O-O, then free the position with ...dxc4 + ...c5, or ...b6 + ...Bb7, or ...c6 + ...e5. Against the Exchange Variation, expect White’s queenside minority attack (b4–b5) and use your kingside space.</p>',
     lines: [
       { name: 'Orthodox with 4.Bg5 (Tartakower idea)', moves: [
-        ['d4', ''], ['d5', 'Claim the centre.'],
+        ['d4', 'Claims the centre; the queen protects d4.'], ['d5', 'Claim the centre.'],
         ['c4', 'The Queen’s Gambit: White offers a wing pawn to deflect d5.'],
         ['e6', 'Declined: d5 is supported and the f8-bishop is freed.'],
         ['Nc3', 'More pressure on d5.'],
@@ -196,7 +196,7 @@ var OPENINGS = [
         ['b6', 'The Tartakower: ...Bb7 next solves the problem bishop on c8.']
       ]},
       { name: 'Exchange Variation', moves: [
-        ['d4', ''], ['d5', ''], ['c4', ''], ['e6', ''], ['Nc3', ''], ['Nf6', ''],
+        ['d4', 'Claims the centre; the queen protects d4.'], ['d5', 'Black mirrors.'], ['c4', 'The Queen’s Gambit: White offers a wing pawn to deflect d5.'], ['e6', 'Declined: d5 is supported and the f8-bishop is freed.'], ['Nc3', 'More pressure on d5.'], ['Nf6', 'Defends d5 a third time.'],
         ['cxd5', 'White fixes the pawn structure.'],
         ['exd5', 'Recapture with the e-pawn: the c8-bishop is now free!'],
         ['Bg5', 'Pressure on f6/d5.'],
@@ -207,10 +207,10 @@ var OPENINGS = [
         ['Nbd7', 'Black completes development: castle next, then ...Re8, ...Nf8 and kingside play.']
       ]},
       { name: 'The Elephant Trap (if White gets greedy)', moves: [
-        ['d4', ''], ['d5', ''], ['c4', ''], ['e6', ''], ['Nc3', ''], ['Nf6', ''], ['Bg5', ''],
+        ['d4', 'Claims the centre; the queen protects d4.'], ['d5', 'Black mirrors.'], ['c4', 'The Queen’s Gambit: White offers a wing pawn to deflect d5.'], ['e6', 'Declined: d5 is supported and the f8-bishop is freed.'], ['Nc3', 'More pressure on d5.'], ['Nf6', 'Defends d5 a third time.'], ['Bg5', 'Pins the knight, increasing the pressure on d5.'],
         ['Nbd7', 'Looks like it leaves d5 loose — but it sets a trap.'],
-        ['cxd5', ''],
-        ['exd5', ''],
+        ['cxd5', 'White releases the tension and eyes the d5-pawn, thinking it is now loose.'],
+        ['exd5', 'Recapture with the pawn. The bait is set: d5 looks like it can be taken.'],
         ['Nxd5', 'Greedy! White thinks the f6-knight is pinned.'],
         ['Nxd5', 'Ignore the “pin”: the queen can be given up.'],
         ['Bxd8', 'White takes the queen…'],
@@ -221,12 +221,12 @@ var OPENINGS = [
         ['Kxd8', 'Black has won a piece. Remember this trap when you play the QGD!']
       ]},
       { name: 'Vs the London: the ...Qb6 idea', moves: [
-        ['d4', ''], ['d5', ''],
+        ['d4', 'Claims the centre; the queen protects d4.'], ['d5', 'Black mirrors.'],
         ['Bf4', 'White plays the London.'],
         ['c5', 'Hit d4 straight away — Black’s most active plan.'],
-        ['e3', ''],
+        ['e3', 'Calmly supports d4.'],
         ['Nc6', 'More pressure.'],
-        ['c3', ''],
+        ['c3', 'Pyramid complete.'],
         ['Qb6', 'The b2-pawn is weak because White’s bishop left c1.'],
         ['Qb3', 'White’s best answer.'],
         ['c4', 'Gain space with tempo on the queen.'],
@@ -246,7 +246,7 @@ var OPENINGS = [
     plans: '<p><b>Principle:</b> defend the threat <i>with development</i>, then attack the queen with minor pieces to gain time.</p>',
     lines: [
       { name: 'Stopping Scholar’s Mate', moves: [
-        ['e4', ''], ['e5', ''],
+        ['e4', 'Occupies the centre and opens lines for the queen and the f1-bishop.'], ['e5', 'Black stakes an equal claim in the centre.'],
         ['Qh5', 'Attacks e5 and eyes f7.'],
         ['Nc6', 'Defends e5 with development.'],
         ['Bc4', 'Now Qxf7# is threatened!'],
@@ -255,9 +255,9 @@ var OPENINGS = [
         ['Nf6', 'Blocks the f-file and develops. Black will follow with ...Bg7 and ...O-O, ahead in development.']
       ]},
       { name: 'Scholar’s attempt with Qf3', moves: [
-        ['e4', ''], ['e5', ''],
-        ['Bc4', ''],
-        ['Nc6', ''],
+        ['e4', 'Occupies the centre and opens lines for the queen and the f1-bishop.'], ['e5', 'Black stakes an equal claim in the centre.'],
+        ['Bc4', 'The bishop aims at f7 straight away, before any knights come out.'],
+        ['Nc6', 'A natural developing move that also guards e5 and d4.'],
         ['Qf3', 'Threatens Qxf7#.'],
         ['Nf6', 'The knight blocks the f-file and develops. If the queen lingers, ...Nd4 hits c2 and the queen.']
       ]}

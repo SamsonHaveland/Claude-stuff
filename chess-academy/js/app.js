@@ -333,6 +333,61 @@
   }
   function sanToMove(fen, san) { const g = new Chess(fen); return g.move(san); }
 
+  /* Explain why a move the student played is not the move being taught.
+   * 1) a written "why not" note for that position, if there is one;
+   * 2) otherwise the engine's concrete punishment (best reply + material swing);
+   * 3) otherwise an honest "not a blunder, but not the move we're learning". */
+  const PIECE = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
+  let bookByFen = null;
+  function bookElsewhere(fen, san) {
+    if (!bookByFen) {
+      bookByFen = {};
+      for (const o of OPENINGS) for (const l of o.lines) {
+        const g = new Chess();
+        for (const [m] of l.moves) {
+          const k = g.fen().split(' ').slice(0, 2).join(' ');
+          (bookByFen[k] = bookByFen[k] || {})[strip(m)] = bookByFen[k][strip(m)] || { name: o.name, tier: (TIERS.find(t => t.id === o.tier) || {}).name };
+          if (!g.move(m)) break;
+        }
+      }
+    }
+    const hit = bookByFen[fen.split(' ').slice(0, 2).join(' ')];
+    return hit && hit[strip(san)];
+  }
+  let whyNotByFen = null;
+  function whyNotFor(fen) {
+    if (!whyNotByFen) {
+      whyNotByFen = {};
+      for (const k of Object.keys(WHY_NOT)) { const g = new Chess(); if (!k || k.split(' ').every(m => g.move(m))) whyNotByFen[g.fen().split(' ').slice(0, 2).join(' ')] = WHY_NOT[k]; }
+    }
+    return whyNotByFen[fen.split(' ').slice(0, 2).join(' ')];
+  }
+  function explainWrongMove(fenBefore, san, bookSan, key, mateGoal) {
+    const notes = key !== null ? WHY_NOT[key] : whyNotFor(fenBefore);
+    const note = notes && Object.entries(notes).find(([m]) => strip(m) === strip(san));
+    if (note) return { html: `<p class="whynot-h">Why not ${esc(san)}?</p><p>${esc(note[1])}</p>`, arrow: null };
+    const other = bookElsewhere(fenBefore, san);
+    if (other) return { html: `<p><b>${esc(san)}</b> is a good move: it’s the <b>${esc(other.name)}</b>${other.tier ? ` (${esc(other.tier)} level)` : ''}, also in this course. It just isn’t the opening this ${key !== null ? 'line' : 'exercise'} is teaching.</p>`, arrow: null };
+    const g = new Chess(fenBefore); g.move(san);
+    if (g.in_stalemate()) return { html: '<p>That is <b>stalemate</b>: your opponent has no legal move but is not in check, so the game is a draw.</p>', arrow: null };
+    const r = Engine.search(g.fen(), 2, 0);
+    if (!r) return { html: '', arrow: null };
+    const reply = r.move, arrow = { from: reply.from, to: reply.to, color: 'red' };
+    const replyTxt = `<b>${esc(reply.san)}</b>`;
+    if (reply.san.includes('#')) return { html: `<p>It allows checkmate: your opponent replies ${replyTxt}.</p>`, arrow };
+    const after = -r.score;
+    let book = null;
+    if (bookSan) { const gb = new Chess(fenBefore); if (gb.move(bookSan)) book = -Engine.scoreFor(gb.fen(), 2); }
+    const drop = book === null ? 0 : book - after;
+    if (r.score > Engine.MATE - 100) return { html: `<p>It walks into a forced mate, starting with ${replyTxt}.</p>`, arrow };
+    if (drop >= 150) {
+      const what = reply.captured ? ` capturing your ${PIECE[reply.captured]}` : '';
+      return { html: `<p>It loses material: your opponent replies ${replyTxt}${what}. The engine rates it about <b>${Math.round(drop / 100)} pawn${Math.round(drop / 100) === 1 ? '' : 's'}</b> worse than the right move.</p>`, arrow };
+    }
+    if (mateGoal) return { html: `<p>It isn’t checkmate: your opponent can answer ${replyTxt}.</p>`, arrow };
+    return { html: `<p>It isn’t a blunder: the engine sees no material loss after ${esc(san)}. But it isn’t the move this ${key !== null ? 'line' : 'exercise'} teaches, and it doesn’t carry out the plan explained here.</p>`, arrow: null };
+  }
+
   function stepMove(st, board, panel, next, miss) {
     const game = new Chess(st.fen);
     let ply = 0, tries = 0, timer = null;
@@ -353,8 +408,10 @@
       if (!ok) {
         game.undo(); miss(); tries++;
         board.shake(); board.flash(to, 'bad'); syncBoard(board, game);
-        fb.innerHTML = `<div class="fb bad"><b>${esc(mv.san)}</b> isn’t it. ${tries >= 2 ? 'Look at the arrow.' : 'Try again.'}</div>`;
-        if (tries >= 2) showAnswer(fenBefore);
+        const ex = explainWrongMove(fenBefore, mv.san, st.goal === 'mate' ? null : expected()[0], null, st.goal === 'mate');
+        fb.innerHTML = `<div class="fb bad"><b>${esc(mv.san)}</b> isn’t it. ${ex.html}<p>${tries >= 2 ? 'The blue arrow shows the right move.' : 'Try again.'}</p></div>`;
+        board.setArrows(ex.arrow ? [ex.arrow] : []);
+        if (tries >= 2) showAnswer(fenBefore, ex.arrow);
         return;
       }
       board.setArrows([]);
@@ -374,15 +431,13 @@
         fb.innerHTML = `<div class="fb">Opponent played <b>${esc(reply.san)}</b>. Your move.</div>`;
       }, 600);
     };
-    function showAnswer(fen) {
+    function showAnswer(fen, extra) {
+      let m;
       if (st.goal === 'mate') {
         const g = new Chess(fen);
-        const m = g.moves({ verbose: true }).find(m => { g.move(m); const r = g.in_checkmate(); g.undo(); return r; });
-        if (m) board.setArrows([{ from: m.from, to: m.to, color: 'blue' }]);
-      } else {
-        const m = sanToMove(fen, expected()[0]);
-        board.setArrows([{ from: m.from, to: m.to, color: 'blue' }]);
-      }
+        m = g.moves({ verbose: true }).find(m => { g.move(m); const r = g.in_checkmate(); g.undo(); return r; });
+      } else m = sanToMove(fen, expected()[0]);
+      if (m) board.setArrows([{ from: m.from, to: m.to, color: 'blue' }].concat(extra ? [extra] : []));
     }
     $('.hint', panel).onclick = () => { fb.innerHTML = `<div class="fb">💡 ${esc(st.hint || 'Look for checks, captures and threats.')}</div>`; };
     $('.reset', panel).onclick = reset;
@@ -504,6 +559,12 @@
     return sans.map((s, i) => { const p = i + startPly; return (p % 2 === 0 ? `${p / 2 + 1}.` : (i === 0 ? `${Math.floor(p / 2) + 1}...` : '')) + s; }).join(' ');
   }
 
+  function whyNotHtml(key, bookSan, plyIndex) {
+    const alts = Object.entries(WHY_NOT[key] || {}).filter(([m]) => strip(m) !== strip(bookSan));
+    if (!alts.length) return '';
+    return `<div class="whynot">${alts.map(([m, r]) => `<p class="whynot-h">Why not ${esc(pgn([m], plyIndex))}?</p><p>${esc(r)}</p>`).join('')}</div>`;
+  }
+
   function viewExplore(id, li) {
     const o = OPENINGS.find(x => x.id === id);
     if (!o || !o.lines[li]) return viewOpenings();
@@ -530,7 +591,7 @@
       const cur = line.moves[ply - 1];
       $('.comment').innerHTML = ply === 0
         ? `<p>Starting position. The blue arrow shows the next move. Press ▶ to step through the line.</p>`
-        : `<p class="mv-title">${esc(pgn([cur[0]], ply - 1))}</p><p>${esc(cur[1] || 'A natural move in this line.')}</p>`;
+        : `<p class="mv-title">${esc(pgn([cur[0]], ply - 1))}</p><p>${esc(cur[1])}</p>${whyNotHtml(line.moves.slice(0, ply - 1).map(m => m[0]).join(' '), cur[0], ply - 1)}`;
       $('.movelist').innerHTML = line.moves.map((m, i) => `${i % 2 === 0 ? `<span class="num">${i / 2 + 1}.</span>` : ''}<button class="mv ${i === ply - 1 ? 'cur' : ''}" data-p="${i + 1}">${esc(m[0])}</button>`).join('');
       $('.movelist').querySelectorAll('.mv').forEach(b => b.onclick = () => { ply = +b.dataset.p; draw(); });
     }
@@ -605,8 +666,10 @@
           game.undo(); failed = true;
           board.shake(); syncBoard(board, game);
           const m = sanToMove(game.fen(), want);
-          board.setArrows([{ from: m.from, to: m.to, color: 'blue' }]);
-          fb.innerHTML = `<div class="fb bad">Not <b>${esc(mv.san)}</b>. The book move is <b>${esc(want)}</b>: ${esc(why || '')} Play it to continue.</div>`;
+          const ex = explainWrongMove(game.fen(), mv.san, want, l.moves.slice(0, ply).map(x => x[0]).join(' '), false);
+          board.setArrows([{ from: m.from, to: m.to, color: 'blue' }].concat(ex.arrow ? [ex.arrow] : []));
+          fb.innerHTML = `<div class="fb bad"><p><b>Not ${esc(mv.san)}.</b></p>${ex.html}
+            <p class="whynot-h">The book move: ${esc(want)} (blue arrow)</p><p>${esc(why || '')}</p><p class="muted">Play it to continue.${ex.arrow ? ' The red arrow shows the punishing reply.' : ''}</p></div>`;
           return;
         }
         ply++; board.setArrows([]);

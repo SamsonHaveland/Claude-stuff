@@ -5,7 +5,7 @@ const path = require('path');
 const vm = require('vm');
 const root = path.join(__dirname, '..', 'js');
 globalThis.window = globalThis;
-for (const f of ['vendor/chess.js', 'engine.js', 'curriculum.js', 'openings.js', 'openings-more.js']) {
+for (const f of ['vendor/chess.js', 'engine.js', 'curriculum.js', 'openings.js', 'openings-more.js', 'whynot.js']) {
   vm.runInThisContext(fs.readFileSync(path.join(root, f), 'utf8'), { filename: f });
 }
 let errors = 0, checks = 0;
@@ -83,6 +83,37 @@ for (const op of OPENINGS) {
     if (forStudent < -150) fail(tag, `student side looks worse at the end: ${forStudent}cp`);
     else { checks++; console.log(`  ${tag}: ${forStudent >= 0 ? '+' : ''}${forStudent}cp for ${op.side}`); }
   });
+}
+
+// Every opening move has an explanation.
+for (const op of OPENINGS) op.lines.forEach((line, i) => line.moves.forEach(([san, why], k) => {
+  if (!why || !why.trim()) fail(`${op.id} line ${i}`, `ply ${k + 1} ${san} has no explanation`); else checks++;
+}));
+
+// "Why not" notes: position reachable, alternative legal, alternative is not itself a book move there.
+const bookAt = {};
+for (const op of OPENINGS) for (const l of op.lines) l.moves.forEach(([san], k) => {
+  if ((k % 2 === 0) !== (op.side === 'white')) return;          // only the student's own book moves
+  const key = l.moves.slice(0, k).map(m => m[0]).join(' ');
+  (bookAt[key] = bookAt[key] || new Set()).add(strip(san));
+});
+for (const [key, alts] of Object.entries(WHY_NOT)) {
+  const g = new Chess();
+  const ok = !key || key.split(' ').every(m => g.move(m));
+  if (!ok) { fail('whynot ' + key, 'unreachable position'); continue; }
+  for (const [alt, reason] of Object.entries(alts)) {
+    const where = `whynot [${key}] ${alt}`;
+    if (!g.moves().map(strip).includes(strip(alt))) { fail(where, 'illegal alternative'); continue; }
+    if (bookAt[key] && bookAt[key].has(strip(alt))) { fail(where, 'alternative is a student book move in some line'); continue; }
+    if (!reason || reason.length < 20) { fail(where, 'reason missing'); continue; }
+    // Engine view, for review: side-to-move score after the alternative vs after the book move.
+    const mover = g.turn();
+    g.move(alt); const sAlt = -Engine.scoreFor(g.fen(), 2); g.undo();
+    let sBook = null;
+    if (bookAt[key]) { const b = [...bookAt[key]][0]; g.move(b); sBook = -Engine.scoreFor(g.fen(), 2); g.undo(); }
+    checks++;
+    console.log(`  ${where}: alt ${sAlt}cp${sBook !== null ? ` vs book ${sBook}cp` : ''} (for ${mover})`);
+  }
 }
 
 // Engine smoke test
