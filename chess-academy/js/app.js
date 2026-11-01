@@ -8,13 +8,16 @@
 
   /* ---------------- Progress store ---------------- */
   const KEY = 'chessAcademy.v1';
+  function freshData() {
+    return { lessons: {}, srs: {}, streak: { last: null, count: 0 }, settings: { coach: true, level: 1 },
+      rating: { r: 400, n: 0, ex: 0, games: 0 }, rated: {} };
+  }
   const Store = {
-    data: Object.assign({ xp: 0, lessons: {}, srs: {}, streak: { last: null, count: 0 }, settings: { coach: true, level: 1 } },
+    data: Object.assign(freshData(),
       (() => { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { return {}; } })()),
     save() { try { localStorage.setItem(KEY, JSON.stringify(this.data)); } catch (e) { /* storage unavailable: progress lasts this visit only */ } renderHeader(); },
     today() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; },
-    addXp(n) {
-      this.data.xp += n;
+    touch() {
       const t = this.today(), s = this.data.streak;
       if (s.last !== t) {
         const y = new Date(); y.setDate(y.getDate() - 1);
@@ -23,9 +26,7 @@
         s.last = t;
       }
       this.save();
-      toast(`+${n} XP`);
     },
-    level() { return Math.floor(Math.sqrt(this.data.xp / 25)) + 1; },
     // Spaced repetition (Leitner boxes)
     INTERVALS: [0, 1, 3, 7, 14, 30, 60],
     card(key) { return this.data.srs[key] || { box: 0, due: 0, seen: 0 }; },
@@ -45,6 +46,45 @@
     }
   };
 
+  /* ---------------- Rating estimate ----------------
+   * An Elo-style guess. Every rated event is treated as a "game" against an
+   * opponent of known strength: a lesson exercise (first attempt only) has a
+   * difficulty rating; a bot game uses the bot's estimated rating.
+   * The step size shrinks as evidence accumulates, and the displayed range
+   * narrows with it. Both difficulty and bot ratings are informed guesses,
+   * not calibrated against rated players — the UI says so. */
+  const Rating = {
+    // Difficulty of the exercises in each lesson (roughly Chess.com rapid scale).
+    LESSON: { board: 250, rook: 200, bishop: 250, queen: 250, king: 200, knight: 300, pawn: 300,
+      capture: 400, castling: 450, special: 500, mates1: 600, mates2: 700, cct: 650, fork: 850,
+      pin: 950, discovery: 1000, principles: 700, mistakes: 750, history: 600, 'rep-intro': 700,
+      kqk: 900, pawnend: 1000 },
+    get() { return Store.data.rating; },
+    expected(r, opp) { return 1 / (1 + Math.pow(10, (opp - r) / 400)); },
+    record(opp, score, kind) {
+      const R = this.get(), before = Math.round(R.r);
+      const weight = kind === 'game' ? 3 : 1;
+      const k = (R.n < 10 ? 70 : R.n < 30 ? 45 : R.n < 80 ? 30 : 20) * (kind === 'game' ? 1.5 : 1);
+      R.r = Math.max(100, Math.min(2400, R.r + k * (score - this.expected(R.r, opp))));
+      R.n += weight;
+      if (kind === 'game') R.games++; else R.ex++;
+      Store.save();
+      return { before, after: Math.round(R.r) };
+    },
+    range() { const R = this.get(); return Math.max(75, Math.round(350 / Math.sqrt(1 + R.n / 3))); },
+    label() {
+      const R = this.get(); if (!R.n) return 'Not yet rated';
+      return `≈ ${Math.round(R.r)}`;
+    },
+    describe(r) {
+      if (r < 600) return 'New to the game — learning how pieces work together.';
+      if (r < 900) return 'Beginner — knows the rules, still losing pieces to simple tactics.';
+      if (r < 1200) return 'Improving beginner — spots basic tactics, plays sound openings.';
+      if (r < 1500) return 'Club player — solid fundamentals; games are decided by calculation and plans.';
+      return 'Strong club player.';
+    }
+  };
+
   function toast(msg) {
     const t = document.createElement('div');
     t.className = 'toast'; t.textContent = msg;
@@ -55,7 +95,8 @@
 
   function renderHeader() {
     const d = Store.data;
-    $('#stats').innerHTML = `<span title="Daily streak">🔥 ${d.streak.count}</span><span title="Experience">⭐ ${d.xp} XP</span><span title="Level" class="lvl">Lv ${Store.level()}</span>`;
+    const R = d.rating;
+    $('#stats').innerHTML = `<span title="Daily streak">🔥 ${d.streak.count}</span><a href="#/learn" class="lvl" title="Estimated rating — a rough guess from your exercises and bot games">${R.n ? `Rating ≈ ${Math.round(R.r)}` : 'Unrated'}</a>`;
     const due = Store.dueCount();
     const badge = $('#due-badge');
     if (badge) { badge.textContent = due; badge.hidden = !due; }
@@ -102,6 +143,7 @@
         </div>
         <div class="progress-ring" style="--p:${Math.round(done / total * 100)}"><span>${done}/${total}<small>lessons</small></span></div>
       </section>
+      ${ratingCard()}
       <div class="path">
         ${CURRICULUM.map((u, ui) => `
           <section class="unit">
@@ -109,8 +151,8 @@
             <div class="nodes">
               ${u.lessons.map(l => {
                 const st = Store.data.lessons[l.id];
-                const cls = st ? (st.perfect ? 'done perfect' : 'done') : (next && next.id === l.id ? 'next' : '');
-                return `<a class="node ${cls}" href="#/lesson/${l.id}"><span class="dot">${st ? (st.perfect ? '★' : '✓') : ''}</span><span class="name">${esc(l.title)}</span><span class="xp">${l.xp} XP</span></a>`;
+                const cls = st ? 'done' : (next && next.id === l.id ? 'next' : '');
+                return `<a class="node ${cls}" href="#/lesson/${l.id}"><span class="dot">${st ? '✓' : ''}</span><span class="name">${esc(l.title)}</span><span class="xp" title="Approximate rating level of this lesson’s exercises">~${Rating.LESSON[l.id] || ''}</span></a>`;
               }).join('')}
               ${u.id === 'u6' ? '<a class="node link" href="#/openings"><span class="dot">→</span><span class="name">Open the Openings study</span></a>' : ''}
             </div>
@@ -118,11 +160,23 @@
       </div>`;
   }
 
+  function ratingCard() {
+    const R = Rating.get();
+    if (!R.n) return `<section class="rating-card"><div class="rating-num">?</div><div><h2>Your estimated rating</h2>
+      <p>Complete a few lessons or play the bot and the Academy will estimate your playing strength. Only your <b>first attempt</b> at each exercise counts.</p></div></section>`;
+    const r = Math.round(R.r), u = Rating.range();
+    return `<section class="rating-card"><div class="rating-num">${r}<small>estimated</small></div><div>
+      <h2>Your estimated rating</h2>
+      <p><b>Likely between ${Math.max(100, r - u)} and ${r + u}.</b> ${Rating.describe(r)}</p>
+      <p class="muted">Based on ${R.ex} exercise${R.ex === 1 ? '' : 's'} and ${R.games} rated bot game${R.games === 1 ? '' : 's'}. This is a rough guess on a Chess.com-style scale, not an official rating; it gets more reliable as you play the bot. <a href="#/library">How it works</a></p>
+    </div></section>`;
+  }
+
   /* ---------------- Lesson player ---------------- */
   function viewLesson(id) {
     const lesson = allLessons().find(l => l.id === id);
     if (!lesson) return viewLearn();
-    let idx = 0, mistakes = 0;
+    let idx = 0, mistakes = 0, stepStartMistakes = 0, rBefore = Math.round(Rating.get().r), ratedAny = false;
     app.innerHTML = `
       <div class="lesson">
         <div class="lesson-top"><a href="#/learn" class="close" aria-label="Back to path">✕</a><div class="bar"><div class="fill"></div></div><span class="count"></span></div>
@@ -147,22 +201,31 @@
       board.setFen(st.fen || (st.type === 'stars' || st.type === 'square' ? '8/8/8/8/8/8/8/8 w - - 0 1' : START));
       $('.board-col').classList.toggle('dim', !st.fen && st.type !== 'stars' && st.type !== 'square');
       if (st.arrows) board.setArrows(st.arrows);
+      stepStartMistakes = mistakes;
       const steppers = { text: stepText, quiz: stepQuiz, square: stepSquare, stars: stepStars, move: stepMove, play: stepPlay };
       stepCleanup = steppers[st.type](st, board, panel, next, () => mistakes++);
     }
     function next() {
+      const st = lesson.steps[idx], key = `${lesson.id}:${idx}`;
+      if (['move', 'quiz', 'play'].includes(st.type) && Rating.LESSON[lesson.id] && !Store.data.rated[key]) {
+        Store.data.rated[key] = 1;
+        Rating.record(Rating.LESSON[lesson.id], mistakes === stepStartMistakes ? 1 : 0, 'exercise');
+        ratedAny = true;
+      }
       idx++;
       if (idx < lesson.steps.length) return show();
       $('.fill').style.width = '100%';
       const prev = Store.data.lessons[lesson.id];
       const perfect = mistakes === 0;
-      const firstTime = !prev;
-      Store.data.lessons[lesson.id] = { done: true, perfect: perfect || (prev && prev.perfect) };
-      const gain = firstTime ? lesson.xp + (perfect ? 10 : 0) : 5;
-      Store.addXp(gain);
+      Store.data.lessons[lesson.id] = { done: true };
+      Store.touch();
+      const rAfter = Math.round(Rating.get().r);
+      const ratingLine = ratedAny
+        ? `<p class="rating-change">Estimated rating: ${rBefore} → <b>${rAfter}</b> (${rAfter >= rBefore ? '+' : ''}${rAfter - rBefore})</p>`
+        : '<p class="muted">Repeat attempts don’t change your rating estimate.</p>';
       const nxt = nextLesson();
-      panel.innerHTML = `<div class="complete"><div class="big">${perfect ? '★' : '✓'}</div><h2>Lesson complete!</h2>
-        <p>${perfect ? 'Flawless — no mistakes. ' : `${mistakes} mistake${mistakes > 1 ? 's' : ''} — mistakes are how you learn. `}+${gain} XP</p>
+      panel.innerHTML = `<div class="complete"><div class="big">✓</div><h2>Lesson complete!</h2>
+        <p>${perfect ? 'No mistakes.' : `${mistakes} mistake${mistakes > 1 ? 's' : ''} — mistakes are how you learn.`}</p>${ratingLine}
         <div class="row">${nxt ? `<a class="btn primary" href="#/lesson/${nxt.id}">Next: ${esc(nxt.title)}</a>` : ''}<a class="btn" href="#/learn">Back to path</a></div></div>`;
       board.setInteractive(false);
     }
@@ -532,7 +595,7 @@
         board.setInteractive(false);
         const c = Store.grade(key, !failed);
         results.push(!failed);
-        if (!failed) Store.addXp(5);
+        Store.touch();
         const days = Store.INTERVALS[c.box];
         fb.innerHTML = `<div class="fb ${failed ? 'bad' : 'good'}">${failed ? 'Line finished with a slip — it will come back soon.' : `Perfect line! Next review in ${days} day${days > 1 ? 's' : ''}.`}</div>
           <div class="row">${qi + 1 < queue.length ? continueBtn('Next line') : continueBtn('Finish')}<a class="btn" href="#/play?opening=${o.id}&line=${queue[qi].i}">Play from here</a></div>`;
@@ -542,16 +605,16 @@
     }
     function summary() {
       const ok = results.filter(Boolean).length;
-      panel.innerHTML = `<div class="complete"><div class="big">${ok === results.length ? '★' : '✓'}</div><h2>Session complete</h2><p>${ok} / ${results.length} lines perfect.</p><div class="row"><a class="btn primary" href="#/openings">Openings</a><a class="btn" href="#/learn">Path</a></div></div>`;
+      panel.innerHTML = `<div class="complete"><div class="big">✓</div><h2>Session complete</h2><p>${ok} / ${results.length} lines perfect.</p><div class="row"><a class="btn primary" href="#/openings">Openings</a><a class="btn" href="#/learn">Path</a></div></div>`;
     }
     runLine();
   }
 
   /* ---------------- Practice vs. the bot ---------------- */
   const LEVELS = [
-    { name: 'Novice', depth: 1, rand: 150 },
-    { name: 'Casual', depth: 2, rand: 40 },
-    { name: 'Club', depth: 3, rand: 0 }
+    { name: 'Novice', depth: 1, rand: 150, elo: 600 },
+    { name: 'Casual', depth: 2, rand: 40, elo: 900 },
+    { name: 'Club', depth: 3, rand: 0, elo: 1250 }
   ];
   function viewPlay(params) {
     let startFen = START, startNote = 'Standard starting position', userColor = 'w', preMoves = [];
@@ -567,23 +630,31 @@
     app.innerHTML = `
       <div class="lesson-body">
         <div class="board-col"><div id="board"></div>
-          <div class="row center controls"><button class="btn small" id="undo">Take back</button><button class="btn small" id="hint">Hint</button><button class="btn small" id="flip">Flip</button><button class="btn small primary" id="new">New game</button></div>
+          <div class="row center controls"><button class="btn small" id="undo">Take back</button><button class="btn small" id="hint">Hint</button><button class="btn small" id="flip">Flip</button><button class="btn small" id="resign">Resign</button><button class="btn small primary" id="new">New game</button></div>
         </div>
         <div class="panel">
           <p class="eyebrow">Practice</p><h2>Play the Academy bot</h2>
           <p class="muted">${esc(startNote)}</p>
           <div class="settings">
             <label>You play <select id="color"><option value="w">White</option><option value="b">Black</option></select></label>
-            <label>Bot <select id="level">${LEVELS.map((l, i) => `<option value="${i}">${l.name}</option>`).join('')}</select></label>
+            <label>Bot <select id="level">${LEVELS.map((l, i) => `<option value="${i}">${l.name} (~${l.elo})</option>`).join('')}</select></label>
             <label class="check"><input type="checkbox" id="coach"> Coach warns about blunders</label>
           </div>
+          <p class="rated-note muted"></p>
           <div class="status"></div><div class="feedback"></div>
           <div class="movelist mono" id="moves"></div>
         </div>
       </div>`;
     $('#color').value = userColor; $('#level').value = s.level; $('#coach').checked = s.coach;
     const board = new Board($('#board'));
-    let game, thinking = false, timer = null;
+    let game, thinking = false, timer = null, gameLevel = 1, assisted = false, recorded = false, resigned = false;
+    const assist = (why) => { if (!assisted && !recorded) { assisted = true; noteRated(why); } };
+    function noteRated(why) {
+      const lv = LEVELS[gameLevel];
+      $('.rated-note').innerHTML = assisted
+        ? `Unrated game — ${esc(why)}. Your rating estimate won’t change.`
+        : `Rated game vs ${lv.name} (~${lv.elo}). Hint, Take back, the Coach’s warning or changing the bot level make it unrated.`;
+    }
     const fb = $('.feedback'), status = $('.status');
     cleanup = () => clearTimeout(timer);
 
@@ -591,14 +662,30 @@
       clearTimeout(timer); thinking = false;
       userColor = $('#color').value;
       game = new Chess(startFen);
+      gameLevel = +$('#level').value; assisted = false; recorded = false; resigned = false; noteRated();
+      board.setInteractive(true);
       board.setOrientation(userColor === 'w' ? 'white' : 'black');
       board.destsFn = sq => (!thinking && game.turn() === userColor && !game.game_over()) ? chessDests(game)(sq) : [];
       board.setArrows([]); syncBoard(board, game); fb.innerHTML = '';
       update();
       if (game.turn() !== userColor) botMove();
     }
+    function finishGame() {
+      if (recorded || !(game.game_over() || resigned) || !game.history().length) return '';
+      recorded = true;
+      if (assisted) return '';
+      const score = resigned ? 0 : game.in_checkmate() ? (game.turn() === userColor ? 0 : 1) : 0.5;
+      const { before, after } = Rating.record(LEVELS[gameLevel].elo, score, 'game');
+      Store.touch();
+      const msg = `Rating estimate ${before} → ${after} (${after >= before ? '+' : ''}${after - before})`;
+      toast(msg);
+      return msg;
+    }
     function update() {
       const h = game.history();
+      const rmsg = finishGame();
+      if (rmsg) $('.rated-note').innerHTML = `<b>${esc(rmsg)}</b>`;
+      if (resigned) { status.innerHTML = '<div class="fb bad"><b>You resigned.</b> Start a new game when ready.</div>'; return; }
       $('#moves').innerHTML = esc(pgn(preMoves.concat(h)));
       if (game.in_checkmate()) status.innerHTML = `<div class="fb ${game.turn() === userColor ? 'bad' : 'good'}"><b>Checkmate.</b> ${game.turn() === userColor ? 'The bot wins — review the game and try again.' : 'You win! 🎉'}</div>`;
       else if (game.in_draw() || game.in_stalemate() || game.in_threefold_repetition()) status.innerHTML = '<div class="fb">Draw.</div>';
@@ -628,6 +715,7 @@
           thinking = false;
           const drop = before - after;
           if (drop >= 200 && after < 150) {
+            assist('the Coach warned you about a blunder');
             fb.innerHTML = `<div class="fb bad"><b>Coach:</b> careful — <b>${esc(mv.san)}</b> looks like it gives away about ${Math.round(drop / 100)} pawns of material. Check: what can your opponent capture or attack now?
               <div class="row"><button class="btn small" id="tb">Take it back</button><button class="btn small" id="go">Play it anyway</button></div></div>`;
             update();
@@ -638,19 +726,25 @@
       } else botMove();
     };
     $('#undo').onclick = () => {
-      if (thinking) return;
+      if (thinking || resigned) return;
+      assist('you used Take back');
       game.undo(); if (game.turn() !== userColor) game.undo();
       syncBoard(board, game); fb.innerHTML = ''; update();
     };
     $('#hint').onclick = () => {
-      if (thinking || game.turn() !== userColor || game.game_over()) return;
+      if (thinking || resigned || game.turn() !== userColor || game.game_over()) return;
+      assist('you used a Hint');
       const r = Engine.search(game.fen(), 2, 0);
       if (r) { board.setArrows([{ from: r.move.from, to: r.move.to, color: 'blue' }]); fb.innerHTML = `<div class="fb">💡 Consider <b>${esc(r.move.san)}</b>. Why might it be good?</div>`; }
     };
     $('#flip').onclick = () => board.flip();
     $('#new').onclick = newGame;
+    $('#resign').onclick = () => {
+      if (recorded || resigned || game.game_over() || !game.history().length) return;
+      clearTimeout(timer); thinking = false; resigned = true; board.setInteractive(false); update();
+    };
     $('#color').onchange = newGame;
-    $('#level').onchange = () => { s.level = +$('#level').value; Store.save(); };
+    $('#level').onchange = () => { s.level = +$('#level').value; Store.save(); if (+$('#level').value !== gameLevel && game.history().length) assist('the bot level changed mid-game'); else { gameLevel = +$('#level').value; noteRated(); } };
     $('#coach').onchange = () => { s.coach = $('#coach').checked; Store.save(); };
     newGame();
   }
@@ -659,12 +753,12 @@
   function viewLibrary() {
     app.innerHTML = `<section class="page-head"><h1>Library</h1><p>Reference material: how to study, key terms, and further reading.</p></section>
       <div class="lib">${LIBRARY.map(sec => `<section class="note"><h2>${esc(sec.title)}</h2>${sec.html}</section>`).join('')}</div>
-      <section class="note danger"><h3>Reset progress</h3><p>Clears XP, lessons and drill schedule stored in this browser.</p><button class="btn small" id="reset">Reset everything</button></section>`;
+      <section class="note danger"><h3>Reset progress</h3><p>Clears your rating estimate, lessons and drill schedule stored in this browser.</p><button class="btn small" id="reset">Reset everything</button></section>`;
     $('#reset').onclick = (e) => {
       const b = e.currentTarget;
       if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Click again to confirm'; return; }
       try { localStorage.removeItem(KEY); } catch (err) {}
-      Store.data = { xp: 0, lessons: {}, srs: {}, streak: { last: null, count: 0 }, settings: { coach: true, level: 1 } };
+      Store.data = freshData();
       renderHeader(); location.hash = '#/learn';
     };
   }

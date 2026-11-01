@@ -8,6 +8,14 @@ var LIBRARY = [
       <li><b>Study endgames early.</b> They teach how each piece really works, and the knowledge never goes out of date.</li>
     </ol>
     <p class="muted">Why spaced repetition? Reviewing just before you would forget strengthens memory more than cramming. The drill trainer uses Leitner boxes: a line you play perfectly moves up a box (next review in 1, 3, 7, 14, 30, then 60 days); a slip sends it back to box 1.</p>` },
+  { title: 'About your estimated rating', html: `
+    <p>The Academy guesses your playing strength with an Elo-style calculation, the same family of maths used by FIDE, Chess.com and Lichess.</p>
+    <ul>
+      <li><b>Exercises:</b> each lesson has a difficulty level (shown on the path, e.g. ~850). Getting an exercise right on your <i>first attempt</i> counts as a win against that level; a mistake counts as a loss. Repeats never count, so replaying a lesson can’t inflate the number.</li>
+      <li><b>Bot games</b> count three times as much, because real games are the best evidence. A game is rated only if you finish it (or resign) without using Hint, Take back, the Coach’s blunder warning, or changing the bot level mid-game.</li>
+      <li>Early results move the estimate a lot; it settles down as evidence builds up, and the “likely between” range narrows.</li>
+    </ul>
+    <p><b>Limits — please read:</b> lesson difficulty levels and the bots’ ratings (Novice ~600, Casual ~900, Club ~1250) are informed guesses. They have not been measured against rated human players, so treat the number as a rough indication of progress, not a real rating. Exercises top out around 1000, so the bot games matter most beyond that. Ratings also differ between sites; for a real rating, play rated rapid games on Lichess or Chess.com.</p>` },
   { title: 'Glossary', html: `<dl class="glossary">
     <dt>Algebraic notation</dt><dd>The standard way to write moves: piece letter + destination square (Nf3, Bxc6, O-O).</dd>
     <dt>Development</dt><dd>Moving pieces off their starting squares to useful posts.</dd>

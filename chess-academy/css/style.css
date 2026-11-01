@@ -23,7 +23,7 @@ nav a { color: #d9cfbf; text-decoration: none; padding: .4rem .75rem; border-rad
 nav a.active, nav a:hover { background: #4a4238; color: #fff; }
 .badge { background: var(--bad); color: #fff; border-radius: 999px; padding: 0 .45em; font-size: .75rem; }
 .stats { display: flex; gap: .8rem; font-weight: 600; font-size: .9rem; white-space: nowrap; }
-.stats .lvl { background: var(--gold); color: #2b2620; padding: 0 .5em; border-radius: 6px; }
+.stats .lvl { background: var(--gold); color: #2b2620; padding: 0 .5em; border-radius: 6px; text-decoration: none; }
 main { max-width: 1120px; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
 footer { text-align: center; color: var(--muted); font-size: .8rem; padding: 1rem; }
 
@@ -183,3 +183,13 @@ table.rep th { white-space: nowrap; font-family: var(--serif); }
   .line-row { flex-direction: column; align-items: flex-start; }
   h1 { font-size: 1.6rem; }
 }
+
+/* Rating estimate */
+.rating-card { display: flex; gap: 1.5rem; align-items: center; background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--gold); border-radius: 18px; padding: 1.25rem 1.75rem; margin: -1rem 0 2rem; }
+.rating-card h2 { margin-bottom: .3rem; }
+.rating-card p { margin: .2rem 0; }
+.rating-num { font: 700 2.6rem var(--serif); color: var(--ink); min-width: 110px; text-align: center; line-height: 1; }
+.rating-num small { display: block; font: 600 .7rem var(--sans); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-top: .35rem; }
+.rating-change { font-size: 1.05rem; }
+.rated-note { font-size: .88rem; }
+@media (max-width: 820px) { .rating-card { flex-direction: column; align-items: flex-start; padding: 1.25rem; } .rating-num { text-align: left; } }

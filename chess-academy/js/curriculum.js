@@ -14,7 +14,7 @@ var CURRICULUM = [
     blurb: 'Coordinates, and how each piece moves. The alphabet of chess.',
     lessons: [
       {
-        id: 'board', title: 'The Battlefield', xp: 20,
+        id: 'board', title: 'The Battlefield',
         steps: [
           { type: 'text', title: 'Sixty-four squares', fen: '8/8/8/8/8/8/8/8 w - - 0 1',
             body: '<p>Chess is played on an 8×8 board. The vertical columns are <b>files</b>, lettered <b>a–h</b>. The horizontal rows are <b>ranks</b>, numbered <b>1–8</b> from White’s side.</p><p>Every square has a name: its file then its rank. The highlighted square is <b>e4</b>.</p><p class="tip">Orientation rule: there is always a <b>light square in each player’s bottom-right corner</b> (h1 for White). “Light on the right.”</p>',
@@ -27,7 +27,7 @@ var CURRICULUM = [
         ]
       },
       {
-        id: 'rook', title: 'The Rook', xp: 15,
+        id: 'rook', title: 'The Rook',
         steps: [
           { type: 'text', title: 'Straight lines', fen: '8/8/8/8/3R4/8/8/8 w - - 0 1',
             arrows: [{ from: 'd4', to: 'd8' }, { from: 'd4', to: 'd1' }, { from: 'd4', to: 'a4' }, { from: 'd4', to: 'h4' }],
@@ -37,7 +37,7 @@ var CURRICULUM = [
         ]
       },
       {
-        id: 'bishop', title: 'The Bishop', xp: 15,
+        id: 'bishop', title: 'The Bishop',
         steps: [
           { type: 'text', title: 'Diagonals', fen: '8/8/8/8/3B4/8/8/8 w - - 0 1',
             arrows: [{ from: 'd4', to: 'h8' }, { from: 'd4', to: 'a7' }, { from: 'd4', to: 'a1' }, { from: 'd4', to: 'g1' }],
@@ -48,7 +48,7 @@ var CURRICULUM = [
         ]
       },
       {
-        id: 'queen', title: 'The Queen', xp: 15,
+        id: 'queen', title: 'The Queen',
         steps: [
           { type: 'text', title: 'Rook + bishop', fen: '8/8/8/8/3Q4/8/8/8 w - - 0 1',
             arrows: [{ from: 'd4', to: 'd8' }, { from: 'd4', to: 'h8' }, { from: 'd4', to: 'h4' }, { from: 'd4', to: 'g1' }, { from: 'd4', to: 'd1' }, { from: 'd4', to: 'a1' }, { from: 'd4', to: 'a4' }, { from: 'd4', to: 'a7' }],
@@ -57,7 +57,7 @@ var CURRICULUM = [
         ]
       },
       {
-        id: 'king', title: 'The King', xp: 15,
+        id: 'king', title: 'The King',
         steps: [
           { type: 'text', title: 'The most important piece', fen: '8/8/8/8/3K4/8/8/8 w - - 0 1',
             highlights: { c3: 'green', c4: 'green', c5: 'green', d3: 'green', d5: 'green', e3: 'green', e4: 'green', e5: 'green' },
@@ -66,7 +66,7 @@ var CURRICULUM = [
         ]
       },
       {
-        id: 'knight', title: 'The Knight', xp: 20,
+        id: 'knight', title: 'The Knight',
         steps: [
           { type: 'text', title: 'The jumper', fen: '8/8/8/8/3N4/8/8/8 w - - 0 1',
             highlights: { b3: 'green', b5: 'green', c2: 'green', c6: 'green', e2: 'green', e6: 'green', f3: 'green', f5: 'green' },
@@ -76,7 +76,7 @@ var CURRICULUM = [
         ]
       },
       {
-        id: 'pawn', title: 'The Pawn', xp: 20,
+        id: 'pawn', title: 'The Pawn',
         steps: [
           { type: 'text', title: 'The soul of chess', fen: '8/8/8/3p4/4P3/8/2P5/8 w - - 0 1',
             arrows: [{ from: 'c2', to: 'c4' }, { from: 'e4', to: 'd5', color: 'red' }],
@@ -93,7 +93,7 @@ var CURRICULUM = [
     blurb: 'Capturing, check, castling, en passant, promotion and draws.',
     lessons: [
       {
-        id: 'capture', title: 'Capture & Check', xp: 20,
+        id: 'capture', title: 'Capture & Check',
         steps: [
           { type: 'text', title: 'Taking pieces', body: '<p>You capture by moving onto an enemy piece’s square; it leaves the board. A piece is <b>hanging</b> if it can be taken for free. The single most common beginner loss is a hanging piece.</p>' },
           { type: 'move', fen: 'k7/8/8/3n4/8/8/8/K2R4 w - - 0 1', prompt: 'Black’s knight is undefended. Capture it.', solution: ['Rxd5'], hint: 'Rooks move along files.', explain: 'Free material. Always ask: “Is anything hanging — mine or theirs?”' },
@@ -103,7 +103,7 @@ var CURRICULUM = [
         ]
       },
       {
-        id: 'castling', title: 'Castling', xp: 20,
+        id: 'castling', title: 'Castling',
         steps: [
           { type: 'text', title: 'The only double move', fen: 'r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1',
             arrows: [{ from: 'e1', to: 'g1' }, { from: 'h1', to: 'f1', color: 'blue' }, { from: 'e1', to: 'c1' }, { from: 'a1', to: 'd1', color: 'blue' }],
@@ -115,7 +115,7 @@ var CURRICULUM = [
         ]
       },
       {
-        id: 'special', title: 'En Passant & Promotion', xp: 20,
+        id: 'special', title: 'En Passant & Promotion',
         steps: [
           { type: 'text', title: 'En passant: “in passing”', fen: '4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1', arrows: [{ from: 'e5', to: 'd6' }],
             body: '<p>Black just played <code>d7–d5</code>, jumping past your e5-pawn. Only on the <b>very next move</b>, your pawn may capture it as if it had moved one square: <code>exd6</code>.</p><p>The rule was added (as pawns gained the double step, centuries ago) so a pawn cannot sneak past an enemy pawn.</p>' },
@@ -134,7 +134,7 @@ var CURRICULUM = [
     blurb: 'Recognise the classic mating nets so you can spot them in a flash.',
     lessons: [
       {
-        id: 'mates1', title: 'Back Rank & Ladder', xp: 25,
+        id: 'mates1', title: 'Back Rank & Ladder',
         steps: [
           { type: 'text', title: 'Pattern recognition', body: '<p>Strong players do not calculate everything — they <b>recognise patterns</b>. Psychology research on chess masters (de Groot, then Chase & Simon in the 1970s) found that experts remember meaningful positions far better than novices because they see familiar “chunks”. Mating patterns are the first chunks worth learning.</p>' },
           { type: 'text', title: 'The back-rank mate', fen: '6k1/5ppp/8/8/8/8/8/3R2K1 w - - 0 1', arrows: [{ from: 'd1', to: 'd8' }],
@@ -146,7 +146,7 @@ var CURRICULUM = [
         ]
       },
       {
-        id: 'mates2', title: 'Smothered & Scholar’s Mate', xp: 25,
+        id: 'mates2', title: 'Smothered & Scholar’s Mate',
         steps: [
           { type: 'text', title: 'Smothered mate', fen: '6rk/6pp/8/6N1/8/8/8/6K1 w - - 0 1',
             body: '<p>A king surrounded by its own pieces can be mated by a lone knight — the knight jumps, nothing can block. It is one of the most beautiful patterns in chess.</p>' },
@@ -165,7 +165,7 @@ var CURRICULUM = [
     blurb: 'Forks, pins, skewers and discoveries — the engine room of chess.',
     lessons: [
       {
-        id: 'cct', title: 'Checks, Captures, Threats', xp: 20,
+        id: 'cct', title: 'Checks, Captures, Threats',
         steps: [
           { type: 'text', title: 'A thinking routine', body: '<p>Before every move, scan in this order:</p><ol><li><b>Checks</b> — every check you can give.</li><li><b>Captures</b> — every capture.</li><li><b>Threats</b> — moves that attack something.</li></ol><p>Then ask the same questions <i>from your opponent’s side</i>: “What does their last move threaten?” This blunder-check habit is taught by coaches at every level, and it is the fastest way to stop losing pieces.</p><p class="tip">The Practice board has a <b>Coach</b> that warns you when a move hangs material — use it to build this habit.</p>' },
           { type: 'quiz', q: 'Your opponent just moved. What should you ask first?', options: ['What is my plan?', 'What does their move threaten?', 'Which piece looks nicest?'], answer: 1,
@@ -173,7 +173,7 @@ var CURRICULUM = [
         ]
       },
       {
-        id: 'fork', title: 'The Fork', xp: 25,
+        id: 'fork', title: 'The Fork',
         steps: [
           { type: 'text', title: 'Two targets, one move', fen: '2r3k1/5ppp/8/3N4/8/8/5PPP/6K1 w - - 0 1',
             body: '<p>A <b>fork</b> attacks two things at once. The opponent can save only one. Knights are the champion forkers, because their attack cannot be blocked.</p>' },
@@ -181,7 +181,7 @@ var CURRICULUM = [
         ]
       },
       {
-        id: 'pin', title: 'Pins & Skewers', xp: 25,
+        id: 'pin', title: 'Pins & Skewers',
         steps: [
           { type: 'text', title: 'The pin', body: '<p>A <b>pin</b> attacks a piece that cannot move without exposing something more valuable behind it. If the piece behind is the king, the pin is <i>absolute</i> — the pinned piece legally cannot move.</p>' },
           { type: 'move', fen: '6k1/6p1/4q3/8/8/1P6/5PPP/5BK1 w - - 0 1', prompt: 'Pin Black’s queen to the king.', solution: ['Bc4'], hint: 'Line up the bishop with the queen and the king on g8.', explain: 'Bc4 pins the queen. It cannot step aside; the best Black can do is Qxc4 bxc4, giving the queen (9) for a bishop (3).' },
@@ -190,7 +190,7 @@ var CURRICULUM = [
         ]
       },
       {
-        id: 'discovery', title: 'Discovered Attacks', xp: 25,
+        id: 'discovery', title: 'Discovered Attacks',
         steps: [
           { type: 'text', title: 'Unmasking a battery', fen: '3q3k/8/8/8/3N4/8/1B6/6K1 w - - 0 1', arrows: [{ from: 'b2', to: 'h8', color: 'red' }],
             body: '<p>When one piece moves out of another’s line, it <b>discovers</b> an attack. If the hidden attack is a check, the moving piece is free to grab almost anything — the opponent must deal with the check first.</p>' },
@@ -204,7 +204,7 @@ var CURRICULUM = [
     blurb: 'The theory behind every good opening — and a short history of how it was discovered.',
     lessons: [
       {
-        id: 'principles', title: 'The Three Goals', xp: 25,
+        id: 'principles', title: 'The Three Goals',
         steps: [
           { type: 'text', title: 'Why openings matter', fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
             body: '<p>The opening is a race. Both sides start with the same army; the side that mobilises faster and controls more space usually gets the better middlegame. Every sound opening pursues three goals:</p><ol><li><b>Control the centre</b> (d4, e4, d5, e5).</li><li><b>Develop</b> knights and bishops quickly.</li><li><b>Castle</b> to make the king safe and connect the rooks.</li></ol><p class="tip">Learn the <i>why</i> before memorising lines. If you understand the goals, you can find good moves even after your opponent leaves the book.</p>' },
@@ -218,7 +218,7 @@ var CURRICULUM = [
         ]
       },
       {
-        id: 'mistakes', title: 'Opening Sins', xp: 25,
+        id: 'mistakes', title: 'Opening Sins',
         steps: [
           { type: 'text', title: 'The early queen', fen: 'rnbqkbnr/pppp1ppp/8/4p2Q/4P3/8/PPPP1PPP/RNB1KBNR b KQkq - 1 2',
             body: '<p><code>2.Qh5</code> attacks e5 and eyes f7. It looks scary, but Black can develop <i>with tempo</i> — bringing out pieces while attacking the queen, so White wastes moves running away.</p>' },
@@ -229,7 +229,7 @@ var CURRICULUM = [
         ]
       },
       {
-        id: 'history', title: 'A Brief History of Opening Theory', xp: 20,
+        id: 'history', title: 'A Brief History of Opening Theory',
         steps: [
           { type: 'text', title: 'The Romantic era (c. 1800–1880)', body: '<p>Players such as Adolf Anderssen and Paul Morphy favoured gambits: sacrifice a pawn or more for rapid development and a direct attack. Morphy, the American prodigy of the 1850s, showed the power of fast development and open lines better than anyone of his time.</p>' },
           { type: 'text', title: 'The Classical school', body: '<p>Wilhelm Steinitz, the first official World Champion (1886), argued that attacks succeed only when the position justifies them. He introduced ideas we still use: accumulating small advantages, pawn structure, and the value of a solid defence. Siegbert Tarrasch then turned these into dogmatic rules: occupy the centre with pawns.</p>' },
@@ -245,7 +245,7 @@ var CURRICULUM = [
     id: 'u6', title: 'Your First Repertoire', icon: '♝',
     blurb: 'Openings chosen for learners — each with plans, history and drills. Open the Openings tab to study and train them.',
     lessons: [
-      { id: 'rep-intro', title: 'Choosing a Repertoire', xp: 20,
+      { id: 'rep-intro', title: 'Choosing a Repertoire',
         steps: [
           { type: 'text', title: 'What is a repertoire?', body: '<p>A <b>repertoire</b> is the small set of openings you play every game: one system as White, one answer to <code>1.e4</code> and one to <code>1.d4</code> as Black. Sticking to it means every game teaches you more about the same middlegames.</p><p>This Academy recommends:</p><table class="rep"><tr><th>As White</th><td><b>Italian Game</b> (main) — or the <b>London System</b> if you prefer a fixed setup</td></tr><tr><th>Black vs 1.e4</th><td><b>Caro-Kann Defence</b></td></tr><tr><th>Black vs 1.d4</th><td><b>Queen’s Gambit Declined</b></td></tr></table><p>Why these? They follow the opening principles directly, lead to sound structures, are played at every level from club to World Championship, and don’t require memorising razor-sharp lines to survive.</p>' },
           { type: 'quiz', q: 'Why do coaches recommend principled openings over tricky traps for improving players?', options: ['Traps never work', 'Principled openings teach plans you reuse in every game; traps only work if the opponent errs', 'Principled openings are shorter to memorise'], answer: 1,
@@ -260,7 +260,7 @@ var CURRICULUM = [
     blurb: 'Convert your advantages: basic mates and pawn endings.',
     lessons: [
       {
-        id: 'kqk', title: 'King & Queen vs King', xp: 30,
+        id: 'kqk', title: 'King & Queen vs King',
         steps: [
           { type: 'text', title: 'The box method', fen: '8/8/8/4k3/8/8/8/3QK3 w - - 0 1',
             body: '<p>Use the queen to build a shrinking <b>box</b> around the enemy king (stay a knight’s move away from it), push it to the edge, then bring your own king up to help deliver mate.</p><p class="tip">Danger: stalemate! Once the king is on the edge, always make sure it still has a legal move until you give mate.</p>' },
@@ -268,7 +268,7 @@ var CURRICULUM = [
         ]
       },
       {
-        id: 'pawnend', title: 'Pawn Endings', xp: 25,
+        id: 'pawnend', title: 'Pawn Endings',
         steps: [
           { type: 'text', title: 'The rule of the square', fen: '8/8/8/3k4/P7/8/8/7K b - - 0 1',
             highlights: { a4: 'yellow', b4: 'yellow', c4: 'yellow', d4: 'yellow', e4: 'yellow', a5: 'yellow', b5: 'yellow', c5: 'yellow', d5: 'yellow', e5: 'yellow', a6: 'yellow', b6: 'yellow', c6: 'yellow', d6: 'yellow', e6: 'yellow', a7: 'yellow', b7: 'yellow', c7: 'yellow', d7: 'yellow', e7: 'yellow', a8: 'yellow', b8: 'yellow', c8: 'yellow', d8: 'yellow', e8: 'yellow' },

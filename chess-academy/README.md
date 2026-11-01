@@ -2,7 +2,7 @@
 
 A step-by-step chess course in the browser: rules, tactics, opening theory and a starter opening repertoire with spaced-repetition drills. It needs no install, no build step and no internet connection.
 
-**Run it:** open `index.html` in any modern browser. Progress (XP, streak, lessons done, drill schedule) is saved in that browser's `localStorage`.
+**Run it:** open `index.html` in any modern browser. Progress (rating estimate, streak, lessons done, drill schedule) is saved in that browser's `localStorage`.
 
 ## What's inside
 
@@ -13,7 +13,8 @@ A step-by-step chess course in the browser: rules, tactics, opening theory and a
 | **Openings** | Five studies: Italian Game, London System, Caro-Kann, Queen's Gambit Declined, and Traps to Avoid. Each one covers why to play it, the typical plans, the history, and lines with a reason given for every move. | Chessable course layout |
 | **Drill** | Play your side of each line from memory. Uses Leitner-box spaced repetition with reviews after 1, 3, 7, 14, 30 and 60 days; a mistake resets the line. | Chessable MoveTrainer |
 | **Practice** | Play a bot at three levels, from the starting position or from the end of any opening line. An optional **Coach** warns you when a move gives away material, and there are Hint and Take-back buttons. | Chess.com / Lichess analysis aids |
-| **Library** | Study method, a glossary and further reading. | — |
+| **Rating estimate** | An Elo-style guess at your playing strength. It uses first attempts at lesson exercises (each lesson has a difficulty level) and unassisted bot games, which count 3×. It is shown with a likely range. Lesson difficulties and bot ratings (~600 / ~900 / ~1250) are uncalibrated estimates. | Chess.com / Lichess puzzle ratings |
+| **Library** | Study method, how the rating estimate works, a glossary and further reading. | — |
 
 Unit outline: (1) Board & pieces → (2) Rules: check, castling, en passant, promotion, draws → (3) Checkmate patterns → (4) Tactics: checks/captures/threats, fork, pin, skewer, discovery → (5) Opening principles, opening sins and the history of opening theory → (6) Choosing a repertoire → (7) Endgames: K+Q vs K, rule of the square, opposition.
 
