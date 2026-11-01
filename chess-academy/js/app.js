@@ -10,8 +10,8 @@
   const KEY = 'chessAcademy.v1';
   const Store = {
     data: Object.assign({ xp: 0, lessons: {}, srs: {}, streak: { last: null, count: 0 }, settings: { coach: true, level: 1 } },
-      JSON.parse(localStorage.getItem(KEY) || '{}')),
-    save() { localStorage.setItem(KEY, JSON.stringify(this.data)); renderHeader(); },
+      (() => { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { return {}; } })()),
+    save() { try { localStorage.setItem(KEY, JSON.stringify(this.data)); } catch (e) { /* storage unavailable: progress lasts this visit only */ } renderHeader(); },
     today() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; },
     addXp(n) {
       this.data.xp += n;
@@ -660,7 +660,13 @@
     app.innerHTML = `<section class="page-head"><h1>Library</h1><p>Reference material: how to study, key terms, and further reading.</p></section>
       <div class="lib">${LIBRARY.map(sec => `<section class="note"><h2>${esc(sec.title)}</h2>${sec.html}</section>`).join('')}</div>
       <section class="note danger"><h3>Reset progress</h3><p>Clears XP, lessons and drill schedule stored in this browser.</p><button class="btn small" id="reset">Reset everything</button></section>`;
-    $('#reset').onclick = () => { if (confirm('Erase all progress in this browser?')) { localStorage.removeItem(KEY); location.reload(); } };
+    $('#reset').onclick = (e) => {
+      const b = e.currentTarget;
+      if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Click again to confirm'; return; }
+      try { localStorage.removeItem(KEY); } catch (err) {}
+      Store.data = { xp: 0, lessons: {}, srs: {}, streak: { last: null, count: 0 }, settings: { coach: true, level: 1 } };
+      renderHeader(); location.hash = '#/learn';
+    };
   }
 
   renderHeader();
