@@ -424,22 +424,46 @@
   }
 
   /* ---------------- Openings ---------------- */
+  const TIERS = [
+    { id: 'beginner', name: 'Beginner', range: 'roughly under 800',
+      blurb: 'Pure opening principles: develop, castle, control the centre. Little to memorise.' },
+    { id: 'novice', name: 'Novice', range: 'roughly 800–1200',
+      blurb: 'Solid, classical systems with a few key lines you need to know.' },
+    { id: 'pro', name: 'Pro', range: 'roughly 1200–1800',
+      blurb: 'Deeper strategic openings with real theory and long-term plans.' },
+    { id: 'champ', name: 'Champ', range: 'roughly 1800+',
+      blurb: 'Elite, theory-heavy weapons used in World Championship play. Learn these once your tactics are strong.' }
+  ];
+  function tierFor(rating) { return rating < 800 ? 'beginner' : rating < 1200 ? 'novice' : rating < 1800 ? 'pro' : 'champ'; }
+  let openingFilter = 'all';
   function viewOpenings() {
+    const R = Rating.get();
+    const rec = R.n ? tierFor(R.r) : 'beginner';
     const card = o => {
       const due = Store.dueCount(o.id);
       const learned = o.lines.filter((_, i) => Store.data.srs[`${o.id}:${i}`]).length;
       return `<a class="op-card" href="#/openings/${o.id}">
         <div class="mini" data-fen="${finalFen(o.lines[0])}" data-orient="${o.side}"></div>
-        <div><h3>${esc(o.name)}</h3><p class="first">${esc(o.first)}</p><p>${esc(o.tagline)}</p>
+        <div><p class="side-tag ${o.side}">${o.side === 'white' ? 'As White' : 'As Black'}</p><h3>${esc(o.name)}</h3><p class="first">${esc(o.first)}</p><p>${esc(o.tagline)}</p>
         <p class="muted">${o.lines.length} lines · ${learned} studied${due ? ` · <b class="due">${due} due</b>` : ''}</p></div></a>`;
     };
+    const shown = o => openingFilter === 'all' || o.side === openingFilter;
     app.innerHTML = `
-      <section class="page-head"><h1>Openings</h1><p>A compact repertoire for improving players. For each one: <b>why</b> it works, the plans, and lines with an explanation for <i>every</i> move. Then train it with spaced repetition.</p>
-      ${Store.dueCount() ? `<a class="btn primary" href="#/drill/all">Review all due lines (${Store.dueCount()})</a>` : ''}</section>
-      <h2 class="group">Playing White</h2><div class="op-grid">${OPENINGS.filter(o => o.side === 'white').map(card).join('')}</div>
-      <h2 class="group">Playing Black</h2><div class="op-grid">${OPENINGS.filter(o => o.side === 'black' && o.id !== 'traps').map(card).join('')}</div>
-      <h2 class="group">Survival kit</h2><div class="op-grid">${OPENINGS.filter(o => o.id === 'traps').map(card).join('')}</div>
-      <section class="note"><h3>How these were chosen</h3><p>Coaches broadly recommend learning principled openings that develop pieces naturally and create sound structures rather than collecting traps. The Italian Game and London System for White, and the Caro-Kann and Queen’s Gambit Declined for Black, are among the most commonly recommended choices for developing players — and all are still played at the very top. There is no single “best” opening; once you understand these, explore what suits your style.</p></section>`;
+      <section class="page-head"><h1>Openings</h1><p>${OPENINGS.length} sound, established openings in four levels. For each one you get <b>why</b> it works, the plans, and lines with an explanation for <i>every</i> move. Then train it with spaced repetition.</p>
+      <div class="row">
+        <div class="seg" role="tablist">${[['all', 'All'], ['white', 'As White'], ['black', 'As Black']].map(([k, l]) => `<button role="tab" class="${openingFilter === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>
+        ${Store.dueCount() ? `<a class="btn primary small" href="#/drill/all">Review all due lines (${Store.dueCount()})</a>` : ''}
+      </div></section>
+      ${TIERS.map(t => {
+        const ops = OPENINGS.filter(o => o.tier === t.id && shown(o));
+        if (!ops.length) return '';
+        return `<section class="tier">
+          <div class="tier-head"><h2 class="group">${t.name}</h2><span class="tier-range">${t.range}</span>${t.id === rec ? `<span class="tier-rec">${R.n ? 'Recommended for your rating' : 'Start here'}</span>` : ''}</div>
+          <p class="tier-blurb">${t.blurb}</p>
+          <div class="op-grid">${ops.map(card).join('')}</div></section>`;
+      }).join('')}
+      <section class="note"><h3>How these were chosen</h3><p>Every opening here is a sound main line that is still played by strong players. There are no dubious gambits or trick openings. Each line was checked move by move for legality, and an engine check confirmed that no line ends with your side materially worse. The levels are a guide to how much theory and calculation an opening demands, not a rule: a beginner can play the Ruy Lopez, and champions still play the Italian. The rating ranges are rough and use the same scale as your estimate. A sensible repertoire is one opening as White, one against 1.e4 and one against 1.d4, chosen from your level.</p></section>`;
+    app.querySelectorAll('.seg button').forEach(b => b.onclick = () => { openingFilter = b.dataset.f; viewOpenings(); });
     renderMinis();
   }
 
@@ -459,7 +483,7 @@
       <section class="op-head">
         <div class="mini big" data-fen="${finalFen(o.lines[0])}" data-orient="${o.side}"></div>
         <div>
-          <p class="eyebrow">You play ${o.side === 'white' ? 'White' : 'Black'} · ECO ${esc(o.eco)}</p>
+          <p class="eyebrow">${(TIERS.find(t => t.id === o.tier) || {}).name || ''} · You play ${o.side === 'white' ? 'White' : 'Black'} · ECO ${esc(o.eco)}</p>
           <h1>${esc(o.name)}</h1><p class="first">${esc(o.first)}</p><p>${esc(o.tagline)}</p>
           <h3>Why play it</h3><ul class="why">${o.why.map(w => `<li>${w}</li>`).join('')}</ul>
           <div class="prose">${o.plans}</div>

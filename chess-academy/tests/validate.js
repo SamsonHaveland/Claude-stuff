@@ -5,7 +5,7 @@ const path = require('path');
 const vm = require('vm');
 const root = path.join(__dirname, '..', 'js');
 globalThis.window = globalThis;
-for (const f of ['vendor/chess.js', 'engine.js', 'curriculum.js', 'openings.js']) {
+for (const f of ['vendor/chess.js', 'engine.js', 'curriculum.js', 'openings.js', 'openings-more.js']) {
   vm.runInThisContext(fs.readFileSync(path.join(root, f), 'utf8'), { filename: f });
 }
 let errors = 0, checks = 0;
@@ -66,6 +66,24 @@ for (const op of OPENINGS) op.lines.forEach((line, i) => {
     // fine either way; just report which side moves last
   }
 });
+
+// Opening metadata + soundness: every opening has a tier, and no line may end
+// with the student's side clearly worse (engine eval, depth 2 + quiescence).
+const TIERS = ['beginner', 'novice', 'pro', 'champ'];
+const ids = new Set();
+for (const op of OPENINGS) {
+  if (!TIERS.includes(op.tier)) fail(op.id, 'missing/invalid tier: ' + op.tier);
+  if (ids.has(op.id)) fail(op.id, 'duplicate id'); ids.add(op.id);
+  op.lines.forEach((line, i) => {
+    const g = new Chess(); line.moves.forEach(([m]) => g.move(m));
+    const sideToMove = g.turn();
+    const s = Engine.scoreFor(g.fen(), 2);                  // for side to move
+    const forStudent = (op.side === 'white') === (sideToMove === 'w') ? s : -s;
+    const tag = `${op.id} line ${i} (${line.name})`;
+    if (forStudent < -150) fail(tag, `student side looks worse at the end: ${forStudent}cp`);
+    else { checks++; console.log(`  ${tag}: ${forStudent >= 0 ? '+' : ''}${forStudent}cp for ${op.side}`); }
+  });
+}
 
 // Engine smoke test
 const t0 = Date.now();

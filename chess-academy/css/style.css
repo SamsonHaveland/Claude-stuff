@@ -257,3 +257,17 @@ table.rep th { white-space: nowrap; font-weight: 600; color: var(--muted); font-
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* Opening tiers */
+.seg { display: inline-flex; gap: 2px; padding: 3px; background: var(--fill); border-radius: 11px; }
+.seg button { border: 0; background: transparent; color: var(--ink); font: 500 .88rem var(--sans); padding: .35rem .95rem; border-radius: 8px; cursor: pointer; }
+.seg button.on { background: var(--card); box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+.tier { margin-top: 2.25rem; }
+.tier-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: .4rem .8rem; }
+.tier-head .group { margin: 0; }
+.tier-range { color: var(--muted); font-size: .9rem; }
+.tier-rec { background: var(--accent-tint); color: var(--accent); font-size: .75rem; font-weight: 600; padding: .2em .7em; border-radius: 999px; }
+.tier-blurb { color: var(--muted); margin: .3rem 0 1rem; }
+.side-tag { font-size: .72rem; font-weight: 600; margin: 0 0 .2rem !important; color: var(--muted) !important; }
+.side-tag.white::before { content: "\25CB  "; } .side-tag.black::before { content: "\25CF  "; }
+.mini { align-self: flex-start; aspect-ratio: 1; }

@@ -10,7 +10,7 @@ A step-by-step chess course in the browser: rules, tactics, opening theory and a
 |---|---|---|
 | **Learn** | A path of 7 units and 22 short lessons. Each lesson mixes explanation cards, quizzes and hands-on board exercises. | Duolingo's lesson path; Chess.com Lessons |
 | **Board exercises** | Star-collecting games for each piece, a coordinate drill, puzzles with scripted replies, mate-in-one with any mating move accepted, and K+Q vs K played against the engine. | Lichess *Learn* and *Practice* |
-| **Openings** | Five studies: Italian Game, London System, Caro-Kann, Queen's Gambit Declined, and Traps to Avoid. Each one covers why to play it, the typical plans, the history, and lines with a reason given for every move. | Chessable course layout |
+| **Openings** | 17 sound, established openings in four levels: **Beginner** (Italian, London, Scotch, Four Knights, Traps to Avoid), **Novice** (Queen's Gambit, Caro-Kann, QGD, Scandinavian), **Pro** (Ruy Lopez, English, French, King's Indian) and **Champ** (Najdorf, Nimzo-Indian, Grünfeld, Catalan). You can filter by colour, and the level matching your estimated rating is highlighted. Each one covers why to play it, the typical plans, the history, and its lines. | Chessable course layout |
 | **Drill** | Play your side of each line from memory. Uses Leitner-box spaced repetition with reviews after 1, 3, 7, 14, 30 and 60 days; a mistake resets the line. | Chessable MoveTrainer |
 | **Practice** | Play a bot at three levels, from the starting position or from the end of any opening line. An optional **Coach** warns you when a move gives away material, and there are Hint and Take-back buttons. | Chess.com / Lichess analysis aids |
 | **Rating estimate** | An Elo-style guess at your playing strength. It uses first attempts at lesson exercises (each lesson has a difficulty level) and unassisted bot games, which count 3×. It is shown with a likely range. Lesson difficulties and bot ratings (~600 / ~900 / ~1250) are uncalibrated estimates. | Chess.com / Lichess puzzle ratings |
@@ -38,10 +38,12 @@ js/vendor/chess.js    chess.js 0.13.4 (BSD-2-Clause), move legality
 js/board.js           interactive board (drag or click, arrows, promotion picker)
 js/engine.js          small alpha-beta engine (bot, hints, blunder coach)
 js/curriculum.js      all lesson content
-js/openings.js        opening lines + per-move explanations
+js/openings.js        original five openings
+js/openings-more.js   twelve more openings + level (tier) for every opening
 js/library.js         reference pages
 js/app.js             router, views, progress / spaced repetition
-tests/validate.js     checks every FEN, solution, mate and opening move for legality
+tests/validate.js     checks every FEN, solution, mate and opening move for legality, and that no
+                      opening line ends with the student's side materially worse (engine check)
 ```
 
 To add a lesson or an opening line, edit `curriculum.js` or `openings.js`, then run `node tests/validate.js`.
