@@ -6,7 +6,7 @@ A step-by-step chess course in the browser: rules, tactics, opening theory and a
 
 **Install it on a phone:** host the `chess-academy/` folder on any HTTPS site (e.g. GitHub Pages), open it on the phone, then *Share → Add to Home Screen* (iPhone, Safari) or *⋮ → Install app* (Android, Chrome). It is a Progressive Web App: it gets its own icon, opens full-screen, and works offline after the first visit (`sw.js` caches every file). When you change any file, bump `VERSION` in `sw.js` so installed copies update.
 
- Progress (rating estimate, streak, lessons done, drill schedule) is saved in that browser's `localStorage`.
+**Saving progress:** lessons save after every step, bot games after every move, drills after every line. Progress is kept in the browser's `localStorage`. When the app runs as a Claude artifact it is also saved to the signed-in viewer's private area of the artifact database (`data/users/<id>/progress`), so it survives cleared storage and follows them across devices. The Library has a backup code to copy progress between devices anywhere, and the header warns ("Not saving") if the browser blocks storage.
 
 ## What's inside
 

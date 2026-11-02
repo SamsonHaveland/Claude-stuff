@@ -8,14 +8,67 @@
 
   /* ---------------- Progress store ---------------- */
   const KEY = 'chessAcademy.v1';
+  // Can this browser keep data between visits? (Some block storage for embedded pages.)
+  const localOk = (() => { try { localStorage.setItem(KEY + '.t', '1'); localStorage.removeItem(KEY + '.t'); return true; } catch (e) { return false; } })();
+  const hasProgress = d => !!(d && ((d.rating && d.rating.n) || Object.keys(d.lessons || {}).length || Object.keys(d.srs || {}).length || d.game));
+
+  /* Cloud save: when the app runs inside Claude, progress is also kept in the
+   * signed-in viewer's private area of the artifact database
+   * (data/users/<id>/progress), so it survives cleared/blocked browser storage
+   * and follows the viewer between devices. Elsewhere this stays inactive. */
+  const Cloud = { ref: null, status: 'local', busy: false, pending: false, timer: null };
+  Cloud.push = function () {
+    if (!Cloud.ref) return;
+    clearTimeout(Cloud.timer);
+    Cloud.timer = setTimeout(async () => {
+      if (Cloud.busy) { Cloud.pending = true; return; }
+      Cloud.busy = true;
+      try {
+        await Cloud.ref.set({ json: JSON.stringify(Store.data), updatedAt: Store.data.updatedAt || Date.now() });
+        Cloud.status = 'cloud';
+      } catch (e) {
+        const code = e && e.code;
+        if (code === 'unavailable' || code === 'resource_exhausted') { Cloud.pending = true; }
+        else { Cloud.ref = null; Cloud.status = 'local'; }
+      }
+      Cloud.busy = false; renderHeader();
+      if (Cloud.pending) { Cloud.pending = false; setTimeout(Cloud.push, 3000 + Math.random() * 2000); }
+    }, 1200);
+  };
+  async function initCloud() {
+    for (let i = 0; i < 20 && !(window.claude && typeof window.claude.use === 'function'); i++) await new Promise(r => setTimeout(r, 150));
+    if (!(window.claude && typeof window.claude.use === 'function')) return;
+    try {
+      const [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
+      if (!db || !user) return;
+      const id = await user.id();
+      if (!id) return;
+      const ref = db.doc('data/users/' + id + '/progress');
+      const snap = await Promise.race([ref.get(), new Promise((_, rej) => setTimeout(() => rej({ code: 'timeout' }), 10000))]);
+      Cloud.ref = ref; Cloud.status = 'cloud';
+      let remote = null;
+      try { remote = snap.exists ? JSON.parse((snap.data() || {}).json || 'null') : null; } catch (e) { remote = null; }
+      if (remote && hasProgress(remote) && (remote.updatedAt || 0) > (Store.data.updatedAt || 0)) {
+        Store.data = Object.assign(freshData(), remote);
+        try { localStorage.setItem(KEY, JSON.stringify(Store.data)); } catch (e) {}
+        renderHeader(); route(); toast('Progress loaded from your Claude account');
+      } else if (hasProgress(Store.data)) Cloud.push();
+      renderHeader();
+    } catch (e) { /* stay on device storage */ }
+  }
   function freshData() {
     return { lessons: {}, srs: {}, streak: { last: null, count: 0 }, settings: { coach: true, level: 1 },
-      rating: { r: 400, n: 0, ex: 0, games: 0 }, rated: {} };
+      rating: { r: 400, n: 0, ex: 0, games: 0 }, rated: {}, lessonPos: {}, game: null, updatedAt: 0 };
   }
   const Store = {
     data: Object.assign(freshData(),
       (() => { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { return {}; } })()),
-    save() { try { localStorage.setItem(KEY, JSON.stringify(this.data)); } catch (e) { /* storage unavailable: progress lasts this visit only */ } renderHeader(); },
+    save() {
+      this.data.updatedAt = Date.now();
+      try { localStorage.setItem(KEY, JSON.stringify(this.data)); } catch (e) { /* storage blocked: Cloud (if available) still saves */ }
+      Cloud.push();
+      renderHeader();
+    },
     today() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; },
     touch() {
       const t = this.today(), s = this.data.streak;
@@ -96,7 +149,10 @@
   function renderHeader() {
     const d = Store.data;
     const R = d.rating;
-    $('#stats').innerHTML = `<span title="Daily streak">🔥 ${d.streak.count}</span><a href="#/learn" class="lvl" title="Estimated rating — a rough guess from your exercises and bot games">${R.n ? `Rating ≈ ${Math.round(R.r)}` : 'Unrated'}</a>`;
+    const saveTag = Cloud.status === 'cloud'
+      ? '<span class="save-tag ok" title="Your progress is saved to your Claude account and follows you between devices.">☁︎ Saved</span>'
+      : localOk ? '' : '<a href="#/library" class="save-tag bad" title="This browser is blocking storage, so progress will be lost when you close the app. Tap for options.">⚠︎ Not saving</a>';
+    $('#stats').innerHTML = `${saveTag}<span title="Daily streak">🔥 ${d.streak.count}</span><a href="#/learn" class="lvl" title="Estimated rating — a rough guess from your exercises and bot games">${R.n ? `Rating ≈ ${Math.round(R.r)}` : 'Unrated'}</a>`;
     const due = Store.dueCount();
     const badge = $('#due-badge');
     if (badge) { badge.textContent = due; badge.hidden = !due; }
@@ -176,7 +232,10 @@
   function viewLesson(id) {
     const lesson = allLessons().find(l => l.id === id);
     if (!lesson) return viewLearn();
-    let idx = 0, mistakes = 0, stepStartMistakes = 0, rBefore = Math.round(Rating.get().r), ratedAny = false;
+    Store.data.lessonPos = Store.data.lessonPos || {};
+    let idx = Store.data.lessonPos[id] || 0, mistakes = 0, stepStartMistakes = 0, rBefore = Math.round(Rating.get().r), ratedAny = false;
+    if (idx >= lesson.steps.length) idx = 0;
+    if (idx > 0) setTimeout(() => toast('Picked up where you left off'), 50);
     app.innerHTML = `
       <div class="lesson">
         <div class="lesson-top"><a href="#/learn" class="close" aria-label="Back to path">✕</a><div class="bar"><div class="fill"></div></div><span class="count"></span></div>
@@ -192,6 +251,7 @@
     function show() {
       if (stepCleanup) { stepCleanup(); stepCleanup = null; }
       const st = lesson.steps[idx];
+      if ((Store.data.lessonPos[id] || 0) !== idx) { Store.data.lessonPos[id] = idx; Store.save(); }
       $('.fill').style.width = (idx / lesson.steps.length * 100) + '%';
       $('.count').textContent = `${idx + 1} / ${lesson.steps.length}`;
       board.onSquareClick = null; board.onMove = null; board.destsFn = () => [];
@@ -218,6 +278,7 @@
       const prev = Store.data.lessons[lesson.id];
       const perfect = mistakes === 0;
       Store.data.lessons[lesson.id] = { done: true };
+      delete Store.data.lessonPos[lesson.id];
       Store.touch();
       const rAfter = Math.round(Rating.get().r);
       const ratingLine = ratedAny
@@ -705,6 +766,8 @@
   ];
   function viewPlay(params) {
     let startFen = START, startNote = 'Standard starting position', userColor = 'w', preMoves = [];
+    const saved = !params.opening && Store.data.game && Array.isArray(Store.data.game.moves) ? Store.data.game : null;
+    if (saved) { startFen = saved.startFen; startNote = saved.startNote; userColor = saved.userColor; preMoves = saved.preMoves || []; }
     if (params.opening) {
       const o = OPENINGS.find(x => x.id === params.opening);
       const l = o && o.lines[+params.line || 0];
@@ -734,8 +797,17 @@
       </div>`;
     $('#color').value = userColor; $('#level').value = s.level; $('#coach').checked = s.coach;
     const board = new Board($('#board'));
-    let game, thinking = false, timer = null, gameLevel = 1, assisted = false, recorded = false, resigned = false;
-    const assist = (why) => { if (!assisted && !recorded) { assisted = true; noteRated(why); } };
+    let game, thinking = false, timer = null, gameLevel = 1, assisted = false, assistWhy = '', recorded = false, resigned = false, savedLen = -1;
+    const assist = (why) => { if (!assisted && !recorded) { assisted = true; assistWhy = why; noteRated(why); saveGame(true); } };
+    // Keep the unfinished game in progress storage so it survives closing the app.
+    function saveGame(force) {
+      const over = recorded || resigned || game.game_over();
+      const len = game.history().length;
+      if (!force && len === savedLen && !over) return;
+      savedLen = len;
+      Store.data.game = over || !len ? null : { startFen, startNote, preMoves, userColor, level: gameLevel, moves: game.history(), assisted, assistWhy };
+      Store.save();
+    }
     function noteRated(why) {
       const lv = LEVELS[gameLevel];
       $('.rated-note').innerHTML = assisted
@@ -745,17 +817,24 @@
     const fb = $('.feedback'), status = $('.status');
     cleanup = () => clearTimeout(timer);
 
-    function newGame() {
+    function newGame(resume) {
       clearTimeout(timer); thinking = false;
+      if (resume) { $('#color').value = resume.userColor; $('#level').value = resume.level; }
       userColor = $('#color').value;
       game = new Chess(startFen);
-      gameLevel = +$('#level').value; assisted = false; recorded = false; resigned = false; noteRated();
+      if (resume) resume.moves.forEach(m => game.move(m));
+      gameLevel = +$('#level').value; recorded = false; resigned = false; savedLen = game.history().length;
+      assisted = !!(resume && resume.assisted); assistWhy = (resume && resume.assistWhy) || '';
+      noteRated(assistWhy);
+      if (resume) toast('Resumed your unfinished game');
+      else if (Store.data.game) { Store.data.game = null; Store.save(); }
       board.setInteractive(true);
       board.setOrientation(userColor === 'w' ? 'white' : 'black');
       board.destsFn = sq => (!thinking && game.turn() === userColor && !game.game_over()) ? chessDests(game)(sq) : [];
       board.setArrows([]); syncBoard(board, game); fb.innerHTML = '';
+      if (resume && game.history().length) { const h = game.history({ verbose: true }); const last = h[h.length - 1]; board.setLastMove(last.from, last.to); }
       update();
-      if (game.turn() !== userColor) botMove();
+      if (game.turn() !== userColor && !game.game_over()) botMove();
     }
     function finishGame() {
       if (recorded || !(game.game_over() || resigned) || !game.history().length) return '';
@@ -772,11 +851,12 @@
       const h = game.history();
       const rmsg = finishGame();
       if (rmsg) $('.rated-note').innerHTML = `<b>${esc(rmsg)}</b>`;
-      if (resigned) { status.innerHTML = '<div class="fb bad"><b>You resigned.</b> Start a new game when ready.</div>'; return; }
+      if (resigned) { saveGame(true); status.innerHTML = '<div class="fb bad"><b>You resigned.</b> Start a new game when ready.</div>'; return; }
       $('#moves').innerHTML = esc(pgn(preMoves.concat(h)));
       if (game.in_checkmate()) status.innerHTML = `<div class="fb ${game.turn() === userColor ? 'bad' : 'good'}"><b>Checkmate.</b> ${game.turn() === userColor ? 'The bot wins — review the game and try again.' : 'You win! 🎉'}</div>`;
       else if (game.in_draw() || game.in_stalemate() || game.in_threefold_repetition()) status.innerHTML = '<div class="fb">Draw.</div>';
       else status.innerHTML = `<p>${thinking ? 'Bot is thinking…' : game.turn() === userColor ? 'Your move.' : ''}${game.in_check() ? ' <b>Check!</b>' : ''}</p>`;
+      saveGame();
     }
     function botMove() {
       thinking = true; update();
@@ -825,31 +905,64 @@
       if (r) { board.setArrows([{ from: r.move.from, to: r.move.to, color: 'blue' }]); fb.innerHTML = `<div class="fb">💡 Consider <b>${esc(r.move.san)}</b>. Why might it be good?</div>`; }
     };
     $('#flip').onclick = () => board.flip();
-    $('#new').onclick = newGame;
+    $('#new').onclick = () => newGame();
     $('#resign').onclick = () => {
       if (recorded || resigned || game.game_over() || !game.history().length) return;
       clearTimeout(timer); thinking = false; resigned = true; board.setInteractive(false); update();
     };
-    $('#color').onchange = newGame;
+    $('#color').onchange = () => newGame();
     $('#level').onchange = () => { s.level = +$('#level').value; Store.save(); if (+$('#level').value !== gameLevel && game.history().length) assist('the bot level changed mid-game'); else { gameLevel = +$('#level').value; noteRated(); } };
     $('#coach').onchange = () => { s.coach = $('#coach').checked; Store.save(); };
-    newGame();
+    newGame(saved);
   }
 
   /* ---------------- Library ---------------- */
   function viewLibrary() {
     app.innerHTML = `<section class="page-head"><h1>Library</h1><p>Reference material: how to study, key terms, and further reading.</p></section>
       <div class="lib">${LIBRARY.map(sec => `<section class="note"><h2>${esc(sec.title)}</h2>${sec.html}</section>`).join('')}</div>
-      <section class="note danger"><h3>Reset progress</h3><p>Clears your rating estimate, lessons and drill schedule stored in this browser.</p><button class="btn small" id="reset">Reset everything</button></section>`;
+      <section class="note" id="backup"><h2>Your progress: where it’s saved</h2>
+        <p>${Cloud.status === 'cloud'
+          ? '<b>☁︎ Saved to your Claude account.</b> Your lessons, rating, drill schedule and any unfinished game are kept privately for you and follow you to any device where you open this page signed in.'
+          : localOk ? '<b>Saved on this device only</b>, in this browser. Clearing browsing data, using private mode, or opening the app on another device or browser starts fresh. Use a backup code to move your progress.'
+          : '<b>⚠︎ This browser is blocking storage, so progress is lost when you close the app.</b> Open the app in your normal browser (not private mode), or keep a backup code below and restore it next time.'}</p>
+        <p class="muted">Lessons save after every step, bot games after every move, and drills after every line.</p>
+        <h3>Backup code</h3>
+        <p class="muted">Copy this code to keep a backup, or paste it on another device to move your progress there.</p>
+        <textarea id="bk-out" class="code" readonly rows="3"></textarea>
+        <div class="row"><button class="btn small" id="bk-copy">Copy code</button></div>
+        <textarea id="bk-in" class="code" rows="3" placeholder="Paste a backup code here to restore it"></textarea>
+        <div class="row"><button class="btn small primary" id="bk-restore">Restore from code</button></div>
+        <p class="bk-msg muted"></p>
+      </section>
+      <section class="note danger"><h3>Reset progress</h3><p>Clears your rating estimate, lessons and drill schedule${Cloud.status === 'cloud' ? ' (here and in your Claude account)' : ' stored in this browser'}.</p><button class="btn small" id="reset">Reset everything</button></section>`;
+    const enc = d => btoa(unescape(encodeURIComponent(JSON.stringify(d))));
+    const dec = c => JSON.parse(decodeURIComponent(escape(atob(c.replace(/\s+/g, '')))));
+    $('#bk-out').value = enc(Store.data);
+    $('#bk-copy').onclick = async () => {
+      const t = $('#bk-out'); t.select();
+      try { await navigator.clipboard.writeText(t.value); $('.bk-msg').textContent = 'Copied. Keep it somewhere safe, like a note on your phone.'; }
+      catch (e) { $('.bk-msg').textContent = 'Select the code above and copy it manually.'; }
+    };
+    $('#bk-restore').onclick = () => {
+      try {
+        const d = dec($('#bk-in').value.trim());
+        if (!d || typeof d !== 'object' || !d.rating || !d.lessons) throw new Error('bad');
+        Store.data = Object.assign(freshData(), d);
+        Store.save();
+        toast('Progress restored');
+        location.hash = '#/learn';
+      } catch (e) { $('.bk-msg').textContent = 'That code isn’t valid. Copy the whole code and try again.'; }
+    };
     $('#reset').onclick = (e) => {
       const b = e.currentTarget;
       if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Click again to confirm'; return; }
       try { localStorage.removeItem(KEY); } catch (err) {}
       Store.data = freshData();
-      renderHeader(); location.hash = '#/learn';
+      Store.save(); location.hash = '#/learn';
     };
   }
 
   renderHeader();
   route();
+  initCloud();
 })();
