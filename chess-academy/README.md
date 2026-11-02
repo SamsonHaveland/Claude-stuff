@@ -2,7 +2,11 @@
 
 A step-by-step chess course in the browser: rules, tactics, opening theory and a starter opening repertoire with spaced-repetition drills. It needs no install, no build step and no internet connection.
 
-**Run it:** open `index.html` in any modern browser. Progress (rating estimate, streak, lessons done, drill schedule) is saved in that browser's `localStorage`.
+**Run it:** open `index.html` in any modern browser.
+
+**Install it on a phone:** host the `chess-academy/` folder on any HTTPS site (e.g. GitHub Pages), open it on the phone, then *Share → Add to Home Screen* (iPhone, Safari) or *⋮ → Install app* (Android, Chrome). It is a Progressive Web App: it gets its own icon, opens full-screen, and works offline after the first visit (`sw.js` caches every file). When you change any file, bump `VERSION` in `sw.js` so installed copies update.
+
+ Progress (rating estimate, streak, lessons done, drill schedule) is saved in that browser's `localStorage`.
 
 ## What's inside
 
@@ -33,6 +37,9 @@ These are among the most commonly recommended choices for developing players. Th
 
 ```
 index.html            app shell
+manifest.webmanifest  install metadata (name, icons, colours)
+sw.js                 service worker: offline caching
+icons/                app icons (home screen, maskable, favicon)
 css/style.css         styling (responsive)
 js/vendor/chess.js    chess.js 0.13.4 (BSD-2-Clause), move legality
 js/board.js           interactive board (drag or click, arrows, promotion picker)
