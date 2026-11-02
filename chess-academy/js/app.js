@@ -238,7 +238,7 @@
     if (idx > 0) setTimeout(() => toast('Picked up where you left off'), 50);
     app.innerHTML = `
       <div class="lesson">
-        <div class="lesson-top"><a href="#/learn" class="close" aria-label="Back to path">✕</a><div class="bar"><div class="fill"></div></div><span class="count"></span></div>
+        <div class="lesson-top"><a href="#/learn" class="close" aria-label="Back to path">✕</a><div class="bar"><div class="fill"></div></div><span class="count"></span><button class="restart" title="Restart this lesson from the beginning" aria-label="Restart lesson">↺</button></div>
         <div class="lesson-body">
           <div class="board-col"><div id="board"></div></div>
           <div class="panel" id="panel"></div>
@@ -290,6 +290,7 @@
         <div class="row">${nxt ? `<a class="btn primary" href="#/lesson/${nxt.id}">Next: ${esc(nxt.title)}</a>` : ''}<a class="btn" href="#/learn">Back to path</a></div></div>`;
       board.setInteractive(false);
     }
+    $('.restart').onclick = () => { idx = 0; mistakes = 0; show(); };
     show();
     cleanup = () => { if (stepCleanup) stepCleanup(); };
   }
