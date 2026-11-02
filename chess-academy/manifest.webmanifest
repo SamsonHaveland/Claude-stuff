@@ -1,0 +1,18 @@
+{
+  "name": "Chess Academy",
+  "short_name": "Chess Academy",
+  "description": "Learn chess step by step: rules, tactics, 17 openings with the why behind every move, endgames and a practice bot.",
+  "id": "./",
+  "start_url": "./#/learn",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f5f5f7",
+  "theme_color": "#1d1d1f",
+  "categories": ["education", "games"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

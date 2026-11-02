@@ -278,3 +278,9 @@ table.rep th { white-space: nowrap; font-weight: 600; color: var(--muted); font-
 .whynot p:last-child { margin-bottom: 0; }
 .whynot-h { font-weight: 600; color: var(--ink) !important; margin-bottom: .1rem !important; }
 .fb p { margin: .25rem 0; }
+
+/* Installed app (standalone): respect the iPhone notch / home indicator */
+.top { padding-top: max(.55rem, env(safe-area-inset-top)); padding-left: max(env(safe-area-inset-left), calc((100% - 1120px) / 2 + 1.25rem), 1.25rem); padding-right: max(env(safe-area-inset-right), calc((100% - 1120px) / 2 + 1.25rem), 1.25rem); }
+footer { padding-bottom: max(2rem, env(safe-area-inset-bottom)); }
+@media (display-mode: standalone) { footer { display: none; } main { padding-bottom: max(3rem, env(safe-area-inset-bottom)); } }
+@media (max-width: 820px) { .top { padding-left: max(.9rem, env(safe-area-inset-left)); padding-right: max(.9rem, env(safe-area-inset-right)); } }
