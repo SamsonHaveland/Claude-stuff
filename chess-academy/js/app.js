@@ -669,69 +669,138 @@
     if (!o) return viewOpenings();
     const line = o.lines[0];
     const me = o.side === 'white' ? 'w' : 'b';
-    const { game, origin, verbose } = trackPieces(line.moves);
-    // Final formation: my pieces that moved, with arrows home -> destination.
+    const { game: finalGame, origin, verbose } = trackPieces(line.moves);
     const finalArrows = [], finalHl = {};
-    for (const row of game.board()) for (const p of row) {
+    for (const row of finalGame.board()) for (const p of row) {
       if (!p || p.color !== me) continue;
       const from = origin[p.square];
       if (from && from !== p.square) { finalArrows.push({ from, to: p.square, color: 'green' }); finalHl[p.square] = 'green'; }
     }
-    // Steps = my moves, each with the opponent's reply before it.
-    const steps = [];
-    verbose.forEach((m, k) => { if (m.color === me) steps.push({ k, m, why: line.moves[k][1], before: k > 0 && verbose[k - 1].color !== me ? verbose[k - 1] : null }); });
+    const myPlies = verbose.map((m, k) => m.color === me ? k : -1).filter(k => k >= 0);
+    const total = myPlies.length;
+
     app.innerHTML = `
       <a href="#/openings/${o.id}" class="back">← ${esc(o.name)}</a>
+      <div class="lesson-top"><div class="bar"><div class="fill"></div></div><span class="count"></span>
+        <button class="restart" title="Start again" aria-label="Start again">↺</button></div>
       <div class="lesson-body">
-        <div class="board-col"><div id="board"></div>
-          <div class="row center controls"><button class="btn small" id="s-target">Show the finished setup</button><button class="btn small primary" id="s-play">▶ Watch it</button><button class="btn small" id="s-flip">⇅</button></div>
-        </div>
-        <div class="panel">
-          <p class="eyebrow">How to set it up · ${esc(o.name)} · you play ${o.side === 'white' ? 'White' : 'Black'}</p>
-          <h2>Your setup in ${steps.length} moves</h2>
-          <p class="setup-intro">The green squares show where your pieces end up, and the arrows show where each one comes from. Tap any step to see it on the board.</p>
-          <ol class="setup-steps">${steps.map((st, i) => `
-            <li data-i="${i}">
-              ${st.before ? `<p class="theirs">Your opponent ${esc(plainTheirs(st.before))} (${esc(st.before.san)}).</p>` : ''}
-              <p class="mine"><b>${esc(plainMove(st.m))}</b> <span class="san">${esc(pgn([st.m.san], st.k))}</span></p>
-              <p class="why">${esc(st.why)}</p>
-            </li>`).join('')}</ol>
-          <div class="note setup-tip"><p>${o.plans}</p><p class="muted">Your opponent won’t always play these moves. The setup is your goal, so if they do something different, look for a sensible way to reach the same formation, and check the “Why not …?” notes in Explore.</p></div>
-          <div class="row"><a class="btn primary" href="#/drill/${o.id}?line=0">Practise it from memory</a><a class="btn" href="#/explore/${o.id}/0">Explore move by move</a><a class="btn" href="#/play?opening=${o.id}&line=0">Play from the setup</a></div>
-        </div>
+        <div class="board-col"><div id="board"></div></div>
+        <div class="panel" id="panel"></div>
       </div>`;
     const board = new Board($('#board'), { orientation: o.side });
-    board.setInteractive(false);
-    let timer = null, cur = -1;
-    function showTarget() {
-      cur = -1; mark();
-      board.setFen(game.fen()); board.setLastMove(null); board.setHighlights(finalHl); board.setArrows(finalArrows);
+    const panel = $('#panel');
+    const game = new Chess();
+    let ply = 0, timer = null, tries = 0;
+
+    const stepNo = () => myPlies.filter(k => k < ply).length;           // my moves already made
+    function progress() {
+      const done = stepNo();
+      $('.fill').style.width = (done / total * 100) + '%';
+      $('.count').textContent = done < total ? `Step ${Math.min(done + 1, total)} of ${total}` : 'Done';
     }
-    function showStep(i) {
-      cur = i; mark();
-      const st = steps[i], g = new Chess();
-      for (let j = 0; j <= st.k; j++) g.move(line.moves[j][0]);
-      board.setHighlights({}); board.setFen(g.fen()); board.setLastMove(st.m.from, st.m.to);
-      board.setArrows([{ from: st.m.from, to: st.m.to, color: 'green' }].concat(st.before ? [{ from: st.before.from, to: st.before.to, color: 'red' }] : []));
+    function rebuild(toPly) {
+      clearTimeout(timer);
+      game.reset(); for (let j = 0; j < toPly; j++) game.move(line.moves[j][0]);
+      ply = toPly;
     }
-    function mark() {
-      app.querySelectorAll('.setup-steps li').forEach(li => li.classList.toggle('on', +li.dataset.i === cur));
-      const li = app.querySelector(`.setup-steps li[data-i="${cur}"]`);
-      if (li && li.scrollIntoView && window.innerWidth > 820) li.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+
+    // The opponent moves on their own, with a short explanation.
+    function opponentTurn(after) {
+      const [san, why] = line.moves[ply];
+      board.setInteractive(false);
+      timer = setTimeout(() => {
+        const m = game.move(san); ply++;
+        syncBoard(board, game, m);
+        board.setArrows([{ from: m.from, to: m.to, color: 'red' }]); board.setHighlights({});
+        after(m, why);
+      }, 650);
     }
-    function stop() { clearInterval(timer); timer = null; $('#s-play').textContent = '▶ Watch it'; }
-    app.querySelectorAll('.setup-steps li').forEach(li => li.onclick = () => { stop(); showStep(+li.dataset.i); });
-    $('#s-target').onclick = () => { stop(); showTarget(); };
-    $('#s-flip').onclick = () => board.flip();
-    $('#s-play').onclick = () => {
-      if (timer) return stop();
-      $('#s-play').textContent = '❚❚ Pause';
-      let i = cur + 1 >= steps.length ? 0 : cur + 1;
-      showStep(i);
-      timer = setInterval(() => { i++; if (i >= steps.length) { stop(); showTarget(); } else showStep(i); }, 1800);
-    };
-    cleanup = () => clearInterval(timer);
-    showTarget();
+
+    function intro() {
+      rebuild(0); progress();
+      syncBoard(board, game); board.setLastMove(null); board.setArrows(finalArrows); board.setHighlights(finalHl); board.setInteractive(false);
+      panel.innerHTML = `<p class="eyebrow">How to set it up · you play ${o.side === 'white' ? 'White' : 'Black'}</p>
+        <h2>${esc(o.name)}: step by step</h2>
+        <p>The board shows the <b>goal</b>: the green squares are where your pieces will stand, and the arrows show where each one comes from.</p>
+        <p>We’ll get there in <b>${total} moves</b>. For each step you’ll see which piece to move and where it goes. Make the move yourself, and I’ll explain why it’s played and what your opponent does next.</p>
+        ${me === 'b' ? '<p class="muted">You play Black, so your opponent moves first.</p>' : ''}
+        <button class="btn primary continue" id="go">Start step 1</button>`;
+      $('#go').onclick = () => { rebuild(0); syncBoard(board, game); board.setHighlights({}); board.setArrows([]); next(); };
+    }
+
+    function next(oppMove, oppWhy) {
+      progress();
+      if (ply >= line.moves.length) return finish(oppMove, oppWhy);
+      if (game.turn() !== me) {
+        panel.innerHTML = `<p class="eyebrow">${stepNo() ? `Step ${stepNo()} done` : 'Your opponent starts'}</p><p class="muted">Your opponent is moving…</p>`;
+        return opponentTurn((m, why) => next(m, why));
+      }
+      tries = 0;
+      const want = verbose[ply], stepPly = ply;
+      const n = stepNo() + 1;
+      board.setHighlights({ [want.from]: 'blue', [want.to]: 'green' });
+      board.setArrows(oppMove ? [{ from: oppMove.from, to: oppMove.to, color: 'red' }] : []);
+      board.destsFn = sq => game.turn() === me ? chessDests(game)(sq) : [];
+      board.setInteractive(true);
+      panel.innerHTML = `
+        ${oppMove ? `<div class="opp-move"><p class="eyebrow">Your opponent played ${esc(pgn([oppMove.san], ply - 1))}</p><p>${esc(oppWhy)}</p></div>` : ''}
+        <p class="eyebrow">Step ${n} of ${total}</p>
+        <h2 class="step-do">${esc(plainMove(want))}</h2>
+        <p class="muted">The <span class="key blue"></span> square is the piece to move and the <span class="key green"></span> square is where it goes. Drag it there, or tap it then tap the square.</p>
+        <div class="feedback"></div>
+        <div class="row"><button class="btn small" id="showme">Show me</button>${n > 1 ? '<button class="btn small" id="back">← Previous step</button>' : ''}</div>`;
+      $('#showme').onclick = () => played(game.move(want.san), true);
+      if ($('#back')) $('#back').onclick = () => {
+        const prevMine = myPlies.filter(k => k < stepPly).pop();
+        rebuild(prevMine); syncBoard(board, game);
+        const prev = ply > 0 ? game.history({ verbose: true }).slice(-1)[0] : null;
+        next(prev && prev.color !== me ? prev : null, prev && prev.color !== me ? line.moves[ply - 1][1] : '');
+      };
+      board.onMove = (from, to, promotion) => {
+        const fenBefore = game.fen();
+        const mv = game.move({ from, to, promotion: promotion || 'q' });
+        if (!mv) return syncBoard(board, game);
+        if (strip(mv.san) !== strip(want.san)) {
+          game.undo(); tries++;
+          board.shake(); syncBoard(board, game); board.setHighlights({ [want.from]: 'blue', [want.to]: 'green' });
+          const ex = explainWrongMove(fenBefore, mv.san, want.san, line.moves.slice(0, ply).map(x => x[0]).join(' '), false);
+          board.setArrows([{ from: want.from, to: want.to, color: 'blue' }].concat(ex.arrow ? [ex.arrow] : []));
+          $('.feedback', panel).innerHTML = `<div class="fb bad"><p><b>Not ${esc(mv.san)}.</b></p>${ex.html}<p>Move the piece on the blue square to the green square.</p></div>`;
+          return;
+        }
+        played(mv, false);
+      };
+    }
+
+    function played(mv, shown) {
+      ply++;
+      board.setInteractive(false);
+      syncBoard(board, game, mv); board.setHighlights({ [mv.to]: 'green' }); board.setArrows([]); board.flash(mv.to, 'good');
+      const why = line.moves[ply - 1][1];
+      const last = ply >= line.moves.length;
+      $('.feedback', panel).innerHTML = `<div class="fb good"><p><b>${shown ? 'Here it is:' : '✓ Well done!'} ${esc(pgn([mv.san], ply - 1))}</b></p><p><b>Why:</b> ${esc(why)}</p></div>
+        <button class="btn primary continue" id="nx">${last ? 'See the finished setup' : 'Next step'}</button>`;
+      $('#showme').remove();
+      $('#nx').onclick = () => next();
+      progress();
+    }
+
+    function finish(oppMove, oppWhy) {
+      board.setInteractive(false);
+      syncBoard(board, game); board.setLastMove(null); board.setArrows(finalArrows); board.setHighlights(finalHl);
+      panel.innerHTML = `
+        ${oppMove ? `<div class="opp-move"><p class="eyebrow">Your opponent played ${esc(pgn([oppMove.san], ply - 1))}</p><p>${esc(oppWhy)}</p></div>` : ''}
+        <div class="complete"><div class="big">✓</div><h2>Setup complete!</h2>
+        <p>You’ve built the ${esc(o.name)} in ${total} moves. The arrows show where every piece came from.</p></div>
+        <div class="note setup-tip"><p>${o.plans}</p><p class="muted">Opponents won’t always play these exact moves. Keep the goal formation in mind, and check the “Why not …?” notes in Explore.</p></div>
+        <div class="row"><button class="btn" id="again">Do it again</button><a class="btn primary" href="#/drill/${o.id}?line=0">Practise from memory</a><a class="btn" href="#/play?opening=${o.id}&line=0">Play a game from here</a></div>`;
+      $('#again').onclick = intro;
+      Store.touch();
+    }
+
+    $('.restart').onclick = intro;
+    cleanup = () => clearTimeout(timer);
+    intro();
   }
 
   function whyNotHtml(key, bookSan, plyIndex) {

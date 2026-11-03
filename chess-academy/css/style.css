@@ -307,3 +307,9 @@ textarea.code { width: 100%; font: .78rem var(--mono); padding: .6rem .75rem; bo
 .setup-steps .san { font-family: var(--mono); font-size: .8rem; color: var(--accent); margin-left: .25rem; letter-spacing: 0; }
 .setup-steps .why { font-size: .88rem; color: var(--ink-2); }
 .setup-tip { margin-top: 1rem; box-shadow: none; background: var(--card-2); }
+.step-do { font-size: 1.45rem; line-height: 1.25; margin: .2rem 0 .6rem; }
+.opp-move { background: var(--bad-tint); border-radius: 14px; padding: .7rem .95rem; margin-bottom: 1rem; }
+.opp-move p { margin: .1rem 0; color: var(--ink-2); }
+.opp-move .eyebrow { color: var(--bad); }
+.key { display: inline-block; width: .9em; height: .9em; border-radius: 3px; vertical-align: -.1em; }
+.key.blue { background: rgba(0, 113, 227, .55); } .key.green { background: rgba(52, 199, 89, .6); }
