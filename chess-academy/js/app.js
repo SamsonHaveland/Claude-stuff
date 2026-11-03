@@ -725,8 +725,9 @@
         <p>The board shows the <b>goal</b>: the green squares are where your pieces will stand, and the arrows show where each one comes from.</p>
         <p>We’ll get there in <b>${total} moves</b>. For each step you’ll see which piece to move and where it goes. Make the move yourself, and I’ll explain why it’s played and what your opponent does next.</p>
         ${me === 'b' ? '<p class="muted">You play Black, so your opponent moves first.</p>' : ''}
-        <button class="btn primary continue" id="go">Start step 1</button>`;
-      $('#go').onclick = () => { rebuild(0); lastMine = null; syncBoard(board, game); board.setHighlights({}); board.setArrows([]); next(); };
+        <p class="muted starting">Starting in a moment…</p>`;
+      const start = () => { rebuild(0); lastMine = null; syncBoard(board, game); board.setHighlights({}); board.setArrows([]); next(); };
+      timer = setTimeout(start, 4500);                 // no button: begins by itself after showing the goal
     }
 
     function next(oppMove, oppWhy) {
@@ -1016,9 +1017,11 @@
         results.push(!failed);
         Store.touch();
         const days = Store.INTERVALS[c.box];
-        fb.innerHTML = `<div class="fb ${failed ? 'bad' : 'good'}">${failed ? 'Line finished with a slip — it will come back soon.' : `Perfect line! Next review in ${days} day${days > 1 ? 's' : ''}.`}</div>
-          <div class="row">${qi + 1 < queue.length ? continueBtn('Next line') : continueBtn('Finish')}<a class="btn" href="#/play?opening=${o.id}&line=${queue[qi].i}">Play from here</a></div>`;
-        $('.continue', panel).onclick = () => { qi++; if (qi < queue.length) runLine(); else summary(); };
+        const more = qi + 1 < queue.length;
+        fb.innerHTML = `<div class="fb ${failed ? 'bad' : 'good'}">${failed ? 'Line finished with a slip — it will come back soon.' : `Perfect line! Next review in ${days} day${days > 1 ? 's' : ''}.`}
+          <p class="muted">${more ? 'Next line coming up…' : 'Wrapping up…'}</p></div>
+          <div class="row"><a class="btn small" href="#/play?opening=${o.id}&line=${queue[qi].i}">Play a game from here</a></div>`;
+        timer = setTimeout(() => { qi++; if (qi < queue.length) runLine(); else summary(); }, 2600);   // no button: carry on
       }
       advance();
     }
