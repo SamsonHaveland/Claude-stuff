@@ -313,3 +313,19 @@ textarea.code { width: 100%; font: .78rem var(--mono); padding: .6rem .75rem; bo
 .opp-move .eyebrow { color: var(--bad); }
 .key { display: inline-block; width: .9em; height: .9em; border-radius: 3px; vertical-align: -.1em; }
 .key.blue { background: rgba(0, 113, 227, .55); } .key.green { background: rgba(52, 199, 89, .6); }
+
+/* Coach */
+.coach-log { display: grid; gap: .55rem; margin: 1rem 0 .5rem; }
+.coach { display: flex; gap: .65rem; align-items: flex-start; padding: .7rem .85rem; border-radius: 16px; background: var(--card-2); animation: coachIn .25s ease-out; }
+.coach > div { flex: 1; min-width: 0; }
+.coach p { margin: .1rem 0; color: var(--ink-2); }
+.coach-av { flex: none; width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(180deg, #3a3a3c, #1d1d1f); color: #ecdab9; display: grid; place-items: center; font-family: var(--pieces); font-size: 1rem; }
+.coach-h { font-weight: 600; color: var(--ink) !important; }
+.coach.good { background: var(--good-tint); }
+.coach.opp { background: var(--bad-tint); }
+.coach.hint { background: var(--gold-tint); }
+.coach.note { background: transparent; padding-top: 0; padding-bottom: 0; }
+.coach.note .coach-av { visibility: hidden; height: 0; }
+.coach-facts { margin: .35rem 0 0; padding-left: 1.1rem; color: var(--ink-2); font-size: .92rem; }
+.coach-facts li { margin: .15rem 0; }
+@keyframes coachIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }

@@ -848,6 +848,62 @@
   }
 
   /* ---------------- Drill (spaced repetition) ---------------- */
+  /* ---------------- The coach ----------------
+   * Plain-language commentary computed from the position, used alongside the
+   * written reason for each book move: what a move develops, attacks, captures
+   * or escapes from, and graded hints that don't give the answer away at once. */
+  const CENTRE = ['d4', 'e4', 'd5', 'e5'];
+  const HOME_MINOR = { w: ['b1', 'g1', 'c1', 'f1'], b: ['b8', 'g8', 'c8', 'f8'] };
+  const withTurn = (fen, c) => { const f = fen.split(' '); f[1] = c; f[3] = '-'; return f.join(' '); };
+  function attacksFrom(fen, sq) {           // enemy pieces the piece on sq attacks
+    const g = new Chess(fen), p = g.get(sq);
+    if (!p) return [];
+    const g2 = new Chess(withTurn(fen, p.color));
+    return g2.moves({ square: sq, verbose: true }).filter(m => m.captured).map(m => ({ type: m.captured, sq: m.to }));
+  }
+  function isAttacked(fen, sq, byColor) {   // is the (occupied) square attacked by byColor?
+    const g = new Chess(withTurn(fen, byColor));
+    return g.moves({ verbose: true }).some(m => m.to === sq && m.captured);
+  }
+  function coachFacts(fenBefore, mv, prevMove) {
+    const facts = [], fenAfter = (() => { const g = new Chess(fenBefore); g.move(mv.san); return g.fen(); })();
+    const them = mv.color === 'w' ? 'b' : 'w';
+    if (mv.flags.includes('k') || mv.flags.includes('q')) facts.push('It gets your king to safety and brings a rook toward the centre, in one move.');
+    if (mv.captured) facts.push(prevMove && prevMove.captured && prevMove.to === mv.to ? `It wins back the material: your opponent took on ${mv.to}, and you take back.` : `It captures the ${PNAME[mv.captured]} on ${mv.to}.`);
+    if (['n', 'b'].includes(mv.piece) && HOME_MINOR[mv.color].includes(mv.from)) facts.push(`It develops a new piece: your ${PNAME[mv.piece]} joins the game.`);
+    if (mv.piece === 'p' && CENTRE.includes(mv.to)) facts.push('It puts a pawn in the centre, the most important area of the board.');
+    if (!mv.captured && !mv.flags.includes('k') && !mv.flags.includes('q') && isAttacked(fenBefore, mv.from, them)) facts.push(`Your ${PNAME[mv.piece]} was under attack on ${mv.from}, and this steps it out of the attack.`);
+    const hits = attacksFrom(fenAfter, mv.to).filter(t => t.type !== 'p' || CENTRE.includes(t.sq));
+    if (hits.length) facts.push(`It attacks ${hits.map(t => `the ${PNAME[t.type]} on ${t.sq}`).join(' and ')}.`);
+    if (mv.san.includes('+')) facts.push('It gives check, so your opponent must deal with that first.');
+    return facts;
+  }
+  function coachThreats(fenAfter, mv) {      // what an opponent move does to me
+    const out = [];
+    if (mv.captured) {
+      const canRetake = new Chess(fenAfter).moves({ verbose: true }).some(m => m.to === mv.to && m.captured);
+      out.push(`It takes your ${PNAME[mv.captured]} on ${mv.to}${canRetake ? ', so think about taking back' : '. You can’t take back here, so think about what else to do'}.`);
+    }
+    if (mv.san.includes('+')) out.push('It’s check: you must answer it.');
+    const hits = attacksFrom(fenAfter, mv.to).filter(t => t.type !== 'p' && t.type !== 'k');
+    if (hits.length) out.push(`Watch out: it attacks your ${hits.map(t => `${PNAME[t.type]} on ${t.sq}`).join(' and ')}.`);
+    return out;
+  }
+  function coachHint(fen, want, prevMove, plans) {
+    const me = want.color, them = me === 'w' ? 'b' : 'w';
+    if (want.flags.includes('k') || want.flags.includes('q')) return 'Your king is still in the middle of the board. What’s the safest thing to do with it right now?';
+    if (want.captured && prevMove && prevMove.captured && prevMove.to === want.to) return `Your opponent just took something on ${prevMove.to}. Can you take back?`;
+    if (want.captured) return 'Check every capture you can make: one of them is good here.';
+    if (isAttacked(fen, want.from, them)) return `One of your pieces is under attack. Which one, and where can it go?`;
+    if (want.san.includes('+')) return 'Look for a check.';
+    if (['n', 'b'].includes(want.piece) && HOME_MINOR[me].includes(want.from)) return `You still have a ${PNAME[want.piece]} at home. Bring it into the game: which square helps your plan?`;
+    if (want.piece === 'p' && CENTRE.includes(want.to)) return 'Think about the centre. Which pawn can claim space there?';
+    if (want.piece === 'p') return 'This time the answer is a pawn move. Which pawn supports your centre or makes room for a piece?';
+    const hits = attacksFrom((() => { const g = new Chess(fen); g.move(want.san); return g.fen(); })(), want.to).filter(t => t.type !== 'p');
+    if (hits.length) return `One of your pieces can go to a square where it puts pressure on your opponent’s ${PNAME[hits[0].type]}.`;
+    return `Your ${PNAME[want.piece]} isn’t on its best square yet. Where would it do more?`;
+  }
+
   function viewDrill(id, params) {
     let queue = [];
     const ops = id === 'all' ? OPENINGS : OPENINGS.filter(o => o.id === id);
@@ -879,12 +935,38 @@
       const { o, l, key } = queue[qi];
       const user = o.side === 'white' ? 'w' : 'b';
       const game = new Chess();
-      let ply = 0, failed = false, mustPlay = null;
+      let ply = 0, failed = false, hintLevel = 0, lastOpp = null;
       board.setOrientation(o.side); syncBoard(board, game); board.setArrows([]); board.setLastMove(null);
       panel.innerHTML = `<p class="eyebrow">Drill ${qi + 1} / ${queue.length} · ${esc(o.name)}</p><h2>${esc(l.name)}</h2>
-        <p>Play the <b>${o.side}</b> moves from memory. Opponent moves are played for you.</p>
-        <div class="comment"></div><div class="feedback"></div><p class="muted mono progress-moves"></p>`;
-      const fb = $('.feedback', panel), cm = $('.comment', panel);
+        <p>Play the <b>${o.side}</b> moves from memory. Opponent moves are played for you. Stuck? Ask the coach.</p>
+        <div class="coach-log"></div><div class="feedback"></div>
+        <div class="row"><button class="btn small" id="hint">💡 Hint</button></div>
+        <p class="muted mono progress-moves"></p>`;
+      const fb = $('.feedback', panel), log = $('.coach-log', panel);
+      // The coach keeps a short running commentary: the last few remarks.
+      function say(html, kind) {
+        log.insertAdjacentHTML('beforeend', `<div class="coach ${kind || ''}"><span class="coach-av" aria-hidden="true">♟</span><div>${html}</div></div>`);
+        while (log.children.length > 3) log.firstElementChild.remove();
+      }
+      $('#hint').onclick = () => {
+        if (game.turn() !== user || ply >= l.moves.length) return;
+        const want = sanToMove(game.fen(), l.moves[ply][0]);
+        hintLevel++;
+        if (hintLevel === 1) {
+          say(`<p class="coach-h">Hint</p><p>${esc(coachHint(game.fen(), want, lastOpp, o.plans))}</p>`, 'hint');
+        } else if (hintLevel === 2) {
+          failed = true;
+          board.setHighlights({ [want.from]: 'blue' });
+          say(`<p class="coach-h">Bigger hint</p><p>It’s your <b>${PNAME[want.piece]} on ${want.from}</b> (highlighted). Where should it go?</p>`, 'hint');
+        } else {
+          failed = true;
+          board.setHighlights({ [want.from]: 'blue', [want.to]: 'green' });
+          board.setArrows([{ from: want.from, to: want.to, color: 'blue' }]);
+          say(`<p class="coach-h">Here’s the move: ${esc(pgn([want.san], ply))}</p><p>${esc(plainMove(want))} ${esc(l.moves[ply][1])}</p><p class="muted">Play it on the board to continue.</p>`, 'hint');
+          $('#hint').disabled = true;
+        }
+        if (hintLevel === 2) say('<p class="muted">Hints after the first nudge count as a slip, so this line will come back a bit sooner for review. That’s how it sticks!</p>', 'note');
+      };
       board.destsFn = sq => (game.turn() === user && ply < l.moves.length) ? chessDests(game)(sq) : [];
       const showMoves = () => { $('.progress-moves', panel).textContent = pgn(game.history()); };
       function advance() {
@@ -894,12 +976,13 @@
           board.setInteractive(false);
           timer = setTimeout(() => {
             const [san, why] = l.moves[ply];
-            const mv = game.move(san); ply++;
+            const mv = game.move(san); ply++; lastOpp = mv;
             syncBoard(board, game, mv);
-            cm.innerHTML = why ? `<p><b>${esc(pgn([san], ply - 1))}</b> — ${esc(why)}</p>` : '';
+            const threats = coachThreats(game.fen(), mv);
+            say(`<p class="coach-h">Your opponent played ${esc(pgn([san], ply - 1))}</p><p>${esc(why)}</p>${threats.length ? `<p><b>${esc(threats.join(' '))}</b></p>` : ''}<p class="muted">Your move: what’s the plan?</p>`, 'opp');
             board.setInteractive(true);
             advance();
-          }, 500);
+          }, 600);
         } else board.setInteractive(true);
       }
       board.onMove = (from, to, promotion) => {
@@ -916,10 +999,13 @@
             <p class="whynot-h">The book move: ${esc(want)} (blue arrow)</p><p>${esc(why || '')}</p><p class="muted">Play it to continue.${ex.arrow ? ' The red arrow shows the punishing reply.' : ''}</p></div>`;
           return;
         }
-        ply++; board.setArrows([]);
+        const fenBefore = (() => { game.undo(); const f = game.fen(); game.move(mv.san); return f; })();
+        ply++; board.setArrows([]); board.setHighlights({});
         syncBoard(board, game, mv); board.flash(to, 'good');
         fb.innerHTML = '';
-        cm.innerHTML = why ? `<p><b>${esc(pgn([mv.san], ply - 1))}</b> — ${esc(why)}</p>` : '';
+        const facts = coachFacts(fenBefore, mv, lastOpp);
+        say(`<p class="coach-h">✓ ${esc(pgn([mv.san], ply - 1))}${hintLevel ? '' : ' Nice, from memory!'}</p><p><b>Why it makes sense:</b> ${esc(why)}</p>${facts.length ? `<ul class="coach-facts">${facts.map(f => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}`, 'good');
+        hintLevel = 0; $('#hint').disabled = false;
         advance();
       };
       function finishLine() {
