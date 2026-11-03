@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coach-Lite</title>
+<!-- Everything in this page runs locally. No network requests, no analytics, no external scripts. -->
+<style>
+  :root {
+    --bg: #f5f6f4; --panel: #ffffff; --ink: #1d2320; --muted: #66706a; --line: #d9ddd8;
+    --accent: #1f7a4d; --team-a: #2f6fdf; --team-b: #e8731a; --gk: #8b46c9; --ref: #555; --warn: #b42318;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--ink); }
+  header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 16px; margin: 0 12px 0 0; }
+  button, select, input { font: inherit; }
+  button { padding: 5px 10px; border: 1px solid var(--line); background: #fff; border-radius: 6px; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  input[type=text], select { padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  .spacer { flex: 1; }
+  #status { color: var(--muted); }
+  #status.warn { color: var(--warn); }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; padding: 12px 16px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; min-width: 0; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 8px; }
+  video { width: 100%; background: #000; border-radius: 4px; display: block; }
+  canvas#field { width: 100%; display: block; border-radius: 4px; cursor: crosshair; touch-action: manipulation; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0; }
+  #timeline { position: relative; height: 26px; background: #eef0ed; border-radius: 4px; margin-top: 8px; cursor: pointer; }
+  #timeline .now { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); opacity: .5; pointer-events: none; }
+  #timeline .tag { position: absolute; top: 3px; width: 20px; height: 20px; margin-left: -10px; border-radius: 50%; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 0; padding: 0; }
+  .tag-G { background: #1f9d55; } .tag-A { background: #d64545; } .tag-C { background: #c99a06; } .tag-T { background: #3b6fd1; }
+  #taglist { list-style: none; padding: 0; margin: 6px 0 0; max-height: 180px; overflow: auto; }
+  #taglist li { display: flex; gap: 8px; align-items: center; padding: 3px 0; border-bottom: 1px solid #f0f0ee; }
+  #taglist .t { font-variant-numeric: tabular-nums; color: var(--muted); cursor: pointer; text-decoration: underline; }
+  #taglist .note { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .pill { display: inline-block; padding: 0 6px; border-radius: 10px; color: #fff; font-size: 12px; }
+  #notebar { display: none; }
+  #player { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 8px; }
+  #player .warn { color: var(--warn); }
+  .hint { color: var(--muted); font-size: 12px; }
+  kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; font-size: 12px; background: #fff; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { padding: 5px 8px; border-bottom: 1px solid #eef0ed; text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+  th { cursor: pointer; user-select: none; color: var(--muted); font-weight: 600; }
+  th.sorted::after { content: " ▾"; } th.sorted.asc::after { content: " ▴"; }
+  .wide { grid-column: 1 / -1; }
+  .table-wrap { overflow-x: auto; }
+  #empty { padding: 40px 16px; text-align: center; color: var(--muted); }
+  .legend span { margin-right: 10px; white-space: nowrap; }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: middle; margin-right: 4px; border: 1px solid rgba(0,0,0,.35); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Coach-Lite</h1>
+  <button id="openDir" class="primary">Open match folder…</button>
+  <label><input type="file" id="dirInput" webkitdirectory multiple hidden><button id="openDirFallback" type="button">Open folder (fallback)</button></label>
+  <span id="matchName" class="hint"></span>
+  <span class="spacer"></span>
+  <span id="status"></span>
+  <button id="save" disabled>Save coach.json</button>
+</header>
+
+<div id="empty">
+  <p>Open a match folder made by <code>analyze.py</code>. It should contain <code>tracks.json</code>, <code>stats.json</code>, the half videos, and <code>coach.json</code> once you've saved one.</p>
+  <p class="hint">Shortcuts: <kbd>G</kbd> our goal · <kbd>A</kbd> goal against · <kbd>C</kbd> chance · <kbd>T</kbd> teaching moment · <kbd>Space</kbd> play/pause · <kbd>←</kbd>/<kbd>→</kbd> ±5 s</p>
+</div>
+
+<main id="app" hidden>
+  <section class="card">
+    <div class="row">
+      <label>Half <select id="half"></select></label>
+      <span id="videoMissing" hidden><span class="warn">Video not in folder:</span> <input type="file" id="videoPick" accept="video/*"></span>
+    </div>
+    <video id="video" controls preload="metadata"></video>
+    <div id="timeline" title="Tags: click to jump"><div class="now" id="nowLine"></div></div>
+    <div class="row" id="notebar">
+      <span id="noteLabel"></span>
+      <input type="text" id="noteInput" placeholder="optional note, Enter to save" style="flex:1;min-width:150px">
+      <button id="noteOk">OK</button>
+    </div>
+    <ul id="taglist"></ul>
+    <p class="hint">Press <kbd>G</kbd> our goal · <kbd>A</kbd> goal against · <kbd>C</kbd> chance · <kbd>T</kbd> teaching moment</p>
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <label><input type="radio" name="mode" value="live" checked> Replay</label>
+      <label><input type="radio" name="mode" value="heat"> Heatmap</label>
+      <span id="heatCtl" hidden>
+        <select id="heatWho"></select>
+        <select id="heatHalf"><option value="cur">This half</option><option value="1">Half 1</option><option value="2">Half 2</option><option value="both">Both halves</option></select>
+        <label class="hint" title="Teams swap ends at half-time; rotate half 2 so both halves face the same way"><input type="checkbox" id="flipH2" checked> align halves</label>
+      </span>
+    </div>
+    <canvas id="field" width="800" height="540"></canvas>
+    <div class="row legend" id="legend"></div>
+    <div id="player"><span class="hint">Click a dot to name the player. Give two tracks the same name to merge them; tracks break when kids bunch up.</span></div>
+    <div class="row">
+      <label>Team A <input type="text" id="teamA" size="12"></label>
+      <label>Team B <input type="text" id="teamB" size="12"></label>
+    </div>
+  </section>
+
+  <section class="card wide">
+    <div class="row">
+      <h2 style="margin:0">Player stats</h2>
+      <select id="statHalf"><option value="both">Both halves</option><option value="1">Half 1</option><option value="2">Half 2</option></select>
+      <select id="statTeam"><option value="">All teams</option><option value="A">Team A</option><option value="B">Team B</option></select>
+      <label class="hint"><input type="checkbox" id="hideShort" checked> hide unnamed tracks under 2 min</label>
+    </div>
+    <div class="table-wrap"><table id="stats"><thead></thead><tbody></tbody></table></div>
+    <p class="hint">Distance and speed come from a single phone camera and are estimates. Kids far from the camera or in a crowd are tracked less reliably.</p>
+  </section>
+</main>
+<datalist id="names"></datalist>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const TAGS = { G: "Our goal", A: "Goal against", C: "Chance", T: "Teaching moment" };
+const TEAM_OPTS = [["A", "Team A"], ["B", "Team B"], ["GK-A", "Keeper A"], ["GK-B", "Keeper B"], ["REF", "Referee"], ["X", "Ignore (not a player)"]];
+const COLORS = { A: "#2f6fdf", B: "#e8731a", "GK-A": "#8b46c9", "GK-B": "#8b46c9", REF: "#555555", X: "#bbbbbb", "?": "#999999" };
+
+const S = {
+  tracks: null, stats: null, files: {}, dirHandle: null, folder: "",
+  coach: emptyCoach(), half: "1", selected: null, drawn: [], sort: { key: "distance_m", asc: false },
+  dirty: false, pendingTag: null, videoUrl: null,
+};
+function emptyCoach() { return { version: 1, names: {}, team: {}, teams: { A: "Team A", B: "Team B" }, tags: [], savedAt: null }; }
+
+// ---------- safe localStorage (draft autosave only; coach.json file is the real save) ----------
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* private mode / blocked */ } }
+function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+const draftKey = () => "coachlite-draft:" + S.folder;
+
+function status(msg, warn) { const el = $("status"); el.textContent = msg; el.className = warn ? "warn" : ""; }
+function markDirty() {
+  S.dirty = true; $("save").disabled = false; status("Unsaved changes");
+  lsSet(draftKey(), JSON.stringify(S.coach));
+}
+
+// ---------- loading ----------
+$("openDir").onclick = async () => {
+  if (!window.showDirectoryPicker) { $("dirInput").click(); return; }
+  try {
+    const dir = await window.showDirectoryPicker({ mode: "readwrite" });
+    const files = {};
+    for await (const [name, h] of dir.entries()) if (h.kind === "file") files[name] = await h.getFile();
+    S.dirHandle = dir;
+    await loadMatch(dir.name, files);
+  } catch (e) { if (e.name !== "AbortError") status("Could not open folder: " + e.message, true); }
+};
+$("openDirFallback").onclick = () => $("dirInput").click();
+$("dirInput").onchange = async (ev) => {
+  const files = {}; let folder = "match";
+  for (const f of ev.target.files) {
+    const parts = (f.webkitRelativePath || f.name).split("/");
+    if (parts.length > 2) continue; // only top-level files of the chosen folder
+    if (parts.length === 2) folder = parts[0];
+    files[parts[parts.length - 1]] = f;
+  }
+  S.dirHandle = null;
+  await loadMatch(folder, files);
+};
+
+async function readJson(file) { return JSON.parse(await file.text()); }
+
+async function loadMatch(folder, files) {
+  if (!files["tracks.json"] || !files["stats.json"]) { status("No tracks.json / stats.json in that folder", true); return; }
+  S.folder = folder; S.files = files;
+  S.tracks = await readJson(files["tracks.json"]);
+  S.stats = await readJson(files["stats.json"]);
+  let coach = files["coach.json"] ? await readJson(files["coach.json"]) : emptyCoach();
+  coach = Object.assign(emptyCoach(), coach);
+  const draft = lsGet(draftKey());
+  let restored = false;
+  if (draft) {
+    try {
+      const d = JSON.parse(draft);
+      if (!coach.savedAt || (d.savedAt || "") >= coach.savedAt) {
+        if (JSON.stringify(d) !== JSON.stringify(coach)) { coach = Object.assign(emptyCoach(), d); restored = true; }
+      }
+    } catch (e) {}
+  }
+  S.coach = coach;
+  $("matchName").textContent = folder;
+  $("empty").hidden = true; $("app").hidden = false;
+  const halves = Object.keys(S.tracks.halves).sort();
+  $("half").innerHTML = "";
+  for (const h of halves) $("half").add(new Option("Half " + h, h));
+  $("teamA").value = S.coach.teams.A; $("teamB").value = S.coach.teams.B;
+  S.dirty = restored; $("save").disabled = !restored;
+  status(restored ? "Restored unsaved changes from this browser" : "Loaded");
+  setHalf(halves[0]);
+  refreshAll();
+}
+
+function setHalf(h) {
+  S.half = h; $("half").value = h; S.selected = null;
+  const meta = S.tracks.halves[h].meta;
+  const file = S.files[meta.video_name] || S.files[(meta.video || "").split("/").pop()];
+  $("videoMissing").hidden = !!file;
+  if (S.videoUrl) URL.revokeObjectURL(S.videoUrl);
+  S.videoUrl = file ? URL.createObjectURL(file) : null;
+  if (S.videoUrl) $("video").src = S.videoUrl; else $("video").removeAttribute("src");
+  sizeCanvas(); renderPlayerPanel(); renderTags(); draw();
+}
+$("half").onchange = (e) => setHalf(e.target.value);
+$("videoPick").onchange = (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  S.files[S.tracks.halves[S.half].meta.video_name] = f; setHalf(S.half);
+};
+
+// ---------- model helpers ----------
+const meta = () => S.tracks.halves[S.half].meta;
+function teamOf(tid, half) {
+  if (S.coach.team[tid]) return S.coach.team[tid];
+  const t = S.tracks.halves[half || S.half].tracks[tid].team;
+  return t === 0 ? "A" : t === 1 ? "B" : "?";
+}
+const baseTeam = (team) => team.replace("GK-", "");
+const playerKey = (tid) => S.coach.names[tid] || "#" + tid;
+function teamLabel(code) {
+  const n = { A: S.coach.teams.A, B: S.coach.teams.B };
+  if (code === "A" || code === "B") return n[code];
+  if (code.startsWith("GK-")) return "Keeper " + n[code.slice(3)];
+  return { REF: "Referee", X: "Ignored", "?": "?" }[code] || code;
+}
+function allTracks(halfSel) {
+  const out = [];
+  for (const [h, half] of Object.entries(S.tracks.halves)) {
+    if (halfSel && halfSel !== "both" && halfSel !== h) continue;
+    for (const [tid, tr] of Object.entries(half.tracks)) out.push({ h, tid, tr });
+  }
+  return out;
+}
+function fmtTime(t) { const m = Math.floor(t / 60), s = Math.floor(t % 60); return m + ":" + String(s).padStart(2, "0"); }
+
+// ---------- canvas field ----------
+const cv = $("field"), ctx = cv.getContext("2d");
+let geo = { pad: 24, sc: 10 };
+function sizeCanvas() {
+  const [L, W] = meta().field;
+  const cssW = cv.clientWidth || 800, dpr = window.devicePixelRatio || 1;
+  const pad = 24, sc = (cssW - 2 * pad) / L, cssH = W * sc + 2 * pad;
+  cv.style.height = cssH + "px"; cv.width = Math.round(cssW * dpr); cv.height = Math.round(cssH * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  geo = { pad, sc, L, W, cssW, cssH };
+}
+window.addEventListener("resize", () => { if (S.tracks) { sizeCanvas(); draw(); } });
+const px = (x, y) => [geo.pad + x * geo.sc, geo.pad + y * geo.sc];
+
+function drawPitch() {
+  const { L, W, sc } = geo;
+  ctx.fillStyle = "#3f8a4f"; ctx.fillRect(0, 0, geo.cssW, geo.cssH);
+  ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = 2;
+  const [x0, y0] = px(0, 0);
+  ctx.strokeRect(x0, y0, L * sc, W * sc);
+  ctx.beginPath(); ctx.moveTo(...px(L / 2, 0)); ctx.lineTo(...px(L / 2, W)); ctx.stroke();
+  ctx.beginPath(); ctx.arc(...px(L / 2, W / 2), Math.min(W * 0.12, 9.15) * sc, 0, Math.PI * 2); ctx.stroke();
+  const gw = Math.min(W * 0.4, 16), gd = Math.min(L * 0.15, 13); // approximate goal areas for orientation
+  ctx.strokeRect(...px(0, (W - gw) / 2), gd * sc, gw * sc);
+  ctx.strokeRect(...px(L - gd, (W - gw) / 2), gd * sc, gw * sc);
+}
+
+function mode() { return document.querySelector("input[name=mode]:checked").value; }
+
+function draw() {
+  if (!S.tracks) return;
+  drawPitch();
+  if (mode() === "heat") { drawHeat(); return; }
+  const half = S.tracks.halves[S.half], hz = half.meta.hz;
+  const t = $("video").currentTime || 0, idx = Math.round(t * hz);
+  S.drawn = [];
+  ctx.font = "12px system-ui, sans-serif"; ctx.textAlign = "center";
+  for (const [tid, tr] of Object.entries(half.tracks)) {
+    const i = idx - tr.start;
+    if (i < 0 || i >= tr.x.length || tr.x[i] === null) continue;
+    const team = teamOf(tid); if (team === "X") continue;
+    const [cx, cy] = px(tr.x[i], tr.y[i]);
+    S.drawn.push({ tid, cx, cy });
+    ctx.beginPath(); ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+    ctx.fillStyle = COLORS[team] || COLORS["?"]; ctx.fill();
+    ctx.lineWidth = tid === S.selected ? 3 : 1.5; ctx.strokeStyle = tid === S.selected ? "#ffeb3b" : "#fff"; ctx.stroke();
+    const label = S.coach.names[tid] || tid.split("-")[1];
+    ctx.fillStyle = "#fff"; ctx.strokeStyle = "rgba(0,0,0,.6)"; ctx.lineWidth = 3;
+    ctx.strokeText(label, cx, cy - 11); ctx.fillText(label, cx, cy - 11);
+  }
+  const d = $("video").duration;
+  if (d) $("nowLine").style.left = (100 * t / d) + "%";
+}
+
+function loop() { draw(); requestAnimationFrame(loop); }
+requestAnimationFrame(loop);
+
+cv.addEventListener("click", (ev) => {
+  if (mode() !== "live") return;
+  const r = cv.getBoundingClientRect(), x = ev.clientX - r.left, y = ev.clientY - r.top;
+  let best = null, bd = 18 * 18;
+  for (const d of S.drawn) { const dd = (d.cx - x) ** 2 + (d.cy - y) ** 2; if (dd < bd) { bd = dd; best = d.tid; } }
+  S.selected = best; renderPlayerPanel();
+});
+
+// ---------- naming / merging / team fix ----------
+function overlapWarning(tid, name) {
+  if (!name) return "";
+  const a = S.tracks.halves[S.half].tracks[tid];
+  for (const [other, tr] of Object.entries(S.tracks.halves[S.half].tracks)) {
+    if (other === tid || S.coach.names[other] !== name) continue;
+    const lo = Math.max(a.start, tr.start), hi = Math.min(a.start + a.x.length, tr.start + tr.x.length);
+    let both = 0;
+    for (let k = lo; k < hi; k++) if (a.x[k - a.start] !== null && tr.x[k - tr.start] !== null) both++;
+    if (both > 10 * meta().hz) return `Track ${other} is also "${name}" and is on the field at the same time for ${Math.round(both / meta().hz)} s. These are probably two different kids.`;
+  }
+  return "";
+}
+
+function renderPlayerPanel() {
+  const box = $("player"); box.innerHTML = "";
+  if (!S.selected) {
+    const p = document.createElement("span"); p.className = "hint";
+    p.textContent = "Click a dot to name the player. Give two tracks the same name to merge them; tracks break when kids bunch up.";
+    box.append(p); return;
+  }
+  const tid = S.selected, st = S.stats.halves[S.half].players[tid] || {};
+  const row = document.createElement("div"); row.className = "row";
+  const lab = document.createElement("strong"); lab.textContent = "Track " + tid;
+  const name = document.createElement("input"); name.type = "text"; name.placeholder = "Player name"; name.setAttribute("list", "names");
+  name.value = S.coach.names[tid] || ""; name.id = "nameInput";
+  const team = document.createElement("select"); team.id = "teamSelect";
+  for (const [v, l] of TEAM_OPTS) team.add(new Option(v.length === 1 || v.startsWith("GK") ? l.replace("Team A", S.coach.teams.A).replace("Team B", S.coach.teams.B) : l, v));
+  team.value = teamOf(tid) === "?" ? "A" : teamOf(tid);
+  const ok = document.createElement("button"); ok.textContent = "Save name"; ok.className = "primary"; ok.id = "nameSave";
+  const warn = document.createElement("div"); warn.className = "warn";
+  const apply = () => {
+    const v = name.value.trim();
+    if (v) S.coach.names[tid] = v; else delete S.coach.names[tid];
+    warn.textContent = overlapWarning(tid, v);
+    markDirty(); refreshAll();
+  };
+  ok.onclick = apply;
+  name.onkeydown = (e) => { if (e.key === "Enter") apply(); };
+  team.onchange = () => { S.coach.team[tid] = team.value; markDirty(); refreshAll(); };
+  row.append(lab, name, team, ok);
+  const info = document.createElement("div"); info.className = "hint";
+  info.textContent = `${st.minutes ?? "?"} min · ${st.distance_m ?? "?"} m · top ${st.top_speed_kmh ?? "?"} km/h · ${st.sprints ?? "?"} sprints (this track only)`;
+  box.append(row, info, warn);
+}
+
+function refreshNames() {
+  const dl = $("names"); dl.innerHTML = "";
+  for (const n of [...new Set(Object.values(S.coach.names))].sort()) dl.append(new Option(n));
+}
+$("teamA").onchange = (e) => { S.coach.teams.A = e.target.value || "Team A"; markDirty(); refreshAll(); };
+$("teamB").onchange = (e) => { S.coach.teams.B = e.target.value || "Team B"; markDirty(); refreshAll(); };
+
+// ---------- tags ----------
+document.addEventListener("keydown", (e) => {
+  if (!S.tracks || e.ctrlKey || e.metaKey || e.altKey) return;
+  const tag = e.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+  const k = e.key.toUpperCase(), v = $("video");
+  if (TAGS[k]) { e.preventDefault(); addTag(k); }
+  else if (e.key === " ") { e.preventDefault(); v.paused ? v.play() : v.pause(); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); v.currentTime = Math.max(0, v.currentTime - 5); }
+  else if (e.key === "ArrowRight") { e.preventDefault(); v.currentTime = v.currentTime + 5; }
+});
+
+function addTag(type) {
+  const t = Math.round(($("video").currentTime || 0) * 10) / 10;
+  const tag = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), half: Number(S.half), t, type, note: "" };
+  S.coach.tags.push(tag); S.pendingTag = tag;
+  markDirty(); renderTags();
+  $("notebar").style.display = "flex";
+  $("noteLabel").textContent = `${TAGS[type]} at ${fmtTime(t)}`;
+  $("noteInput").value = ""; $("noteInput").focus();
+}
+function commitNote() {
+  if (S.pendingTag) { S.pendingTag.note = $("noteInput").value.trim(); markDirty(); }
+  S.pendingTag = null; $("notebar").style.display = "none"; $("noteInput").blur(); renderTags();
+}
+$("noteOk").onclick = commitNote;
+$("noteInput").onkeydown = (e) => { if (e.key === "Enter" || e.key === "Escape") { e.preventDefault(); commitNote(); } };
+
+function renderTags() {
+  const tl = $("timeline"), list = $("taglist");
+  tl.querySelectorAll(".tag").forEach((n) => n.remove()); list.innerHTML = "";
+  const d = $("video").duration || meta().duration_s || 1;
+  const tags = S.coach.tags.filter((t) => String(t.half) === S.half).sort((a, b) => a.t - b.t);
+  for (const tag of tags) {
+    const m = document.createElement("button");
+    m.className = "tag tag-" + tag.type; m.textContent = tag.type; m.title = `${TAGS[tag.type]} ${fmtTime(tag.t)} ${tag.note}`;
+    m.style.left = Math.min(100, 100 * tag.t / d) + "%";
+    m.onclick = (e) => { e.stopPropagation(); seek(tag.t); };
+    tl.append(m);
+    const li = document.createElement("li");
+    const pill = document.createElement("span"); pill.className = "pill tag-" + tag.type; pill.textContent = TAGS[tag.type];
+    const tt = document.createElement("span"); tt.className = "t"; tt.textContent = fmtTime(tag.t); tt.onclick = () => seek(tag.t);
+    const note = document.createElement("span"); note.className = "note"; note.textContent = tag.note;
+    const del = document.createElement("button"); del.textContent = "✕"; del.title = "Delete tag";
+    del.onclick = () => { S.coach.tags = S.coach.tags.filter((x) => x !== tag); markDirty(); renderTags(); };
+    li.append(pill, tt, note, del); list.append(li);
+  }
+}
+function seek(t) { $("video").currentTime = Math.max(0, t - 3); }
+$("timeline").addEventListener("click", (e) => {
+  const d = $("video").duration; if (!d) return;
+  const r = e.currentTarget.getBoundingClientRect(); $("video").currentTime = d * (e.clientX - r.left) / r.width;
+});
+$("video").addEventListener("loadedmetadata", renderTags);
+
+// ---------- heatmap ----------
+document.querySelectorAll("input[name=mode]").forEach((r) => r.onchange = () => { $("heatCtl").hidden = mode() !== "heat"; draw(); });
+["heatWho", "heatHalf", "flipH2"].forEach((id) => $(id).onchange = draw);
+
+function refreshHeatWho() {
+  const sel = $("heatWho"), prev = sel.value; sel.innerHTML = "";
+  sel.add(new Option(S.coach.teams.A + " (team)", "team:A")); sel.add(new Option(S.coach.teams.B + " (team)", "team:B"));
+  const players = new Set();
+  for (const { h, tid } of allTracks("both")) if (S.coach.names[tid]) players.add(S.coach.names[tid]);
+  for (const p of [...players].sort()) sel.add(new Option(p, "player:" + p));
+  if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
+}
+
+function drawHeat() {
+  const { L, W } = geo, cell = 1; // 1 m bins
+  const nx = Math.ceil(L / cell), ny = Math.ceil(W / cell), grid = new Float32Array(nx * ny);
+  const [kind, who] = $("heatWho").value.split(/:(.*)/s);
+  let hs = $("heatHalf").value; if (hs === "cur") hs = S.half;
+  let n = 0;
+  for (const { h, tid, tr } of allTracks(hs)) {
+    const team = teamOf(tid, h);
+    if (kind === "team" ? baseTeam(team) !== who : S.coach.names[tid] !== who) continue;
+    const flip = $("flipH2").checked && h === "2" && hs === "both";
+    for (let i = 0; i < tr.x.length; i++) {
+      let x = tr.x[i], y = tr.y[i]; if (x === null) continue;
+      if (flip) { x = L - x; y = W - y; }
+      const gx = Math.min(nx - 1, Math.max(0, Math.floor(x / cell))), gy = Math.min(ny - 1, Math.max(0, Math.floor(y / cell)));
+      grid[gy * nx + gx]++; n++;
+    }
+  }
+  // light 3x3 blur so it reads as a heatmap, not noise
+  const bl = new Float32Array(nx * ny); let max = 0;
+  for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+    let s = 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < nx && yy < ny) s += grid[yy * nx + xx] * (dx || dy ? 0.5 : 1);
+    }
+    bl[y * nx + x] = s; if (s > max) max = s;
+  }
+  for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+    const v = bl[y * nx + x] / (max || 1); if (v < 0.02) continue;
+    ctx.fillStyle = heatColor(v);
+    const [cx, cy] = px(x * cell, y * cell); ctx.fillRect(cx, cy, cell * geo.sc + 0.5, cell * geo.sc + 0.5);
+  }
+  ctx.fillStyle = "#fff"; ctx.font = "12px system-ui, sans-serif"; ctx.textAlign = "left";
+  ctx.fillText(n ? `${(n / meta().hz / 60).toFixed(1)} player-minutes` : "No data for this selection", 8, geo.cssH - 6);
+}
+function heatColor(v) { // transparent yellow -> red
+  const r = 255, g = Math.round(230 * (1 - v)), a = 0.25 + 0.6 * v;
+  return `rgba(${r},${g},40,${a})`;
+}
+
+// ---------- stats table ----------
+const COLS = [["player", "Player"], ["team", "Team"], ["minutes", "Min"], ["distance_m", "Distance (m)"], ["m_per_min", "m/min"], ["top_speed_kmh", "Top km/h"], ["sprints", "Sprints"], ["tracks", "Tracks"]];
+function statRows() {
+  const hs = $("statHalf").value, teamF = $("statTeam").value, rows = {};
+  for (const [h, half] of Object.entries(S.stats.halves)) {
+    if (hs !== "both" && hs !== h) continue;
+    for (const [tid, s] of Object.entries(half.players)) {
+      if (!S.tracks.halves[h].tracks[tid]) continue;
+      const team = teamOf(tid, h);
+      if (team === "X" || team === "REF") continue;
+      if (teamF && baseTeam(team) !== teamF) continue;
+      const key = playerKey(tid);
+      const r = rows[key] ||= { player: key, named: !!S.coach.names[tid], team: teamLabel(team), minutes: 0, distance_m: 0, top_speed_kmh: 0, sprints: 0, tracks: 0 };
+      r.minutes += s.minutes; r.distance_m += s.distance_m; r.sprints += s.sprints; r.tracks++;
+      r.top_speed_kmh = Math.max(r.top_speed_kmh, s.top_speed_kmh);
+    }
+  }
+  let out = Object.values(rows);
+  if ($("hideShort").checked) out = out.filter((r) => r.named || r.minutes >= 2);
+  for (const r of out) r.m_per_min = r.minutes ? r.distance_m / r.minutes : 0;
+  const { key, asc } = S.sort;
+  out.sort((a, b) => (typeof a[key] === "string" ? a[key].localeCompare(b[key]) : a[key] - b[key]) * (asc ? 1 : -1));
+  return out;
+}
+function renderStats() {
+  const thead = $("stats").tHead, tbody = $("stats").tBodies[0];
+  thead.innerHTML = ""; tbody.innerHTML = "";
+  const hr = thead.insertRow();
+  for (const [k, l] of COLS) {
+    const th = document.createElement("th"); th.textContent = l; th.dataset.key = k;
+    if (S.sort.key === k) th.className = "sorted" + (S.sort.asc ? " asc" : "");
+    th.onclick = () => { S.sort = { key: k, asc: S.sort.key === k ? !S.sort.asc : typeof statRows()[0]?.[k] === "string" }; renderStats(); };
+    hr.append(th);
+  }
+  for (const r of statRows()) {
+    const tr = tbody.insertRow();
+    const vals = [r.player, r.team, r.minutes.toFixed(1), Math.round(r.distance_m), Math.round(r.m_per_min), r.top_speed_kmh.toFixed(1), r.sprints, r.tracks];
+    for (const v of vals) tr.insertCell().textContent = v;
+  }
+}
+["statHalf", "statTeam", "hideShort"].forEach((id) => $(id).onchange = renderStats);
+
+function renderLegend() {
+  const lg = $("legend"); lg.innerHTML = "";
+  for (const code of ["A", "B", "GK-A", "REF"]) {
+    const s = document.createElement("span"), sw = document.createElement("i");
+    sw.className = "sw"; sw.style.background = COLORS[code];
+    s.append(sw, code === "GK-A" ? "Keepers" : teamLabel(code)); lg.append(s);
+  }
+  const jc = meta().team_colours;
+  if (jc) {
+    const s = document.createElement("span"); s.className = "hint";
+    s.append("Detected shirt colours: A ");
+    const a = document.createElement("i"); a.className = "sw"; a.style.background = jc[0];
+    const b = document.createElement("i"); b.className = "sw"; b.style.background = jc[1];
+    s.append(a, " B ", b); lg.append(s);
+  }
+}
+
+function refreshAll() { refreshNames(); refreshHeatWho(); renderStats(); renderLegend(); renderTags(); draw(); }
+
+// ---------- saving ----------
+$("save").onclick = async () => {
+  S.coach.savedAt = new Date().toISOString();
+  const text = JSON.stringify(S.coach, null, 2);
+  try {
+    if (S.dirHandle) {
+      const fh = await S.dirHandle.getFileHandle("coach.json", { create: true });
+      const w = await fh.createWritable(); await w.write(text); await w.close();
+      status("Saved coach.json to " + S.folder);
+    } else {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+      a.download = "coach.json"; document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      status("Downloaded coach.json, so move it into the match folder");
+    }
+    S.dirty = false; $("save").disabled = true; lsDel(draftKey());
+  } catch (e) { status("Save failed: " + e.message, true); }
+};
+window.addEventListener("beforeunload", (e) => { if (S.dirty) { e.preventDefault(); e.returnValue = ""; } });
+</script>
+</body>
+</html>

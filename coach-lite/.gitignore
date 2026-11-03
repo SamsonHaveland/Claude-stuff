@@ -1,0 +1,9 @@
+# Match footage and data are of minors: never commit them.
+matches/
+demo_matches/
+*.mp4
+*.mov
+*.avi
+*.m4v
+season.csv
+__pycache__/
