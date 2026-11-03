@@ -172,6 +172,7 @@
     else if (parts[0] === 'openings' && !parts[1]) viewOpenings();
     else if (parts[0] === 'openings') viewOpening(parts[1]);
     else if (parts[0] === 'explore') viewExplore(parts[1], +parts[2] || 0);
+    else if (parts[0] === 'setup') viewSetup(parts[1]);
     else if (parts[0] === 'drill') viewDrill(parts[1], params);
     else if (parts[0] === 'play') viewPlay(params);
     else if (parts[0] === 'library') viewLibrary();
@@ -604,6 +605,7 @@
           <h1>${esc(o.name)}</h1><p class="first">${esc(o.first)}</p><p>${esc(o.tagline)}</p>
           <h3>Why play it</h3><ul class="why">${o.why.map(w => `<li>${w}</li>`).join('')}</ul>
           <div class="prose">${o.plans}</div>
+          <div class="row"><a class="btn primary" href="#/setup/${o.id}">How to set it up</a><a class="btn" href="#/explore/${o.id}/0">Explore the main line</a></div>
         </div>
       </section>
       <h2 class="group">Lines</h2>
@@ -619,6 +621,117 @@
 
   function pgn(sans, startPly = 0) {
     return sans.map((s, i) => { const p = i + startPly; return (p % 2 === 0 ? `${p / 2 + 1}.` : (i === 0 ? `${Math.floor(p / 2) + 1}...` : '')) + s; }).join(' ');
+  }
+
+  /* ---------------- Setup guide ----------------
+   * Shows the formation the student is aiming for (main line, final position),
+   * with arrows from each of their pieces' starting squares, then the moves in
+   * plain English, step by step. */
+  const PNAME = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
+  function plainMove(m) {
+    const chk = m.san.includes('#') ? ' Checkmate!' : m.san.includes('+') ? ' (This gives check.)' : '';
+    if (m.flags.includes('k')) return `Castle kingside: your king goes to ${m.to} and the rook jumps to ${m.color === 'w' ? 'f1' : 'f8'}.` + chk;
+    if (m.flags.includes('q')) return `Castle queenside: your king goes to ${m.to} and the rook jumps to ${m.color === 'w' ? 'd1' : 'd8'}.` + chk;
+    if (m.piece === 'p') {
+      if (m.captured) return `Your ${m.from[0]}-pawn captures the ${PNAME[m.captured]} on ${m.to}.` + chk;
+      return `Push your ${m.from[0]}-pawn ${m.flags.includes('b') ? 'two squares' : 'one square'} to ${m.to}.` + chk;
+    }
+    if (m.captured) return `Your ${PNAME[m.piece]} on ${m.from} captures the ${PNAME[m.captured]} on ${m.to}.` + chk;
+    return `Move your ${PNAME[m.piece]} from ${m.from} to ${m.to}.` + chk;
+  }
+  function plainTheirs(m) {
+    if (m.flags.includes('k')) return 'castles kingside';
+    if (m.flags.includes('q')) return 'castles queenside';
+    if (m.piece === 'p') return m.captured ? `takes on ${m.to} with a pawn` : `pushes a pawn to ${m.to}`;
+    return `${m.captured ? 'takes on ' + m.to + ' with the ' + PNAME[m.piece] : 'puts the ' + PNAME[m.piece] + ' on ' + m.to}`;
+  }
+  // Track every piece from its starting square through a line of moves.
+  function trackPieces(moves) {
+    const g = new Chess(), origin = {};
+    for (const row of g.board()) for (const p of row) if (p) origin[p.square] = p.square;
+    const verbose = [];
+    for (const [san] of moves) {
+      const m = g.move(san); verbose.push(m);
+      const o = origin[m.from]; delete origin[m.from];
+      if (m.flags.includes('e')) delete origin[m.to[0] + m.from[1]];
+      origin[m.to] = o;
+      if (m.flags.includes('k') || m.flags.includes('q')) {
+        const r = m.color === 'w' ? '1' : '8';
+        const [rf, rt] = m.flags.includes('k') ? ['h' + r, 'f' + r] : ['a' + r, 'd' + r];
+        origin[rt] = origin[rf]; delete origin[rf];
+      }
+    }
+    return { game: g, origin, verbose };
+  }
+
+  function viewSetup(id) {
+    const o = OPENINGS.find(x => x.id === id);
+    if (!o) return viewOpenings();
+    const line = o.lines[0];
+    const me = o.side === 'white' ? 'w' : 'b';
+    const { game, origin, verbose } = trackPieces(line.moves);
+    // Final formation: my pieces that moved, with arrows home -> destination.
+    const finalArrows = [], finalHl = {};
+    for (const row of game.board()) for (const p of row) {
+      if (!p || p.color !== me) continue;
+      const from = origin[p.square];
+      if (from && from !== p.square) { finalArrows.push({ from, to: p.square, color: 'green' }); finalHl[p.square] = 'green'; }
+    }
+    // Steps = my moves, each with the opponent's reply before it.
+    const steps = [];
+    verbose.forEach((m, k) => { if (m.color === me) steps.push({ k, m, why: line.moves[k][1], before: k > 0 && verbose[k - 1].color !== me ? verbose[k - 1] : null }); });
+    app.innerHTML = `
+      <a href="#/openings/${o.id}" class="back">← ${esc(o.name)}</a>
+      <div class="lesson-body">
+        <div class="board-col"><div id="board"></div>
+          <div class="row center controls"><button class="btn small" id="s-target">Show the finished setup</button><button class="btn small primary" id="s-play">▶ Watch it</button><button class="btn small" id="s-flip">⇅</button></div>
+        </div>
+        <div class="panel">
+          <p class="eyebrow">How to set it up · ${esc(o.name)} · you play ${o.side === 'white' ? 'White' : 'Black'}</p>
+          <h2>Your setup in ${steps.length} moves</h2>
+          <p class="setup-intro">The green squares show where your pieces end up, and the arrows show where each one comes from. Tap any step to see it on the board.</p>
+          <ol class="setup-steps">${steps.map((st, i) => `
+            <li data-i="${i}">
+              ${st.before ? `<p class="theirs">Your opponent ${esc(plainTheirs(st.before))} (${esc(st.before.san)}).</p>` : ''}
+              <p class="mine"><b>${esc(plainMove(st.m))}</b> <span class="san">${esc(pgn([st.m.san], st.k))}</span></p>
+              <p class="why">${esc(st.why)}</p>
+            </li>`).join('')}</ol>
+          <div class="note setup-tip"><p>${o.plans}</p><p class="muted">Your opponent won’t always play these moves. The setup is your goal, so if they do something different, look for a sensible way to reach the same formation, and check the “Why not …?” notes in Explore.</p></div>
+          <div class="row"><a class="btn primary" href="#/drill/${o.id}?line=0">Practise it from memory</a><a class="btn" href="#/explore/${o.id}/0">Explore move by move</a><a class="btn" href="#/play?opening=${o.id}&line=0">Play from the setup</a></div>
+        </div>
+      </div>`;
+    const board = new Board($('#board'), { orientation: o.side });
+    board.setInteractive(false);
+    let timer = null, cur = -1;
+    function showTarget() {
+      cur = -1; mark();
+      board.setFen(game.fen()); board.setLastMove(null); board.setHighlights(finalHl); board.setArrows(finalArrows);
+    }
+    function showStep(i) {
+      cur = i; mark();
+      const st = steps[i], g = new Chess();
+      for (let j = 0; j <= st.k; j++) g.move(line.moves[j][0]);
+      board.setHighlights({}); board.setFen(g.fen()); board.setLastMove(st.m.from, st.m.to);
+      board.setArrows([{ from: st.m.from, to: st.m.to, color: 'green' }].concat(st.before ? [{ from: st.before.from, to: st.before.to, color: 'red' }] : []));
+    }
+    function mark() {
+      app.querySelectorAll('.setup-steps li').forEach(li => li.classList.toggle('on', +li.dataset.i === cur));
+      const li = app.querySelector(`.setup-steps li[data-i="${cur}"]`);
+      if (li && li.scrollIntoView && window.innerWidth > 820) li.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+    function stop() { clearInterval(timer); timer = null; $('#s-play').textContent = '▶ Watch it'; }
+    app.querySelectorAll('.setup-steps li').forEach(li => li.onclick = () => { stop(); showStep(+li.dataset.i); });
+    $('#s-target').onclick = () => { stop(); showTarget(); };
+    $('#s-flip').onclick = () => board.flip();
+    $('#s-play').onclick = () => {
+      if (timer) return stop();
+      $('#s-play').textContent = '❚❚ Pause';
+      let i = cur + 1 >= steps.length ? 0 : cur + 1;
+      showStep(i);
+      timer = setInterval(() => { i++; if (i >= steps.length) { stop(); showTarget(); } else showStep(i); }, 1800);
+    };
+    cleanup = () => clearInterval(timer);
+    showTarget();
   }
 
   function whyNotHtml(key, bookSan, plyIndex) {

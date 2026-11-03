@@ -293,3 +293,17 @@ footer { padding-bottom: max(2rem, env(safe-area-inset-bottom)); }
 textarea.code { width: 100%; font: .78rem var(--mono); padding: .6rem .75rem; border-radius: 12px; border: 1px solid var(--line); background: var(--card-2); color: var(--ink); resize: vertical; margin-top: .5rem; word-break: break-all; }
 .lesson-top .restart { width: 32px; height: 32px; border-radius: 50%; border: 0; background: var(--fill); color: var(--muted); font-size: 1rem; cursor: pointer; }
 .lesson-top .restart:hover { background: var(--fill-hover); }
+
+/* Setup guide */
+.setup-intro { color: var(--muted); }
+.setup-steps { list-style: none; counter-reset: step; padding: 0; margin: 1rem 0; display: grid; gap: .5rem; }
+.setup-steps li { counter-increment: step; position: relative; padding: .75rem .9rem .75rem 3rem; border-radius: 14px; background: var(--card-2); cursor: pointer; transition: background .15s, box-shadow .15s; }
+.setup-steps li::before { content: counter(step); position: absolute; left: .85rem; top: .8rem; width: 1.55rem; height: 1.55rem; border-radius: 50%; background: var(--good); color: #fff; font-weight: 700; font-size: .8rem; display: grid; place-items: center; }
+.setup-steps li:hover { background: var(--fill-hover); }
+.setup-steps li.on { background: var(--good-tint); box-shadow: inset 0 0 0 1.5px var(--good); }
+.setup-steps p { margin: .1rem 0; }
+.setup-steps .theirs { font-size: .82rem; color: var(--muted); }
+.setup-steps .mine { color: var(--ink); }
+.setup-steps .san { font-family: var(--mono); font-size: .8rem; color: var(--accent); margin-left: .25rem; letter-spacing: 0; }
+.setup-steps .why { font-size: .88rem; color: var(--ink-2); }
+.setup-tip { margin-top: 1rem; box-shadow: none; background: var(--card-2); }
