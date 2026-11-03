@@ -690,7 +690,8 @@
     const board = new Board($('#board'), { orientation: o.side });
     const panel = $('#panel');
     const game = new Chess();
-    let ply = 0, timer = null, tries = 0;
+    let ply = 0, timer = null, tries = 0, lastMine = null;   // lastMine: {mv, why, shown} for the move just made
+    const lastMineHtml = () => lastMine ? `<div class="fb good mine-done"><p><b>${lastMine.shown ? 'Shown:' : '✓ Well done:'} ${esc(pgn([lastMine.mv.san], lastMine.ply))}</b></p><p><b>Why:</b> ${esc(lastMine.why)}</p></div>` : '';
 
     const stepNo = () => myPlies.filter(k => k < ply).length;           // my moves already made
     function progress() {
@@ -725,14 +726,14 @@
         <p>We’ll get there in <b>${total} moves</b>. For each step you’ll see which piece to move and where it goes. Make the move yourself, and I’ll explain why it’s played and what your opponent does next.</p>
         ${me === 'b' ? '<p class="muted">You play Black, so your opponent moves first.</p>' : ''}
         <button class="btn primary continue" id="go">Start step 1</button>`;
-      $('#go').onclick = () => { rebuild(0); syncBoard(board, game); board.setHighlights({}); board.setArrows([]); next(); };
+      $('#go').onclick = () => { rebuild(0); lastMine = null; syncBoard(board, game); board.setHighlights({}); board.setArrows([]); next(); };
     }
 
     function next(oppMove, oppWhy) {
       progress();
       if (ply >= line.moves.length) return finish(oppMove, oppWhy);
       if (game.turn() !== me) {
-        panel.innerHTML = `<p class="eyebrow">${stepNo() ? `Step ${stepNo()} done` : 'Your opponent starts'}</p><p class="muted">Your opponent is moving…</p>`;
+        panel.innerHTML = `${lastMineHtml()}<p class="eyebrow">${stepNo() ? '' : 'Your opponent starts'}</p><p class="muted">Your opponent is moving…</p>`;
         return opponentTurn((m, why) => next(m, why));
       }
       tries = 0;
@@ -743,6 +744,7 @@
       board.destsFn = sq => game.turn() === me ? chessDests(game)(sq) : [];
       board.setInteractive(true);
       panel.innerHTML = `
+        ${lastMineHtml()}
         ${oppMove ? `<div class="opp-move"><p class="eyebrow">Your opponent played ${esc(pgn([oppMove.san], ply - 1))}</p><p>${esc(oppWhy)}</p></div>` : ''}
         <p class="eyebrow">Step ${n} of ${total}</p>
         <h2 class="step-do">${esc(plainMove(want))}</h2>
@@ -752,7 +754,7 @@
       $('#showme').onclick = () => played(game.move(want.san), true);
       if ($('#back')) $('#back').onclick = () => {
         const prevMine = myPlies.filter(k => k < stepPly).pop();
-        rebuild(prevMine); syncBoard(board, game);
+        rebuild(prevMine); lastMine = null; syncBoard(board, game);
         const prev = ply > 0 ? game.history({ verbose: true }).slice(-1)[0] : null;
         next(prev && prev.color !== me ? prev : null, prev && prev.color !== me ? line.moves[ply - 1][1] : '');
       };
@@ -777,18 +779,18 @@
       board.setInteractive(false);
       syncBoard(board, game, mv); board.setHighlights({ [mv.to]: 'green' }); board.setArrows([]); board.flash(mv.to, 'good');
       const why = line.moves[ply - 1][1];
-      const last = ply >= line.moves.length;
-      $('.feedback', panel).innerHTML = `<div class="fb good"><p><b>${shown ? 'Here it is:' : '✓ Well done!'} ${esc(pgn([mv.san], ply - 1))}</b></p><p><b>Why:</b> ${esc(why)}</p></div>
-        <button class="btn primary continue" id="nx">${last ? 'See the finished setup' : 'Next step'}</button>`;
-      $('#showme').remove();
-      $('#nx').onclick = () => next();
+      lastMine = { mv, why, shown, ply: ply - 1 };
+      $('.feedback', panel).innerHTML = lastMineHtml();
+      const sm = $('#showme'); if (sm) sm.remove();
       progress();
+      timer = setTimeout(() => next(), 900);           // carry on by itself: no button to press
     }
 
     function finish(oppMove, oppWhy) {
       board.setInteractive(false);
       syncBoard(board, game); board.setLastMove(null); board.setArrows(finalArrows); board.setHighlights(finalHl);
       panel.innerHTML = `
+        ${lastMineHtml()}
         ${oppMove ? `<div class="opp-move"><p class="eyebrow">Your opponent played ${esc(pgn([oppMove.san], ply - 1))}</p><p>${esc(oppWhy)}</p></div>` : ''}
         <div class="complete"><div class="big">✓</div><h2>Setup complete!</h2>
         <p>You’ve built the ${esc(o.name)} in ${total} moves. The arrows show where every piece came from.</p></div>

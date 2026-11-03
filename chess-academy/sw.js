@@ -2,7 +2,7 @@
  * Strategy: precache the whole app shell; serve from cache, refresh the cache
  * in the background (stale-while-revalidate) so updates arrive on next launch.
  * Bump VERSION whenever any file changes. */
-const VERSION = 'chess-academy-v5';
+const VERSION = 'chess-academy-v6';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './css/style.css',
   './js/vendor/chess.js', './js/board.js', './js/engine.js', './js/curriculum.js',
