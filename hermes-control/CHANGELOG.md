@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+- **Create Character.** On an agent's profile, or for everyone at once from Agents, Hermes Control asks each agent in its chat to design its own name, job title, bio and a photorealistic portrait, using the agent's own image tool.
+  - You preview each result and choose Use This, Try Again or Keep Current.
+  - Presentation only: the Hermes profile is never changed.
+  - Pictures are accepted only from public https addresses (private addresses are blocked, including after redirects) or from Hermes image-cache folders, and must be real JPEG/PNG/WebP files under 10 MB.
+- **`hermes.hiddenProfiles`** setting, default `[default]`: hides profiles from Hermes Control without touching Hermes.
+
 ### Changed
 - **Apple-style redesign.** The app is now modelled on Messages:
   - A chat list with photos, last-message previews and unread dots, plus iMessage-style bubbles with a typing indicator.
@@ -12,6 +19,7 @@
   - Visual style: system font, iOS colours, translucent bars and grouped lists. Reduced motion, reduced transparency and higher contrast are respected.
 
 ### Fixed
+- The "Live" indicator could stay on "Connecting…" after a page reload even though updates were connected.
 - Base CSS was overriding utility colours on buttons and inputs.
 - The message box now starts fresh for each chat.
 

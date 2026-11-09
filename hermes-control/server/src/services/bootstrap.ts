@@ -40,7 +40,8 @@ export function bootstrap(db: DB, cfg: Config, discovered: DiscoveredProfile[]) 
       const ws = db.prepare('SELECT id FROM workspaces WHERE slug = ?').get(w.slug) as { id: number };
       // Workspace agent allowlist is authoritative from config (fail closed: empty = none).
       db.prepare('DELETE FROM workspace_agents WHERE workspace_id = ?').run(ws.id);
-      const allowed = w.agents.includes('*') ? allAgents.map((a) => a.profile_name) : w.agents;
+      const hidden = new Set(cfg.hermes.hiddenProfiles);
+      const allowed = (w.agents.includes('*') ? allAgents.map((a) => a.profile_name) : w.agents).filter((p) => !hidden.has(p));
       for (const p of allowed) {
         const id = agentId(p);
         if (id) db.prepare('INSERT OR IGNORE INTO workspace_agents (workspace_id, agent_id) VALUES (?,?)').run(ws.id, id);

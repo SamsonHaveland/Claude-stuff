@@ -10,6 +10,8 @@ import { audit } from '../lib/audit.js';
 import { resolveTargets, type RoutableAgent } from '../services/routing.js';
 import { keyEnvFor, baseUrlFor, HermesError } from '../hermes/client.js';
 import type { KanbanTask } from '../hermes/kanban.js';
+import { characterPrompt, loadPortrait, parseCharacter } from '../services/character.js';
+import { writeFile } from 'node:fs/promises';
 
 interface WsRow { id: number; slug: string; name: string; role: string }
 
@@ -390,6 +392,86 @@ export async function registerApi(app: FastifyInstance, ctx: AppContext) {
   app.get('/api/admin/audit', auth, async (req, reply) => {
     if (!requireAdmin(req, reply)) return;
     return db.prepare('SELECT * FROM audit_log ORDER BY id DESC LIMIT 300').all();
+  });
+
+  // ---- "Create Character": the agent designs its own card + portrait (presentation only) ----
+  function agentInWs(wsId: number, agentId: number) {
+    return db.prepare('SELECT a.* FROM agents a JOIN workspace_agents wa ON wa.agent_id = a.id WHERE wa.workspace_id = ? AND a.id = ?').get(wsId, agentId) as any;
+  }
+  function characterRun(wsId: number, agentId: number, runId: number) {
+    return db.prepare(
+      `SELECT r.id, r.status, r.error, m.body AS reply, m.state FROM runs r JOIN messages m ON m.id = r.reply_message_id
+       WHERE r.id = ? AND r.workspace_id = ? AND r.agent_id = ?`,
+    ).get(runId, wsId, agentId) as any;
+  }
+
+  app.post('/api/w/:ws/agents/:id/character', auth, async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
+    const ws = requireWorkspace(req, reply, 'owner'); if (!ws) return;
+    const a = agentInWs(ws.id, Number((req.params as any).id));
+    if (!a) return reply.code(404).send({ error: 'not_found' });
+    const dm = db.prepare(`SELECT id FROM conversations WHERE workspace_id = ? AND kind = 'dm' AND dm_agent_id = ?`).get(ws.id, a.id) as any;
+    if (!dm) return reply.code(409).send({ error: 'no_dm' });
+    const body = characterPrompt({ displayName: a.display_name, role: a.role, profileName: a.profile_name });
+    const now = Date.now();
+    const r = db.prepare(`INSERT INTO messages (conversation_id, workspace_id, author_kind, author_user_id, author_label, body, state, source, created_at, updated_at) VALUES (?,?,?,?,?,?, 'final', 'hc', ?, ?)`)
+      .run(dm.id, ws.id, 'user', req.user!.id, req.user!.display_name, body, now, now);
+    const msgId = Number(r.lastInsertRowid);
+    runs.publishMessage(msgId);
+    const runId = runs.enqueue({ workspaceId: ws.id, conversationId: dm.id, requestMessageId: msgId, agentId: a.id, label: a.display_name });
+    audit(db, { userId: req.user!.id, workspaceId: ws.id, action: 'agent.character.request', target: `agent:${a.id}`, detail: { runId } });
+    return { runId, conversationId: dm.id };
+  });
+
+  app.get('/api/w/:ws/agents/:id/character/:runId', auth, async (req, reply) => {
+    const ws = requireWorkspace(req, reply); if (!ws) return;
+    const p = req.params as any;
+    const run = characterRun(ws.id, Number(p.id), Number(p.runId));
+    if (!run) return reply.code(404).send({ error: 'not_found' });
+    const done = ['completed', 'failed', 'cancelled', 'interrupted', 'unknown'].includes(run.status);
+    return { status: run.status, done, error: run.error, proposal: run.status === 'completed' ? parseCharacter(run.reply ?? '') : null };
+  });
+
+  app.get('/api/w/:ws/agents/:id/character/:runId/picture', auth, async (req, reply) => {
+    const ws = requireWorkspace(req, reply); if (!ws) return;
+    const p = req.params as any;
+    const run = characterRun(ws.id, Number(p.id), Number(p.runId));
+    const c = run?.status === 'completed' ? parseCharacter(run.reply ?? '') : null;
+    if (!c?.image) return reply.code(404).send({ error: 'no_picture' });
+    try {
+      const { buf, ext } = await loadPortrait(c.image, cfg.hermes.home);
+      return reply.header('Content-Type', ext === 'jpg' ? 'image/jpeg' : `image/${ext}`).header('Cache-Control', 'private, max-age=600').send(buf);
+    } catch (e) { return reply.code(422).send({ error: 'picture_rejected', message: (e as Error).message }); }
+  });
+
+  app.post('/api/w/:ws/agents/:id/character/:runId/apply', auth, async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
+    const ws = requireWorkspace(req, reply, 'owner'); if (!ws) return;
+    const p = req.params as any;
+    const a = agentInWs(ws.id, Number(p.id));
+    const run = a && characterRun(ws.id, a.id, Number(p.runId));
+    if (!run) return reply.code(404).send({ error: 'not_found' });
+    if (run.status !== 'completed') return reply.code(409).send({ error: 'not_ready' });
+    // Re-parse server-side from the stored reply: the client never supplies the values.
+    const c = parseCharacter(run.reply ?? '');
+    if (!c) return reply.code(422).send({ error: 'no_character', message: `${a.display_name}'s reply didn't include a character.` });
+    let avatarUrl: string | null = null;
+    let pictureError: string | null = null;
+    if (c.image) {
+      try {
+        const { buf, ext } = await loadPortrait(c.image, cfg.hermes.home);
+        const name = `agent-${a.id}-${randomBytes(6).toString('hex')}.${ext}`;
+        await writeFile(join(ctx.avatarsDir, name), buf);
+        if (a.avatar_file) await unlink(join(ctx.avatarsDir, a.avatar_file)).catch(() => {});
+        db.prepare('UPDATE agents SET avatar_file = ? WHERE id = ?').run(name, a.id);
+        avatarUrl = `/api/avatars/${name}`;
+      } catch (e) { pictureError = (e as Error).message; }
+    }
+    if (c.name) db.prepare('UPDATE agents SET display_name = ? WHERE id = ?').run(c.name, a.id);
+    if (c.role) db.prepare('UPDATE agents SET role = ? WHERE id = ?').run(c.role, a.id);
+    if (c.bio) db.prepare('UPDATE agents SET description = ? WHERE id = ?').run(c.bio, a.id);
+    audit(db, { userId: req.user!.id, workspaceId: ws.id, action: 'agent.character.apply', target: `agent:${a.id}`, detail: { runId: run.id, picture: !!avatarUrl, pictureError } });
+    return { ok: true, avatarUrl, pictureError };
   });
 
   void HermesError;

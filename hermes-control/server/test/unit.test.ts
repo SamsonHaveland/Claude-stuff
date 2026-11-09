@@ -103,3 +103,21 @@ describe('auto-update status', () => {
     expect(readAutoUpdate(join(dir, 'missing.json'))).toBeNull();
   });
 });
+
+describe('hidden profiles', () => {
+  it('keeps "default" out of every workspace, channel and DM, but still records it', async () => {
+    const { openDb } = await import('../src/db/index.js');
+    const { bootstrap } = await import('../src/services/bootstrap.js');
+    const { parseConfig } = await import('../src/config.js');
+    const cfg = parseConfig({ workspaces: [{ slug: 'hq', name: 'HQ', agents: ['*'], channels: [{ name: 'general', agents: ['*'], defaultAgent: 'default' }] }] });
+    const db = openDb(':memory:');
+    const found = (id: string) => ({ id, path: '/x', displayName: null, description: null, soulExcerpt: null });
+    bootstrap(db, cfg, [found('default'), found('jeff')]);
+    const names = (sql: string) => (db.prepare(sql).all() as any[]).map((r) => r.n);
+    expect(names('SELECT a.profile_name n FROM agents a JOIN workspace_agents w ON w.agent_id = a.id')).toEqual(['jeff']);
+    expect(names("SELECT name n FROM conversations WHERE kind = 'dm'")).toEqual(['dm-jeff']);
+    expect(names('SELECT a.profile_name n FROM conversation_agents ca JOIN agents a ON a.id = ca.agent_id JOIN conversations c ON c.id = ca.conversation_id WHERE c.kind = \'channel\'')).toEqual(['jeff']);
+    expect((db.prepare("SELECT default_agent_id d FROM conversations WHERE name = 'general'").get() as any).d).toBeNull();
+    expect(names('SELECT profile_name n FROM agents ORDER BY profile_name')).toEqual(['default', 'jeff']);
+  });
+});

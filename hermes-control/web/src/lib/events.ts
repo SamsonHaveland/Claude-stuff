@@ -46,6 +46,7 @@ export function useServerEvents(fn: Fn) {
 
 export function useConnectionStatus() {
   const [s, set] = useState(status);
-  useEffect(() => { statusListeners.add(set); return () => { statusListeners.delete(set); }; }, []);
+  // Re-read after subscribing: the connection may have opened between render and this effect.
+  useEffect(() => { statusListeners.add(set); set(status); return () => { statusListeners.delete(set); }; }, []);
   return s;
 }

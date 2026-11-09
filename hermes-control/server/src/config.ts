@@ -34,9 +34,11 @@ const ConfigSchema = z.object({
     requestTimeoutMs: z.number().int().default(30_000),
     /** Hermes CLI used for Kanban (`hermes kanban ... --json`). Executed without a shell. */
     cliPath: z.string().default('hermes'),
+    /** Profiles never shown or routable in Hermes Control (they still exist in Hermes). */
+    hiddenProfiles: z.array(z.string()).default(['default']),
     kanbanBoard: z.string().regex(/^[a-z0-9][a-z0-9_-]*$/).optional(),
     profiles: z.record(z.string(), ProfileOverride).default({}),
-  }).default({ mode: 'disabled', home: '~/.hermes', baseUrl: 'http://127.0.0.1:8642', multiplex: true, requestTimeoutMs: 30_000, cliPath: 'hermes', profiles: {} }),
+  }).default({ mode: 'disabled', home: '~/.hermes', baseUrl: 'http://127.0.0.1:8642', multiplex: true, requestTimeoutMs: 30_000, cliPath: 'hermes', hiddenProfiles: ['default'], profiles: {} }),
   /** Status file written by deploy/hermes-autoupdate.sh (read-only here). */
   autoUpdate: z.object({ statusFile: z.string().default('~/.hermes-autoupdate/status.json') }).default({ statusFile: '~/.hermes-autoupdate/status.json' }),
   telegramMirror: z.array(z.object({

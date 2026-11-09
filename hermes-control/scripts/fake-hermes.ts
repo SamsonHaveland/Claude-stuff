@@ -11,6 +11,11 @@ const fake = new FakeHermes({
   key: process.env.HC_FAKE_KEY ?? 'dev-key',
   script: async (run, f) => {
     f.emit(run, 'run.started');
+    if (/design how you appear in Hermes Control/.test(run.input) && process.env.HC_FAKE_CHARACTER_IMG) {
+      await sleep(1500);
+      f.finish(run, 'completed', `[FAKE HERMES] Here is my look.\n\nCHARACTER\nname: Test Character\nrole: [FAKE] Example Role\nbio: [FAKE HERMES] This card came from the test double, not a real agent.\nimage: ${process.env.HC_FAKE_CHARACTER_IMG}`);
+      return;
+    }
     if (/approve|delete|send/i.test(run.input)) {
       run.status = 'waiting_for_approval';
       f.emit(run, 'approval.request', { request_id: `p-${run.id}`, command: 'send_email --to client@example.com', description: '[FAKE HERMES] Send an external email', choices: ['once', 'session', 'deny'] });
