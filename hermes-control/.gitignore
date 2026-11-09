@@ -1,0 +1,12 @@
+node_modules/
+server/dist/
+web/dist/
+data/
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.*
+!.env.example
+hermes-control.config.yaml
+coverage/
