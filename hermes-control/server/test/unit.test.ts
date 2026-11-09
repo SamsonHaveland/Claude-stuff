@@ -93,3 +93,13 @@ describe('kanban adapter', () => {
     await expect(k.assign('t1', 'Bad Profile')).rejects.toThrow(/Invalid profile/);
   });
 });
+
+describe('auto-update status', () => {
+  it('reads the updater status file and tolerates its absence', async () => {
+    const { readAutoUpdate } = await import('../src/routes/api.js');
+    const dir = mkdtempSync(join(tmpdir(), 'au-'));
+    writeFileSync(join(dir, 's.json'), JSON.stringify({ result: 'updated', version_before: 'v1', version_after: 'v2', log_file: '/secret/path', warnings: [] }));
+    expect(readAutoUpdate(join(dir, 's.json'))).toEqual({ result: 'updated', version_before: 'v1', version_after: 'v2', warnings: [] });
+    expect(readAutoUpdate(join(dir, 'missing.json'))).toBeNull();
+  });
+});

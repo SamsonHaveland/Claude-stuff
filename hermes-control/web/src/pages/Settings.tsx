@@ -11,6 +11,7 @@ interface SystemStatus {
   profiles: { profile: string; discovered: boolean; keyEnv: string; keyPresent: boolean; baseUrl: string; reachable: boolean | null }[];
   telegramMirror: { profile: string; enabled: boolean; workspace: string; status: { ok: boolean; at: number; error?: string; sessions?: number } | null }[];
   openRuns: number;
+  autoUpdate: { result: string; note?: string; version_before?: string; version_after?: string; warnings?: string[]; finished_at?: string } | null;
   sseClients: number;
 }
 
@@ -62,6 +63,15 @@ export function SettingsPage() {
                 </table>
               </div>
               <p className="text-xs text-[var(--muted)]">Key values are never shown or sent to the browser. Profiles, workspaces and channels are configured in <code>hermes-control.config.yaml</code>; keys in the server's environment.</p>
+              <h3 className="pt-2 font-semibold">Hermes auto-update</h3>
+              {!sys.autoUpdate ? <p className="text-sm text-[var(--muted)]">No result yet. The nightly updater (deploy/hermes-autoupdate.sh) is not installed or has not run.</p> : (
+                <div className={`rounded-lg border p-3 text-sm ${sys.autoUpdate.result === 'failed' ? 'border-rose-500/40 bg-rose-500/10' : sys.autoUpdate.result === 'updated_with_warnings' ? 'border-amber-500/40 bg-amber-500/10' : 'border-[var(--border)]'}`}>
+                  <div><b>{sys.autoUpdate.result.replace(/_/g, ' ')}</b>{sys.autoUpdate.finished_at && <> · {new Date(sys.autoUpdate.finished_at).toLocaleString()}</>}</div>
+                  {sys.autoUpdate.note && <div className="text-[var(--muted)]">{sys.autoUpdate.note}</div>}
+                  {sys.autoUpdate.version_after && <div className="text-xs text-[var(--muted)]">{sys.autoUpdate.version_before === sys.autoUpdate.version_after ? sys.autoUpdate.version_after : `${sys.autoUpdate.version_before} → ${sys.autoUpdate.version_after}`}</div>}
+                  {!!sys.autoUpdate.warnings?.length && <ul className="mt-1 list-disc pl-5 text-xs">{sys.autoUpdate.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>}
+                </div>
+              )}
               <h3 className="pt-2 font-semibold">Telegram mirror</h3>
               {!sys.telegramMirror.length && <p className="text-sm text-[var(--muted)]">Not configured.</p>}
               {sys.telegramMirror.map((t) => (

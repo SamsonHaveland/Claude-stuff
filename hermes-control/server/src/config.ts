@@ -37,6 +37,8 @@ const ConfigSchema = z.object({
     kanbanBoard: z.string().regex(/^[a-z0-9][a-z0-9_-]*$/).optional(),
     profiles: z.record(z.string(), ProfileOverride).default({}),
   }).default({ mode: 'disabled', home: '~/.hermes', baseUrl: 'http://127.0.0.1:8642', multiplex: true, requestTimeoutMs: 30_000, cliPath: 'hermes', profiles: {} }),
+  /** Status file written by deploy/hermes-autoupdate.sh (read-only here). */
+  autoUpdate: z.object({ statusFile: z.string().default('~/.hermes-autoupdate/status.json') }).default({ statusFile: '~/.hermes-autoupdate/status.json' }),
   telegramMirror: z.array(z.object({
     profile: z.string(),
     enabled: z.boolean().default(false),
@@ -66,6 +68,7 @@ export function loadConfig(path = process.env.HC_CONFIG ?? 'hermes-control.confi
   const cfg = ConfigSchema.parse(raw);
   cfg.dataDir = resolve(expandHome(cfg.dataDir));
   cfg.hermes.home = resolve(expandHome(cfg.hermes.home));
+  cfg.autoUpdate.statusFile = resolve(expandHome(cfg.autoUpdate.statusFile));
   return cfg;
 }
 

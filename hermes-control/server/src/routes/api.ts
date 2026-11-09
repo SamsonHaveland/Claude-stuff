@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { createReadStream, createWriteStream } from 'node:fs';
+import { createReadStream, createWriteStream, readFileSync } from 'node:fs';
 import { unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
@@ -378,6 +378,7 @@ export async function registerApi(app: FastifyInstance, ctx: AppContext) {
     return {
       hermesMode: cfg.hermes.mode, hermesHome: cfg.hermes.home, profiles,
       telegramMirror: cfg.telegramMirror.map((t) => ({ ...t, status: ctx.mirror.lastStatus.get(`${t.profile}@${t.workspace}`) ?? null })),
+      autoUpdate: readAutoUpdate(cfg.autoUpdate.statusFile),
       openRuns: (db.prepare(`SELECT COUNT(*) n FROM runs WHERE status NOT IN ('completed','failed','cancelled','interrupted')`).get() as any).n,
       sseClients: bus.size,
     };
@@ -403,5 +404,16 @@ async function looksLikeImage(path: string, ext: string): Promise<boolean> {
     return false;
   } finally {
     await fh.close();
+  }
+}
+
+/** Last result written by deploy/hermes-autoupdate.sh; null if the updater was never installed/run. */
+export function readAutoUpdate(file: string): Record<string, unknown> | null {
+  try {
+    const d = JSON.parse(readFileSync(file, 'utf8'));
+    const pick = ['result', 'exit_code', 'version_before', 'version_after', 'note', 'warnings', 'started_at', 'finished_at', 'channel'];
+    return Object.fromEntries(pick.filter((k) => k in d).map((k) => [k, d[k]]));
+  } catch {
+    return null;
   }
 }

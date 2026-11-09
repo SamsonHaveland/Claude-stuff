@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- macOS LaunchAgent: run the Hermes auto-updater nightly at 04:17. NOT INSTALLED.
+     Install (requires your approval — it schedules unattended Hermes updates):
+       cp deploy/hermes-autoupdate.sh ~/.hermes-autoupdate/  (or point the path below at the repo copy)
+       cp deploy/com.hermes.autoupdate.plist ~/Library/LaunchAgents/
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.hermes.autoupdate.plist
+     Remove:  launchctl bootout gui/$(id -u)/com.hermes.autoupdate
+     If the Mac is asleep at 04:17, launchd runs the job when it next wakes. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.hermes.autoupdate</string>
+  <key>ProgramArguments</key>
+  <array><string>/bin/bash</string><string>/Users/samsonhaveland/hermes-control/deploy/hermes-autoupdate.sh</string></array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/Users/samsonhaveland/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>4</integer><key>Minute</key><integer>17</integer></dict>
+  <key>StandardOutPath</key><string>/Users/samsonhaveland/.hermes-autoupdate/launchd.log</string>
+  <key>StandardErrorPath</key><string>/Users/samsonhaveland/.hermes-autoupdate/launchd.log</string>
+</dict>
+</plist>

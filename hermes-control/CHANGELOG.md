@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Nightly Hermes auto-update (stable releases only).** Adds the `deploy/hermes-autoupdate.sh` wrapper around `hermes update`, with a launchd job for the Mac and a systemd timer for the Pi. None of these are installed yet.
+- **Update status in Settings.** Hermes Control shows the result of the last update. See `docs/AUTO_UPDATE.md`.
+
 ## 0.1.0 — 2026-11-09
 
 First working build. Nothing has been deployed, and no existing Hermes configuration has been touched.
