@@ -3,68 +3,86 @@ import { Link } from 'react-router-dom';
 import { api, type Approval } from '../lib/api';
 import { useServerEvents } from '../lib/events';
 import { useWs } from '../lib/workspace';
-import { PageHeader } from '../components/Shell';
-import { Avatar } from '../components/Avatar';
+import { Avatar, Button, EmptyState, IHand, LargeTitle, timeLabel } from '../components/ui';
 
-const CHOICE_LABEL: Record<string, string> = { once: 'Allow once', session: 'Allow for session', always: 'Always allow', deny: 'Deny' };
-const STATUS_LABEL: Record<Approval['status'], string> = {
-  pending: 'Waiting for your decision',
-  submitted: 'Decision sent — waiting for Hermes to confirm',
-  confirmed: 'Hermes recorded the decision',
-  rejected: 'Hermes refused (stale or already answered elsewhere)',
-  expired: 'Run ended before a decision',
-  error: 'Could not reach Hermes',
+const STATUS_TEXT: Record<Approval['status'], { text: string; tone: string }> = {
+  pending: { text: 'Waiting for you', tone: 'var(--orange)' },
+  submitted: { text: 'Sending your answer…', tone: 'var(--label-2)' },
+  confirmed: { text: 'Done. Hermes got your answer.', tone: 'var(--green)' },
+  rejected: { text: 'Too late: this was already answered or has ended.', tone: 'var(--label-2)' },
+  expired: { text: 'This request ended before you answered.', tone: 'var(--label-2)' },
+  error: { text: 'Couldn’t reach Hermes. Try again.', tone: 'var(--red)' },
 };
+const MORE: Record<string, string> = { session: 'Allow for this whole chat', always: 'Always allow this' };
 
 export function ApprovalsPage() {
   const { ws, agentById } = useWs();
-  const [list, setList] = useState<Approval[]>([]);
-  const [all, setAll] = useState(false);
+  const [list, setList] = useState<Approval[] | null>(null);
+  const [tab, setTab] = useState<'now' | 'earlier'>('now');
   const [err, setErr] = useState<Record<number, string>>({});
-  const load = () => api<Approval[]>(`/api/w/${ws.slug}/approvals${all ? '?status=all' : ''}`).then(setList).catch(() => {});
-  useEffect(() => { void load(); }, [ws.slug, all]);
+  const [busy, setBusy] = useState<number | null>(null);
+  const load = () => api<Approval[]>(`/api/w/${ws.slug}/approvals${tab === 'earlier' ? '?status=all' : ''}`).then((l) => setList(tab === 'earlier' ? l.filter((a) => a.status !== 'pending') : l)).catch(() => setList([]));
+  useEffect(() => { setList(null); void load(); }, [ws.slug, tab]);
   useServerEvents((e) => { if (e.type === 'approvals.changed' || e.type === 'reconnected') void load(); });
+
   const decide = async (a: Approval, choice: string) => {
-    if (choice !== 'deny' && choice !== 'once' && !confirm(`${CHOICE_LABEL[choice]}? This widens what ${a.agent} may do without asking.`)) return;
-    setErr((x) => ({ ...x, [a.id]: '' }));
+    if (MORE[choice] && !confirm(`${MORE[choice]}?\n\n${a.agent} won’t ask again for this kind of action.`)) return;
+    setBusy(a.id); setErr((x) => ({ ...x, [a.id]: '' }));
     try { await api(`/api/w/${ws.slug}/approvals/${a.id}/decision`, { method: 'POST', json: { choice } }); } catch (e) { setErr((x) => ({ ...x, [a.id]: (e as Error).message })); }
-    void load();
+    setBusy(null); void load();
   };
+
   return (
-    <div className="flex min-w-0 flex-1 flex-col">
-      <PageHeader title="Approvals" subtitle="Actions Hermes paused for a human decision" actions={<label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} />Show history</label>} />
-      <div className="scroll-thin flex-1 overflow-y-auto p-4 md:p-6">
-        <div className="mx-auto max-w-3xl space-y-3">
-          {!list.length && (
-            <div className="rounded-xl border border-dashed border-[var(--border)] p-8 text-center text-sm text-[var(--muted)]">
-              No pending approvals. Requests appear here when an agent run started from Hermes Control hits a Hermes approval gate.
-              Approvals raised in Telegram or the CLI are still answered there; Hermes does not expose a global pending-approvals list.
-            </div>
-          )}
-          {list.map((a) => {
+    <div className="scroll h-full flex-1 bg-[var(--bg-grouped)]">
+      <LargeTitle title="Needs You" subtitle="Your agents ask before doing anything important." />
+      <div className="mx-auto max-w-2xl px-4 pb-10 md:px-8">
+        <div role="tablist" className="mb-5 grid grid-cols-2 rounded-[9px] bg-[var(--fill)] p-0.5">
+          {(['now', 'earlier'] as const).map((t) => (
+            <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`press rounded-[7px] py-1.5 text-[14px] font-semibold ${tab === t ? 'bg-[var(--cell)] shadow-sm' : 'text-[var(--label-2)]'}`}>{t === 'now' ? 'Waiting' : 'Earlier'}</button>
+          ))}
+        </div>
+        {list && !list.length && (
+          <EmptyState icon={<IHand size={56} />} title={tab === 'now' ? 'Nothing needs you' : 'No earlier answers'} body={tab === 'now' ? 'When an agent wants to do something important, like send an email, it will ask you here first.' : undefined} />
+        )}
+        <div className="space-y-4">
+          {list?.map((a) => {
             const agent = agentById(a.agentId);
+            const s = STATUS_TEXT[a.status];
+            const extra = a.choices.filter((c) => MORE[c]);
             return (
-              <article key={a.id} className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4">
+              <article key={a.id} className="rounded-[18px] bg-[var(--cell)] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
                 <div className="flex items-center gap-3">
-                  <Avatar name={a.agent} url={agent?.avatarUrl} size={36} />
-                  <div className="min-w-0 flex-1"><div className="font-semibold">{a.agent} requests approval</div><div className="text-xs text-[var(--muted)]">{new Date(a.created_at).toLocaleString()} · <Link className="hover:underline" to={`/w/${ws.slug}/c/${a.conversationId}`}>{a.kind === 'dm' ? 'Direct message' : `#${a.conversation}`}</Link></div></div>
-                  <span className={`rounded-full px-2 py-0.5 text-xs ${a.status === 'pending' ? 'bg-violet-500/15 text-violet-600 dark:text-violet-300' : 'bg-[var(--hover)] text-[var(--muted)]'}`}>{a.status}</span>
-                </div>
-                {a.description && <p className="mt-3 text-sm">{a.description}</p>}
-                {a.command && <pre className="mt-2 overflow-x-auto rounded-lg bg-[var(--hover)] p-2.5 text-xs"><code>{a.command}</code></pre>}
-                {a.requestText && <p className="mt-2 text-xs text-[var(--muted)]">Context: “{a.requestText.slice(0, 240)}”</p>}
-                <p className="mt-2 text-xs text-[var(--muted)]">{STATUS_LABEL[a.status]}{a.decision ? ` · decision: ${CHOICE_LABEL[a.decision] ?? a.decision}` : ''}</p>
-                {err[a.id] && <p className="mt-1 text-sm text-rose-500">{err[a.id]}</p>}
-                {a.status === 'pending' && ws.role === 'owner' && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {a.choices.map((c) => <button key={c} onClick={() => decide(a, c)} className={`rounded-lg px-3 py-1.5 text-sm font-medium ${c === 'deny' ? 'border border-rose-500/40 text-rose-600 hover:bg-rose-500/10 dark:text-rose-300' : c === 'once' ? 'bg-[var(--color-accent)] text-white' : 'border border-[var(--border)] hover:bg-[var(--hover)]'}`}>{CHOICE_LABEL[c] ?? c}</button>)}
+                  <Avatar name={a.agent} url={agent?.avatarUrl} size={48} />
+                  <div className="min-w-0 flex-1">
+                    <p className="t-headline">{a.agent} wants to:</p>
+                    <p className="t-foot text-[var(--label-2)]">{timeLabel(a.created_at)} · <Link className="text-[var(--blue)]" to={`/w/${ws.slug}/c/${a.conversationId}`}>Open chat</Link></p>
                   </div>
+                </div>
+                <p className="mt-3 text-[19px] leading-snug font-medium">{a.description || 'Run an action that needs permission'}</p>
+                {a.command && (
+                  <details className="mt-2">
+                    <summary className="t-foot cursor-pointer text-[var(--label-2)]">Show the exact action</summary>
+                    <pre className="t-foot mt-1.5 overflow-x-auto rounded-[10px] bg-[var(--fill)] p-3"><code>{a.command}</code></pre>
+                  </details>
                 )}
-                {a.status === 'pending' && ws.role !== 'owner' && <p className="mt-2 text-xs text-[var(--muted)]">Only workspace owners can decide.</p>}
+                {a.requestText && <p className="t-foot mt-2 text-[var(--label-2)]">Because you asked: “{a.requestText.slice(0, 160)}”</p>}
+                {a.status === 'pending' && ws.role === 'owner' ? (
+                  <>
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      <Button variant="destructive" size="lg" disabled={busy === a.id} onClick={() => decide(a, 'deny')}>Don’t Allow</Button>
+                      <Button size="lg" disabled={busy === a.id} onClick={() => decide(a, 'once')}>Allow</Button>
+                    </div>
+                    {extra.length > 0 && <div className="mt-2 flex justify-center gap-4">{extra.map((c) => <button key={c} onClick={() => decide(a, c)} className="press t-foot text-[var(--blue)]">{MORE[c]}</button>)}</div>}
+                  </>
+                ) : (
+                  <p className="t-sub mt-4 font-medium" style={{ color: s.tone }}>{a.status === 'pending' ? 'Only a workspace owner can answer this.' : s.text}{a.decision ? ` (You chose: ${a.decision === 'once' ? 'Allow' : a.decision === 'deny' ? 'Don’t Allow' : MORE[a.decision] ?? a.decision})` : ''}</p>
+                )}
+                {err[a.id] && <p className="t-foot mt-2 text-[var(--red)]">{err[a.id]}</p>}
               </article>
             );
           })}
         </div>
+        <p className="t-foot mt-8 text-center text-[var(--label-2)]">Requests made in Telegram are answered in Telegram.</p>
       </div>
     </div>
   );

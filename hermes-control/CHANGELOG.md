@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Changed
+- **Apple-style redesign.** The app is now modelled on Messages:
+  - A chat list with photos, last-message previews and unread dots, plus iMessage-style bubbles with a typing indicator.
+  - Plain-language failures, such as "Jeff didn't reply. Try Again".
+  - Tap-to-ask name chips in groups, so there's no need to type @mentions.
+  - Four plain destinations (Chats, To-Dos, Needs You, Settings), using a tab bar on iPhone and the sidebar on Mac.
+  - Approvals become big Allow / Don't Allow buttons. Kanban is shown as To Do, Doing and Done.
+  - Visual style: system font, iOS colours, translucent bars and grouped lists. Reduced motion, reduced transparency and higher contrast are respected.
+
+### Fixed
+- Base CSS was overriding utility colours on buttons and inputs.
+- The message box now starts fresh for each chat.
+
 ### Added
 - **Nightly Hermes auto-update (stable releases only).** Adds the `deploy/hermes-autoupdate.sh` wrapper around `hermes update`, with a launchd job for the Mac and a systemd timer for the Pi. None of these are installed yet.
 - **Update status in Settings.** Hermes Control shows the result of the last update. See `docs/AUTO_UPDATE.md`.

@@ -3,8 +3,8 @@
   "short_name": "Hermes",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#14131f",
-  "theme_color": "#1d1b2e",
+  "background_color": "#f2f2f7",
+  "theme_color": "#f9f9f9",
   "icons": [
     { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },

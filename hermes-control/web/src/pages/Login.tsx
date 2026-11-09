@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { api, ApiError } from '../lib/api';
+import { Button } from '../components/ui';
 
 export function Login({ onLogin }: { onLogin: () => void }) {
   const [username, setU] = useState('');
@@ -10,34 +11,27 @@ export function Login({ onLogin }: { onLogin: () => void }) {
     e.preventDefault();
     setBusy(true); setErr('');
     try {
-      await api('/api/auth/login', { method: 'POST', json: { username, password } });
+      await api('/api/auth/login', { method: 'POST', json: { username: username.trim().toLowerCase(), password } });
       onLogin();
     } catch (e) {
-      setErr(e instanceof ApiError && e.status === 429 ? 'Too many attempts. Wait a few minutes.' : 'Incorrect username or password.');
+      setErr(e instanceof ApiError && e.status === 429 ? 'Too many tries. Please wait a few minutes.' : 'That username or password isn’t right.');
     } finally { setBusy(false); }
   };
+  const field = 'h-[52px] w-full bg-transparent px-4 text-[17px] outline-none placeholder:text-[var(--label-3)]';
   return (
-    <div className="flex h-full items-center justify-center bg-[var(--sidebar)] p-4">
-      <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded-2xl bg-[var(--bg)] p-7 shadow-2xl">
-        <div className="flex items-center gap-3">
-          <img src="/icons/icon.svg" alt="" className="h-10 w-10" />
-          <div>
-            <h1 className="text-lg font-semibold">Hermes Control</h1>
-            <p className="text-sm text-[var(--muted)]">Private workspace sign-in</p>
-          </div>
+    <div className="flex min-h-full items-center justify-center bg-[var(--bg-grouped)] p-5">
+      <form onSubmit={submit} className="w-full max-w-sm">
+        <div className="mb-8 flex flex-col items-center text-center">
+          <img src="/icons/icon.svg" alt="" className="h-20 w-20 rounded-[22px] shadow-[var(--shadow)]" />
+          <h1 className="t-large mt-5">Hermes Control</h1>
+          <p className="t-sub mt-1 text-[var(--label-2)]">Sign in to talk to your agents.</p>
         </div>
-        <label className="block text-sm">
-          <span className="mb-1 block font-medium">Username</span>
-          <input autoComplete="username" autoCapitalize="none" value={username} onChange={(e) => setU(e.target.value)} className="w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-2 outline-none focus:border-[var(--color-accent)]" />
-        </label>
-        <label className="block text-sm">
-          <span className="mb-1 block font-medium">Password</span>
-          <input type="password" autoComplete="current-password" value={password} onChange={(e) => setP(e.target.value)} className="w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-2 outline-none focus:border-[var(--color-accent)]" />
-        </label>
-        {err && <p role="alert" className="text-sm text-rose-500">{err}</p>}
-        <button disabled={busy || !username || !password} className="w-full rounded-lg bg-[var(--color-accent)] py-2.5 font-medium text-white hover:bg-[var(--color-accent-strong)] disabled:opacity-50">
-          {busy ? 'Signing in…' : 'Sign in'}
-        </button>
+        <div className="overflow-hidden rounded-[12px] bg-[var(--cell)]">
+          <input aria-label="Username" placeholder="Username" autoComplete="username" autoCapitalize="none" autoCorrect="off" value={username} onChange={(e) => setU(e.target.value)} className={`${field} hairline`} />
+          <input aria-label="Password" placeholder="Password" type="password" autoComplete="current-password" value={password} onChange={(e) => setP(e.target.value)} className={field} />
+        </div>
+        {err && <p role="alert" className="t-sub mt-3 text-center text-[var(--red)]">{err}</p>}
+        <Button size="lg" type="submit" className="mt-5 w-full" disabled={busy || !username || !password}>{busy ? 'Signing In…' : 'Sign In'}</Button>
       </form>
     </div>
   );

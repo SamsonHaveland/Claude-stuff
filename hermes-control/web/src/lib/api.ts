@@ -14,6 +14,7 @@ export interface Conversation {
   agentIds: number[];
   readOnly: boolean;
   lastMessageId: number | null;
+  last: { body: string; at: number; authorKind: string; state: string } | null;
 }
 export type AgentStatus = 'online' | 'working' | 'unreachable' | 'not_configured' | 'not_found' | 'integration_disabled';
 export interface Agent {

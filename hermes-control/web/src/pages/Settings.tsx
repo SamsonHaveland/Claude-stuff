@@ -1,88 +1,100 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
+import { disconnectEvents } from '../lib/events';
 import { applyTheme, getTheme, useWs, type Theme } from '../lib/workspace';
-import { PageHeader, useIsMobile } from '../components/Shell';
-import { IconPulse, IconUsers } from '../components/icons';
+import { WorkspaceSwitcher } from '../components/Shell';
+import { Avatar, LargeTitle, Row, Section } from '../components/ui';
 
 interface SystemStatus {
   hermesMode: string;
-  hermesHome: string;
-  profiles: { profile: string; discovered: boolean; keyEnv: string; keyPresent: boolean; baseUrl: string; reachable: boolean | null }[];
-  telegramMirror: { profile: string; enabled: boolean; workspace: string; status: { ok: boolean; at: number; error?: string; sessions?: number } | null }[];
-  openRuns: number;
-  autoUpdate: { result: string; note?: string; version_before?: string; version_after?: string; warnings?: string[]; finished_at?: string } | null;
-  sseClients: number;
+  profiles: { profile: string; discovered: boolean; keyPresent: boolean; reachable: boolean | null }[];
+  telegramMirror: { profile: string; enabled: boolean; workspace: string; status: { ok: boolean; at: number; error?: string } | null }[];
+  autoUpdate: { result: string; note?: string; version_before?: string; version_after?: string; finished_at?: string } | null;
 }
 
 export function SettingsPage() {
-  const { me, ws } = useWs();
-  const mobile = useIsMobile();
+  const { me, ws, agents } = useWs();
+  const nav = useNavigate();
   const [theme, setTheme] = useState<Theme>(getTheme());
   const [sys, setSys] = useState<SystemStatus | null>(null);
+  const [switching, setSwitching] = useState(false);
   useEffect(() => { if (me.user.role === 'admin') api<SystemStatus>('/api/system/status').then(setSys).catch(() => {}); }, [me.user.role]);
+  const signOut = async () => { await api('/api/auth/logout', { method: 'POST' }).catch(() => {}); disconnectEvents(); location.href = '/'; };
+  const connected = (p: string) => sys?.profiles.find((x) => x.profile === p);
+
   return (
-    <div className="flex min-w-0 flex-1 flex-col">
-      <PageHeader title="Settings" />
-      <div className="scroll-thin flex-1 overflow-y-auto p-4 md:p-6">
-        <div className="mx-auto max-w-3xl space-y-6">
-          {mobile && (
-            <section className="grid grid-cols-2 gap-2">
-              <Link to={`/w/${ws.slug}/activity`} className="flex items-center gap-2 rounded-xl border border-[var(--border)] p-3"><IconPulse />Activity</Link>
-              <Link to={`/w/${ws.slug}/agents`} className="flex items-center gap-2 rounded-xl border border-[var(--border)] p-3"><IconUsers />Agents</Link>
-            </section>
-          )}
-          <section>
-            <h2 className="mb-2 font-semibold">Appearance</h2>
-            <div className="inline-flex rounded-lg border border-[var(--border)] p-0.5">
-              {(['system', 'light', 'dark'] as Theme[]).map((t) => <button key={t} onClick={() => { setTheme(t); applyTheme(t); }} className={`rounded-md px-3 py-1.5 text-sm capitalize ${theme === t ? 'bg-[var(--color-accent)] text-white' : ''}`}>{t}</button>)}
-            </div>
-          </section>
-          <section>
-            <h2 className="mb-1 font-semibold">Account</h2>
-            <p className="text-sm text-[var(--muted)]">{me.user.displayName} (@{me.user.username}) · {me.user.role} · {ws.name}: {ws.role}</p>
-          </section>
-          {sys && (
-            <section className="space-y-3">
-              <h2 className="font-semibold">Hermes connection</h2>
-              <p className="text-sm text-[var(--muted)]">Mode: <b>{sys.hermesMode}</b> · Hermes home (read-only discovery): <code>{sys.hermesHome}</code> · open runs: {sys.openRuns} · live clients: {sys.sseClients}</p>
-              <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-[var(--panel)] text-xs text-[var(--muted)]"><tr><th className="px-3 py-2">Profile</th><th className="px-3 py-2">Discovered</th><th className="px-3 py-2">API key env</th><th className="px-3 py-2">Gateway</th><th className="px-3 py-2">URL</th></tr></thead>
-                  <tbody>
-                    {sys.profiles.map((p) => (
-                      <tr key={p.profile} className="border-t border-[var(--border)]">
-                        <td className="px-3 py-2 font-medium">{p.profile}</td>
-                        <td className="px-3 py-2">{p.discovered ? 'yes' : 'no'}</td>
-                        <td className="px-3 py-2"><code className="text-xs">{p.keyEnv}</code> {p.keyPresent ? '✓' : '— missing'}</td>
-                        <td className="px-3 py-2">{p.reachable === null ? '—' : p.reachable ? 'reachable' : 'unreachable'}</td>
-                        <td className="px-3 py-2"><code className="text-xs">{p.baseUrl}</code></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-xs text-[var(--muted)]">Key values are never shown or sent to the browser. Profiles, workspaces and channels are configured in <code>hermes-control.config.yaml</code>; keys in the server's environment.</p>
-              <h3 className="pt-2 font-semibold">Hermes auto-update</h3>
-              {!sys.autoUpdate ? <p className="text-sm text-[var(--muted)]">No result yet. The nightly updater (deploy/hermes-autoupdate.sh) is not installed or has not run.</p> : (
-                <div className={`rounded-lg border p-3 text-sm ${sys.autoUpdate.result === 'failed' ? 'border-rose-500/40 bg-rose-500/10' : sys.autoUpdate.result === 'updated_with_warnings' ? 'border-amber-500/40 bg-amber-500/10' : 'border-[var(--border)]'}`}>
-                  <div><b>{sys.autoUpdate.result.replace(/_/g, ' ')}</b>{sys.autoUpdate.finished_at && <> · {new Date(sys.autoUpdate.finished_at).toLocaleString()}</>}</div>
-                  {sys.autoUpdate.note && <div className="text-[var(--muted)]">{sys.autoUpdate.note}</div>}
-                  {sys.autoUpdate.version_after && <div className="text-xs text-[var(--muted)]">{sys.autoUpdate.version_before === sys.autoUpdate.version_after ? sys.autoUpdate.version_after : `${sys.autoUpdate.version_before} → ${sys.autoUpdate.version_after}`}</div>}
-                  {!!sys.autoUpdate.warnings?.length && <ul className="mt-1 list-disc pl-5 text-xs">{sys.autoUpdate.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>}
-                </div>
-              )}
-              <h3 className="pt-2 font-semibold">Telegram mirror</h3>
-              {!sys.telegramMirror.length && <p className="text-sm text-[var(--muted)]">Not configured.</p>}
-              {sys.telegramMirror.map((t) => (
-                <p key={t.profile + t.workspace} className="text-sm">
-                  <b>{t.profile}</b> → {t.workspace}: {!t.enabled ? 'disabled' : !t.status ? 'not polled yet' : t.status.ok ? `OK · ${t.status.sessions} Telegram session(s) · ${new Date(t.status.at).toLocaleTimeString()}` : <span className="text-rose-500">failing: {t.status.error}</span>}
-                </p>
+    <div className="scroll h-full flex-1 bg-[var(--bg-grouped)]">
+      <LargeTitle title="Settings" />
+      <div className="mx-auto max-w-2xl px-4 pb-12 md:px-8">
+        <Section>
+          <Row>
+            <Avatar name={me.user.displayName} size={56} />
+            <span className="flex flex-col"><span className="t-title">{me.user.displayName}</span><span className="t-foot text-[var(--label-2)]">@{me.user.username}</span></span>
+          </Row>
+        </Section>
+
+        <Section title="Appearance">
+          <div className="p-2">
+            <div className="grid grid-cols-3 rounded-[9px] bg-[var(--fill)] p-0.5">
+              {(['system', 'light', 'dark'] as Theme[]).map((t) => (
+                <button key={t} onClick={() => { setTheme(t); applyTheme(t); }} className={`press rounded-[7px] py-1.5 text-[14px] font-semibold ${theme === t ? 'bg-[var(--cell)] shadow-sm' : 'text-[var(--label-2)]'}`}>{t === 'system' ? 'Automatic' : t === 'light' ? 'Light' : 'Dark'}</button>
               ))}
-            </section>
-          )}
-        </div>
+            </div>
+          </div>
+        </Section>
+
+        <Section title="Workspace">
+          <Row chevron={me.workspaces.length > 1} onClick={me.workspaces.length > 1 ? () => setSwitching(true) : undefined}><span className="flex-1">Current</span><span className="text-[var(--label-2)]">{ws.name}</span></Row>
+          <Row chevron onClick={() => nav(`/w/${ws.slug}/agents`)}><span className="flex-1">Agents</span><span className="text-[var(--label-2)]">{agents.length}</span></Row>
+          <Row chevron onClick={() => nav(`/w/${ws.slug}/activity`)}><span className="flex-1">Activity Log</span></Row>
+        </Section>
+
+        {sys && (
+          <>
+            <Section title="Connection to Hermes" footer={sys.hermesMode === 'live' ? 'Agents marked “Not connected yet” need their access key set up.' : 'Hermes Control isn’t talking to Hermes yet, so messages are saved but not sent.'}>
+              {agents.map((a) => {
+                const c = connected(a.profileName);
+                const label = sys.hermesMode !== 'live' || !c?.keyPresent ? 'Not connected yet' : c.reachable ? 'Connected' : 'Can’t reach';
+                const color = label === 'Connected' ? 'var(--green)' : label === 'Can’t reach' ? 'var(--red)' : 'var(--label-3)';
+                return (
+                  <Row key={a.id}>
+                    <Avatar name={a.displayName} url={a.avatarUrl} size={30} />
+                    <span className="flex-1">{a.displayName}</span>
+                    <span className="t-sub flex items-center gap-1.5 text-[var(--label-2)]"><span className="h-2 w-2 rounded-full" style={{ background: color }} />{label}</span>
+                  </Row>
+                );
+              })}
+            </Section>
+            <Section title="Updates">
+              <Row>
+                <span className="flex flex-1 flex-col">
+                  <span>Hermes auto-update</span>
+                  <span className="t-foot text-[var(--label-2)]">{sys.autoUpdate ? `${sys.autoUpdate.result.replace(/_/g, ' ')}${sys.autoUpdate.finished_at ? ' · ' + new Date(sys.autoUpdate.finished_at).toLocaleString() : ''}` : 'Not set up yet'}</span>
+                  {sys.autoUpdate?.note && <span className="t-cap text-[var(--label-2)]">{sys.autoUpdate.note}</span>}
+                </span>
+                {sys.autoUpdate && <span className="h-2.5 w-2.5 rounded-full" style={{ background: sys.autoUpdate.result === 'failed' ? 'var(--red)' : sys.autoUpdate.result.includes('warning') ? 'var(--orange)' : 'var(--green)' }} />}
+              </Row>
+            </Section>
+            {sys.telegramMirror.length > 0 && (
+              <Section title="Telegram copy">
+                {sys.telegramMirror.map((t) => (
+                  <Row key={t.profile + t.workspace}>
+                    <span className="flex-1">{agents.find((a) => a.profileName === t.profile)?.displayName ?? t.profile}</span>
+                    <span className="t-sub text-[var(--label-2)]">{!t.enabled ? 'Off' : !t.status ? 'Starting…' : t.status.ok ? 'On' : 'Having trouble'}</span>
+                  </Row>
+                ))}
+              </Section>
+            )}
+          </>
+        )}
+
+        <Section>
+          <Row onClick={signOut}><span className="flex-1 text-center text-[var(--red)]">Sign Out</span></Row>
+        </Section>
+        <p className="t-cap text-center text-[var(--label-3)]">Hermes Control · private to you</p>
       </div>
+      {switching && <WorkspaceSwitcher onClose={() => setSwitching(false)} />}
     </div>
   );
 }

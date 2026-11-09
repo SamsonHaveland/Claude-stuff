@@ -61,13 +61,16 @@ export async function registerApi(app: FastifyInstance, ctx: AppContext) {
     const ws = requireWorkspace(req, reply); if (!ws) return;
     const convs = db.prepare(
       `SELECT c.id, c.kind, c.name, c.topic, c.dm_agent_id AS dmAgentId, c.default_agent_id AS defaultAgentId,
-              (SELECT MAX(id) FROM messages m WHERE m.conversation_id = c.id) AS lastMessageId
+              (SELECT MAX(id) FROM messages m WHERE m.conversation_id = c.id) AS lastMessageId,
+              (SELECT json_object('body', substr(m.body, 1, 140), 'at', COALESCE(m.origin_ts, m.created_at), 'authorKind', m.author_kind, 'state', m.state)
+                 FROM messages m WHERE m.conversation_id = c.id AND m.parent_id IS NULL
+                 ORDER BY COALESCE(m.origin_ts, m.created_at) DESC, m.id DESC LIMIT 1) AS lastJson
        FROM conversations c WHERE c.workspace_id = ? AND c.archived = 0
          AND (c.kind <> 'dm' OR c.dm_agent_id IN (SELECT agent_id FROM workspace_agents WHERE workspace_id = c.workspace_id))
        ORDER BY c.kind, c.name`,
     ).all(ws.id) as any[];
     const members = db.prepare('SELECT conversation_id AS c, agent_id AS a FROM conversation_agents ca JOIN conversations c ON c.id = ca.conversation_id WHERE c.workspace_id = ?').all(ws.id) as { c: number; a: number }[];
-    return convs.map((c) => ({ ...c, agentIds: members.filter((m) => m.c === c.id).map((m) => m.a), readOnly: c.kind === 'telegram_mirror' }));
+    return convs.map(({ lastJson, ...c }) => ({ ...c, last: lastJson ? JSON.parse(lastJson) : null, agentIds: members.filter((m) => m.c === c.id).map((m) => m.a), readOnly: c.kind === 'telegram_mirror' }));
   });
 
   app.get('/api/w/:ws/conversations/:id/messages', auth, async (req, reply) => {

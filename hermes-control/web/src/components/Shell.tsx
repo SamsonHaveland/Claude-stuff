@@ -1,9 +1,9 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { useWs } from '../lib/workspace';
+import { convTitle, useWs } from '../lib/workspace';
 import { useConnectionStatus } from '../lib/events';
-import { Avatar } from './Avatar';
-import { IconChat, IconHash, IconLogout, IconPulse, IconSettings, IconShield, IconTasks, IconTelegram, IconUsers } from './icons';
+import type { Conversation } from '../lib/api';
+import { Avatar, AvatarStack, IChat, IGear, IHand, IList, Sheet, timeLabel, Row, Section, ICheck } from './ui';
 
 export function useIsMobile() {
   const q = '(max-width: 767px)';
@@ -17,148 +17,160 @@ export function useIsMobile() {
   return m;
 }
 
-export function Shell({ children, onLogout }: { children: ReactNode; onLogout: () => void }) {
+const TABS = [
+  { to: '', label: 'Chats', Icon: IChat, end: true },
+  { to: 'todos', label: 'To-Dos', Icon: IList },
+  { to: 'needs-you', label: 'Needs You', Icon: IHand },
+  { to: 'settings', label: 'Settings', Icon: IGear },
+];
+
+export function Shell({ children }: { children: ReactNode }) {
   const mobile = useIsMobile();
   const loc = useLocation();
-  const inConversation = /\/c\/\d+/.test(loc.pathname);
+  const fullScreen = /\/(c|agents)\/\d+/.test(loc.pathname);
   if (mobile) {
     return (
-      <div className="flex h-full flex-col">
+      <div className="flex h-full flex-col bg-[var(--bg)]">
         <div className="min-h-0 flex-1">{children}</div>
-        {!inConversation && <MobileTabs />}
+        {!fullScreen && <TabBar />}
       </div>
     );
   }
   return (
     <div className="flex h-full">
-      <Sidebar onLogout={onLogout} />
-      <main className="flex min-w-0 flex-1">{children}</main>
+      <Sidebar />
+      <main className="flex min-w-0 flex-1 bg-[var(--bg)]">{children}</main>
     </div>
   );
 }
 
-export function Sidebar({ onLogout, mobile = false }: { onLogout?: () => void; mobile?: boolean }) {
-  const { me, ws, conversations, agentById, unread, pendingApprovals } = useWs();
-  const nav = useNavigate();
-  const conn = useConnectionStatus();
-  const channels = conversations.filter((c) => c.kind === 'channel');
-  const dms = conversations.filter((c) => c.kind === 'dm');
-  const mirrors = conversations.filter((c) => c.kind === 'telegram_mirror');
-  const base = `/w/${ws.slug}`;
-  const item = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-2.5 rounded-md px-2.5 ${mobile ? 'py-2.5 text-[15px]' : 'py-1.5 text-sm'} transition-colors ${isActive ? 'bg-[var(--sidebar-active)] text-white' : 'text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover)]'}`;
-
-  return (
-    <aside className={`${mobile ? 'w-full' : 'w-64 shrink-0'} flex h-full flex-col bg-[var(--sidebar)] text-[var(--sidebar-text)] safe-top`}>
-      <div className="flex items-center gap-2 border-b border-white/5 px-3 py-3">
-        <select
-          aria-label="Workspace"
-          value={ws.slug}
-          onChange={(e) => nav(`/w/${e.target.value}`)}
-          className="min-w-0 flex-1 truncate rounded-md bg-transparent px-1 py-1 text-[15px] font-semibold text-white outline-none hover:bg-[var(--sidebar-hover)]"
-        >
-          {me.workspaces.map((w) => <option key={w.slug} value={w.slug} className="text-black">{w.name}</option>)}
-        </select>
-        <span title={`Live updates: ${conn}`} className={`h-2 w-2 rounded-full ${conn === 'open' ? 'bg-emerald-400' : conn === 'connecting' ? 'bg-amber-400' : 'bg-rose-500'}`} />
-      </div>
-      {me.hermesMode !== 'live' && (
-        <div className="mx-3 mt-3 rounded-md bg-amber-500/15 px-2.5 py-2 text-xs text-amber-200">Hermes integration is disabled. Messages are stored but not delivered to agents.</div>
-      )}
-      <nav className="scroll-thin flex-1 space-y-5 overflow-y-auto px-2 py-3">
-        {!mobile && (
-          <div className="space-y-0.5">
-            <NavLink to={`${base}/agents`} className={item}><IconUsers className="h-4 w-4" />Agents</NavLink>
-            <NavLink to={`${base}/tasks`} className={item}><IconTasks className="h-4 w-4" />Tasks</NavLink>
-            <NavLink to={`${base}/approvals`} className={item}>
-              <IconShield className="h-4 w-4" />Approvals
-              {pendingApprovals > 0 && <span className="ml-auto rounded-full bg-rose-500 px-1.5 text-[11px] font-semibold text-white">{pendingApprovals}</span>}
-            </NavLink>
-            <NavLink to={`${base}/activity`} className={item}><IconPulse className="h-4 w-4" />Activity</NavLink>
-          </div>
-        )}
-        <Section title="Channels">
-          {channels.map((c) => (
-            <NavLink key={c.id} to={`${base}/c/${c.id}`} className={item}>
-              <IconHash className="h-4 w-4 opacity-70" />
-              <span className={`truncate ${unread[c.id] ? 'font-semibold text-white' : ''}`}>{c.name}</span>
-            </NavLink>
-          ))}
-          {!channels.length && <Empty>No channels configured</Empty>}
-        </Section>
-        <Section title="Direct messages">
-          {dms.map((c) => {
-            const a = agentById(c.dmAgentId);
-            return (
-              <NavLink key={c.id} to={`${base}/c/${c.id}`} className={item}>
-                <Avatar name={a?.displayName ?? c.name} url={a?.avatarUrl} size={mobile ? 28 : 22} status={a?.status} />
-                <span className={`truncate ${unread[c.id] ? 'font-semibold text-white' : ''}`}>{a?.displayName ?? c.name}</span>
-                {a?.role && !mobile && <span className="ml-auto truncate text-[11px] text-[var(--sidebar-muted)]">{a.role}</span>}
-              </NavLink>
-            );
-          })}
-          {!dms.length && <Empty>No agents allowed in this workspace</Empty>}
-        </Section>
-        {mirrors.length > 0 && (
-          <Section title="Telegram (read-only)">
-            {mirrors.map((c) => {
-              const a = agentById(c.dmAgentId);
-              return (
-                <NavLink key={c.id} to={`${base}/c/${c.id}`} className={item}>
-                  <IconTelegram className="h-4 w-4 opacity-80" />
-                  <span className={`truncate ${unread[c.id] ? 'font-semibold text-white' : ''}`}>{a?.displayName ?? c.name} · Telegram</span>
-                </NavLink>
-              );
-            })}
-          </Section>
-        )}
-      </nav>
-      <div className="flex items-center gap-2 border-t border-white/5 px-3 py-2.5">
-        <Avatar name={me.user.displayName} size={28} />
-        <div className="min-w-0 flex-1 truncate text-sm">{me.user.displayName}</div>
-        <NavLink to={`${base}/settings`} aria-label="Settings" className="rounded p-1.5 hover:bg-[var(--sidebar-hover)]"><IconSettings className="h-4 w-4" /></NavLink>
-        {onLogout && <button aria-label="Sign out" onClick={onLogout} className="rounded p-1.5 hover:bg-[var(--sidebar-hover)]"><IconLogout className="h-4 w-4" /></button>}
-      </div>
-    </aside>
-  );
+function Badge({ n }: { n: number }) {
+  return n > 0 ? <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--red)] px-1 text-[11px] font-semibold text-white">{n}</span> : null;
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function TabBar() {
+  const { ws, pendingApprovals, unread } = useWs();
+  const unreadCount = Object.values(unread).filter(Boolean).length;
   return (
-    <div>
-      <div className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-[var(--sidebar-muted)] uppercase">{title}</div>
-      <div className="space-y-0.5">{children}</div>
-    </div>
-  );
-}
-const Empty = ({ children }: { children: ReactNode }) => <div className="px-2.5 py-1 text-xs text-[var(--sidebar-muted)]">{children}</div>;
-
-function MobileTabs() {
-  const { ws, pendingApprovals } = useWs();
-  const base = `/w/${ws.slug}`;
-  const tab = ({ isActive }: { isActive: boolean }) => `relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] ${isActive ? 'text-[var(--color-accent)]' : 'text-[var(--muted)]'}`;
-  return (
-    <nav className="safe-bottom flex border-t border-[var(--border)] bg-[var(--panel)]">
-      <NavLink end to={base} className={tab}><IconChat />Chats</NavLink>
-      <NavLink to={`${base}/agents`} className={tab}><IconUsers />Agents</NavLink>
-      <NavLink to={`${base}/tasks`} className={tab}><IconTasks />Tasks</NavLink>
-      <NavLink to={`${base}/approvals`} className={tab}>
-        <IconShield />Approvals
-        {pendingApprovals > 0 && <span className="absolute top-1 right-[28%] rounded-full bg-rose-500 px-1 text-[10px] text-white">{pendingApprovals}</span>}
-      </NavLink>
-      <NavLink to={`${base}/settings`} className={tab}><IconSettings />More</NavLink>
+    <nav className="material-bar safe-bottom flex border-t-[0.5px] border-[var(--separator)]">
+      {TABS.map(({ to, label, Icon, end }) => (
+        <NavLink key={label} end={end} to={`/w/${ws.slug}${to ? '/' + to : ''}`} className={({ isActive }) => `press relative flex flex-1 flex-col items-center gap-0.5 pt-2 pb-1.5 text-[10.5px] font-medium ${isActive ? 'text-[var(--blue)]' : 'text-[var(--label-2)]'}`}>
+          <Icon size={26} />
+          {label}
+          <span className="absolute top-1 left-1/2 ml-2">{label === 'Needs You' ? <Badge n={pendingApprovals} /> : label === 'Chats' ? <Badge n={unreadCount} /> : null}</span>
+        </NavLink>
+      ))}
     </nav>
   );
 }
 
-/** Standard page header used by non-conversation pages. */
-export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {
+function Sidebar() {
+  const { ws, me, pendingApprovals } = useWs();
+  const conn = useConnectionStatus();
+  const [switcher, setSwitcher] = useState(false);
   return (
-    <header className="safe-top flex items-center gap-3 border-b border-[var(--border)] bg-[var(--bg)] px-4 py-3 md:px-6">
-      <div className="min-w-0 flex-1">
-        <h1 className="truncate text-lg font-semibold">{title}</h1>
-        {subtitle && <p className="truncate text-sm text-[var(--muted)]">{subtitle}</p>}
+    <aside className="material-sidebar flex w-[340px] shrink-0 flex-col border-r-[0.5px] border-[var(--separator)]">
+      <div className="flex items-center gap-2 px-4 pt-4 pb-2">
+        <button onClick={() => me.workspaces.length > 1 && setSwitcher(true)} className="press flex min-w-0 items-center gap-1.5 rounded-lg px-1 py-1 text-left">
+          <span className="t-headline truncate">{ws.name}</span>
+          {me.workspaces.length > 1 && <span className="text-[var(--label-2)]">⌄</span>}
+        </button>
+        <span className="ml-auto flex items-center gap-1.5 text-[12px] text-[var(--label-2)]" title={conn === 'open' ? 'Live updates on' : 'Reconnecting…'}>
+          <span className="h-2 w-2 rounded-full" style={{ background: conn === 'open' ? 'var(--green)' : 'var(--orange)' }} />
+          {conn === 'open' ? 'Live' : 'Connecting…'}
+        </span>
       </div>
-      {actions}
-    </header>
+      <nav className="grid grid-cols-4 gap-1 px-3 pb-3">
+        {TABS.map(({ to, label, Icon, end }) => (
+          <NavLink key={label} end={end} to={`/w/${ws.slug}${to ? '/' + to : ''}`} className={({ isActive }) => `press relative flex flex-col items-center gap-1 rounded-[12px] py-2 text-[11.5px] font-medium ${isActive ? 'bg-[var(--cell)] text-[var(--blue)] shadow-sm' : 'text-[var(--label-2)] hover:bg-[var(--fill)]'}`}>
+            <Icon size={22} />
+            {label}
+            {label === 'Needs You' && pendingApprovals > 0 && <span className="absolute top-1 right-2"><Badge n={pendingApprovals} /></span>}
+          </NavLink>
+        ))}
+      </nav>
+      <div className="scroll min-h-0 flex-1 px-2 pb-3"><ChatList compact /></div>
+      {switcher && <WorkspaceSwitcher onClose={() => setSwitcher(false)} />}
+    </aside>
+  );
+}
+
+export function WorkspaceSwitcher({ onClose }: { onClose: () => void }) {
+  const { me, ws } = useWs();
+  const nav = useNavigate();
+  return (
+    <Sheet title="Switch Workspace" onClose={onClose}>
+      <Section footer="Each workspace keeps its own chats, files and to-dos separate.">
+        {me.workspaces.map((w) => (
+          <Row key={w.slug} onClick={() => { onClose(); nav(`/w/${w.slug}`); }}>
+            <span className="flex-1">{w.name}</span>
+            {w.slug === ws.slug && <ICheck size={20} className="text-[var(--blue)]" />}
+          </Row>
+        ))}
+      </Section>
+    </Sheet>
+  );
+}
+
+/** The Messages-style list of conversations. */
+export function ChatList({ compact = false }: { compact?: boolean }) {
+  const { ws, conversations, agentById, unread, pendingApprovals } = useWs();
+  const loc = useLocation();
+  const [q, setQ] = useState('');
+  const name = (id: number | null) => agentById(id)?.displayName;
+  const rows = useMemo(() => {
+    const list = conversations.filter((c) => c.kind !== 'dm' || agentById(c.dmAgentId));
+    const filtered = q ? list.filter((c) => convTitle(c, name).toLowerCase().includes(q.toLowerCase())) : list;
+    return [...filtered].sort((a, b) => (b.last?.at ?? 0) - (a.last?.at ?? 0) || (a.kind === 'channel' ? -1 : 1) - (b.kind === 'channel' ? -1 : 1) || convTitle(a, name).localeCompare(convTitle(b, name)));
+  }, [conversations, q, agentById]);
+
+  return (
+    <div>
+      <div className={compact ? 'px-2 pb-2' : 'px-4 pb-2 md:px-8'}>
+        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" aria-label="Search chats" className="h-9 w-full rounded-[10px] bg-[var(--fill)] px-3 text-[16px] outline-none placeholder:text-[var(--label-2)]" />
+      </div>
+      {pendingApprovals > 0 && (
+        <NavLink to={`/w/${ws.slug}/needs-you`} className={`press mb-2 flex items-center gap-3 rounded-[14px] bg-[color-mix(in_srgb,var(--orange)_16%,transparent)] px-4 py-3 ${compact ? 'mx-2' : 'mx-4 md:mx-8'}`}>
+          <IHand size={24} className="text-[var(--orange)]" />
+          <span className="t-sub flex-1 font-semibold">{pendingApprovals === 1 ? '1 thing needs your OK' : `${pendingApprovals} things need your OK`}</span>
+          <span className="text-[var(--label-3)]">›</span>
+        </NavLink>
+      )}
+      <ul className={compact ? '' : 'md:px-4'}>
+        {rows.map((c) => <ChatRow key={c.id} c={c} active={loc.pathname.endsWith(`/c/${c.id}`)} unread={!!unread[c.id]} compact={compact} />)}
+      </ul>
+      {!rows.length && <p className="t-sub px-6 py-10 text-center text-[var(--label-2)]">{q ? 'No matches.' : 'No chats yet.'}</p>}
+    </div>
+  );
+}
+
+function preview(c: Conversation) {
+  if (!c.last) return c.kind === 'channel' ? `${c.agentIds.length} agents` : c.kind === 'telegram_mirror' ? 'Read-only copy of the Telegram chat' : 'Say hello';
+  if (c.last.state === 'pending' || c.last.state === 'streaming') return 'Typing…';
+  if (c.last.state === 'failed') return 'Didn’t get a reply';
+  return (c.last.authorKind === 'user' ? 'You: ' : '') + c.last.body.replace(/\s+/g, ' ');
+}
+
+function ChatRow({ c, active, unread, compact }: { c: Conversation; active: boolean; unread: boolean; compact: boolean }) {
+  const { ws, agentById } = useWs();
+  const nav = useNavigate();
+  const a = agentById(c.dmAgentId);
+  const title = convTitle(c, (id) => agentById(id)?.displayName);
+  const people = c.agentIds.map((id) => agentById(id)).filter(Boolean).map((x) => ({ name: x!.displayName, url: x!.avatarUrl }));
+  const size = compact ? 46 : 54;
+  return (
+    <li>
+      <button onClick={() => nav(`/w/${ws.slug}/c/${c.id}`)} className={`press flex w-full items-center gap-3 rounded-[12px] px-2 text-left ${active ? 'bg-[var(--blue)] text-white' : 'hover:bg-[var(--fill)]'}`}>
+        <span className="flex w-2.5 justify-center">{unread && !active && <span className="h-2.5 w-2.5 rounded-full bg-[var(--blue)]" />}</span>
+        <span className="py-2">{c.kind === 'channel' ? <AvatarStack people={people} size={size} /> : <Avatar name={a?.displayName ?? title} url={a?.avatarUrl} size={size} status={c.kind === 'dm' ? a?.status : undefined} />}</span>
+        <span className={`flex min-w-0 flex-1 flex-col self-stretch justify-center py-2.5 pr-2 ${active ? '' : 'hairline'}`}>
+          <span className="flex items-baseline gap-2">
+            <span className={`t-headline truncate ${unread && !active ? 'font-bold' : ''}`}>{title}</span>
+            <span className={`t-foot ml-auto shrink-0 ${active ? 'text-white/80' : 'text-[var(--label-2)]'}`}>{c.last ? timeLabel(c.last.at) : ''}</span>
+          </span>
+          <span className={`t-sub line-clamp-2 ${active ? 'text-white/85' : 'text-[var(--label-2)]'}`}>{preview(c)}</span>
+        </span>
+      </button>
+    </li>
   );
 }

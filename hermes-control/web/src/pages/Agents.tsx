@@ -1,113 +1,88 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { api, type Agent } from '../lib/api';
 import { useWs } from '../lib/workspace';
-import { Avatar, STATUS_META } from '../components/Avatar';
-import { PageHeader } from '../components/Shell';
-import { StatusPill } from './Conversation';
-import { IconBack, IconChat } from '../components/icons';
+import { useIsMobile } from '../components/Shell';
+import { Avatar, Button, IBack, IChat, LargeTitle, Row, Section, Sheet, STATUS, timeLabel } from '../components/ui';
 
 export function AgentsPage() {
   const { ws, agents } = useWs();
+  const nav = useNavigate();
   return (
-    <div className="flex min-w-0 flex-1 flex-col">
-      <PageHeader title="Agents" subtitle={`${agents.length} Hermes profiles allowed in ${ws.name}`} />
-      <div className="scroll-thin flex-1 overflow-y-auto p-4 md:p-6">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="scroll h-full flex-1 bg-[var(--bg-grouped)]">
+      <LargeTitle title="Agents" leading={<button onClick={() => nav(`/w/${ws.slug}/settings`)} className="press flex items-center text-[17px] text-[var(--blue)]"><IBack size={24} />Settings</button>} />
+      <div className="mx-auto max-w-2xl px-4 pb-10 md:px-8">
+        <Section footer="Names and photos only change how agents look here. They never change the agent in Hermes.">
           {agents.map((a) => (
-            <Link key={a.id} to={`/w/${ws.slug}/agents/${a.id}`} className="flex gap-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4 transition hover:border-[var(--color-accent)]/50 hover:shadow-sm">
-              <Avatar name={a.displayName} url={a.avatarUrl} size={56} status={a.status} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-baseline gap-2"><span className="truncate font-semibold">{a.displayName}</span><span className="truncate text-xs text-[var(--muted)]">@{a.profileName}</span></div>
-                <div className="truncate text-sm text-[var(--muted)]">{a.role ?? 'No role set'}</div>
-                <div className="mt-2"><StatusPill agent={a} /></div>
-              </div>
-            </Link>
+            <Row key={a.id} chevron onClick={() => nav(`/w/${ws.slug}/agents/${a.id}`)}>
+              <Avatar name={a.displayName} url={a.avatarUrl} size={44} status={a.status} />
+              <span className="flex flex-col"><span>{a.displayName}</span><span className="t-foot text-[var(--label-2)]">{a.role ?? STATUS[a.status].label}</span></span>
+            </Row>
           ))}
-        </div>
-        {!agents.length && <p className="text-[var(--muted)]">No agents are allowed in this workspace. An admin configures this in <code>hermes-control.config.yaml</code>.</p>}
-        <p className="mt-6 max-w-2xl text-xs text-[var(--muted)]">
-          Profiles are discovered read-only from the Hermes installation. Status comes only from real telemetry: the gateway's health endpoint and runs in progress here. Portraits and display names are presentation only; messages are always routed by the Hermes profile id shown after “@”.
-        </p>
+        </Section>
       </div>
     </div>
   );
 }
 
 interface AgentDetail extends Agent {
-  recentRuns: { id: number; status: string; error: string | null; created_at: number; updated_at: number; last_event: string | null; conversation: string; kind: string }[];
+  recentRuns: { id: number; status: string; error: string | null; created_at: number; conversation: string; kind: string }[];
   capabilities: { features?: Record<string, boolean> } | null;
 }
+const RUN_WORD: Record<string, string> = { completed: 'Replied', failed: 'Didn’t reply', cancelled: 'Stopped', running: 'Working', waiting_for_approval: 'Asked you first', interrupted: 'Interrupted', unknown: 'Unknown' };
 
 export function AgentProfilePage() {
   const { agentId } = useParams();
   const { ws, me, conversations, refresh } = useWs();
   const nav = useNavigate();
+  const mobile = useIsMobile();
   const [a, setA] = useState<AgentDetail | null>(null);
   const [err, setErr] = useState('');
   const [edit, setEdit] = useState(false);
   const load = () => api<AgentDetail>(`/api/w/${ws.slug}/agents/${agentId}`).then(setA).catch((e) => setErr(e.message));
   useEffect(() => { void load(); }, [agentId, ws.slug]);
-  if (err) return <div className="p-6 text-[var(--muted)]">{err}</div>;
-  if (!a) return <div className="p-6 text-[var(--muted)]">Loading…</div>;
-  const dm = conversations.find((c) => c.kind === 'dm' && c.dmAgentId === a.id);
-  const admin = me.user.role === 'admin';
+  const dm = a && conversations.find((c) => c.kind === 'dm' && c.dmAgentId === a.id);
+  const s = a ? STATUS[a.status] : null;
+
   return (
-    <div className="flex min-w-0 flex-1 flex-col">
-      <header className="safe-top flex items-center gap-2 border-b border-[var(--border)] px-3 py-3 md:px-6">
-        <button aria-label="Back" onClick={() => nav(`/w/${ws.slug}/agents`)} className="rounded p-1.5 hover:bg-[var(--hover)]"><IconBack /></button>
-        <h1 className="font-semibold">Agent profile</h1>
+    <div className="scroll h-full flex-1 bg-[var(--bg-grouped)]">
+      <header className="material-bar safe-top sticky top-0 z-20 flex items-center justify-between px-2 py-1.5">
+        <button onClick={() => (history.length > 1 ? nav(-1) : nav(`/w/${ws.slug}`))} className="press flex h-11 items-center text-[17px] text-[var(--blue)]"><IBack size={26} />Back</button>
+        {me.user.role === 'admin' && a && <button onClick={() => setEdit(true)} className="press h-11 px-3 text-[17px] text-[var(--blue)]">Edit</button>}
       </header>
-      <div className="scroll-thin flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl p-4 md:p-8">
-          <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-start sm:text-left">
-            <Avatar name={a.displayName} url={a.avatarUrl} size={120} status={a.status} />
-            <div className="min-w-0 flex-1">
-              <h2 className="text-2xl font-semibold">{a.displayName}</h2>
-              <p className="text-[var(--muted)]">{a.role ?? 'No role set'}</p>
-              <p className="mt-1 text-xs text-[var(--muted)]">Hermes profile: <code>{a.profileName}</code>{!a.discovered && ' · not found in the Hermes installation'}</p>
-              <div className="mt-3 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                <StatusPill agent={a} />
-                {dm && <Link to={`/w/${ws.slug}/c/${dm.id}`} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-sm font-medium text-white"><IconChat className="h-4 w-4" />Message</Link>}
-                {admin && <button onClick={() => setEdit((e) => !e)} className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--hover)]">{edit ? 'Close editor' : 'Edit profile'}</button>}
-              </div>
-            </div>
+      {err && <p className="p-6 text-center text-[var(--label-2)]">{err}</p>}
+      {a && s && (
+        <div className="mx-auto max-w-xl px-4 pb-12">
+          <div className="flex flex-col items-center pt-2 pb-6 text-center">
+            <Avatar name={a.displayName} url={a.avatarUrl} size={mobile ? 120 : 140} />
+            <h1 className="t-large mt-3">{a.displayName}</h1>
+            {a.role && <p className="t-sub text-[var(--label-2)]">{a.role}</p>}
+            <p className="t-foot mt-2 flex items-center gap-1.5" title={s.hint}>
+              <span className="h-2 w-2 rounded-full" style={{ background: s.color ?? 'var(--label-3)' }} />{s.label}{a.activeRuns > 0 ? ` · ${a.activeRuns} in progress` : ''}
+            </p>
+            {dm && <Button size="lg" className="mt-5 w-56" onClick={() => nav(`/w/${ws.slug}/c/${dm.id}`)}><IChat size={20} />Message</Button>}
           </div>
-          <p className="mt-2 text-xs text-[var(--muted)]">{STATUS_META[a.status].hint}.</p>
-          {edit && <AgentEditor agent={a} onSaved={() => { setEdit(false); void load(); refresh(); }} />}
-          {a.description && <section className="mt-6"><h3 className="mb-1 text-sm font-semibold">About</h3><p className="text-sm whitespace-pre-wrap text-[var(--muted)]">{a.description}</p></section>}
-          <section className="mt-6">
-            <h3 className="mb-2 text-sm font-semibold">Capabilities</h3>
-            {a.capabilities?.features ? (
-              <div className="flex flex-wrap gap-1.5">{Object.entries(a.capabilities.features).filter(([, v]) => v).map(([k]) => <span key={k} className="rounded-full bg-[var(--hover)] px-2 py-0.5 text-xs">{k.replace(/_/g, ' ')}</span>)}</div>
-            ) : <p className="text-sm text-[var(--muted)]">Reported by Hermes (<code>/v1/capabilities</code>) when the profile is online.</p>}
-          </section>
-          <section className="mt-6">
-            <h3 className="mb-2 text-sm font-semibold">Recent activity in {ws.name}</h3>
-            {!a.recentRuns.length && <p className="text-sm text-[var(--muted)]">No runs from Hermes Control yet.</p>}
-            <ul className="divide-y divide-[var(--border)] rounded-lg border border-[var(--border)]">
-              {a.recentRuns.map((r) => (
-                <li key={r.id} className="flex items-center gap-3 px-3 py-2 text-sm">
-                  <RunBadge status={r.status} />
-                  <span className="truncate">{r.kind === 'dm' ? 'Direct message' : `#${r.conversation}`}</span>
-                  {r.error && <span className="truncate text-xs text-rose-500">{r.error}</span>}
-                  <span className="ml-auto shrink-0 text-xs text-[var(--muted)]">{new Date(r.created_at).toLocaleString()}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
+          {(a.description) && <Section title="About"><p className="t-sub px-4 py-3 whitespace-pre-wrap">{a.description}</p></Section>}
+          <Section title="Recent" footer={`Only conversations started in Hermes Control are shown.`}>
+            {a.recentRuns.length ? a.recentRuns.slice(0, 8).map((r) => (
+              <Row key={r.id}>
+                <span className="flex flex-1 flex-col"><span className="t-sub">{RUN_WORD[r.status] ?? r.status}</span><span className="t-cap text-[var(--label-2)]">{r.kind === 'dm' ? 'Direct chat' : `#${r.conversation}`}</span></span>
+                <span className="t-foot text-[var(--label-2)]">{timeLabel(r.created_at)}</span>
+              </Row>
+            )) : <Row><span className="text-[var(--label-2)]">Nothing yet</span></Row>}
+          </Section>
+          <Section title="Technical" footer={s.hint}>
+            <Row><span className="flex-1">Hermes profile</span><code className="t-foot text-[var(--label-2)]">{a.profileName}</code></Row>
+            <Row><span className="flex-1">Found in Hermes</span><span className="text-[var(--label-2)]">{a.discovered ? 'Yes' : 'No'}</span></Row>
+          </Section>
         </div>
-      </div>
+      )}
+      {edit && a && <EditAgent agent={a} onClose={() => setEdit(false)} onSaved={() => { setEdit(false); void load(); refresh(); }} />}
     </div>
   );
 }
 
-export function RunBadge({ status }: { status: string }) {
-  const c: Record<string, string> = { completed: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300', failed: 'bg-rose-500/15 text-rose-600 dark:text-rose-300', running: 'bg-amber-500/15 text-amber-700 dark:text-amber-300', waiting_for_approval: 'bg-violet-500/15 text-violet-600 dark:text-violet-300', unknown: 'bg-zinc-500/15 text-zinc-500' };
-  return <span className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium ${c[status] ?? 'bg-zinc-500/15 text-zinc-500'}`}>{status.replace(/_/g, ' ')}</span>;
-}
-
-function AgentEditor({ agent, onSaved }: { agent: Agent; onSaved: () => void }) {
+function EditAgent({ agent, onClose, onSaved }: { agent: Agent; onClose: () => void; onSaved: () => void }) {
   const [displayName, setName] = useState(agent.displayName);
   const [role, setRole] = useState(agent.role ?? '');
   const [description, setDesc] = useState(agent.description ?? '');
@@ -119,16 +94,22 @@ function AgentEditor({ agent, onSaved }: { agent: Agent; onSaved: () => void }) 
     const fd = new FormData(); fd.append('file', f);
     try { await api(`/api/agents/${agent.id}/avatar`, { method: 'POST', body: fd }); onSaved(); } catch (e) { setMsg((e as Error).message); }
   };
-  const input = 'w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm outline-none focus:border-[var(--color-accent)]';
+  const field = 'h-12 w-full bg-transparent px-4 outline-none';
   return (
-    <div className="mt-5 space-y-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4">
-      <p className="text-xs text-[var(--muted)]">These fields change how the agent looks in Hermes Control only. They never modify the Hermes profile, its SOUL.md or its routing id.</p>
-      <label className="block text-sm"><span className="mb-1 block font-medium">Display name</span><input className={input} value={displayName} onChange={(e) => setName(e.target.value)} /></label>
-      <label className="block text-sm"><span className="mb-1 block font-medium">Role</span><input className={input} value={role} onChange={(e) => setRole(e.target.value)} /></label>
-      <label className="block text-sm"><span className="mb-1 block font-medium">Description</span><textarea rows={3} className={input} value={description} onChange={(e) => setDesc(e.target.value)} /></label>
-      <label className="block text-sm"><span className="mb-1 block font-medium">Portrait (JPEG, PNG or WebP; square works best)</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); }} className="text-sm" /></label>
-      {msg && <p className="text-sm text-rose-500">{msg}</p>}
-      <button onClick={save} className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white">Save</button>
-    </div>
+    <Sheet title="Edit Profile" onClose={onClose} actions={<Button size="lg" className="w-full" onClick={save}>Save</Button>}>
+      <div className="mb-5 flex flex-col items-center">
+        <Avatar name={displayName || agent.displayName} url={agent.avatarUrl} size={96} />
+        <label className="press t-sub mt-2 cursor-pointer font-semibold text-[var(--blue)]">
+          Change Photo
+          <input type="file" hidden accept="image/jpeg,image/png,image/webp" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); }} />
+        </label>
+      </div>
+      <Section title="Name"><input className={field} value={displayName} onChange={(e) => setName(e.target.value)} /></Section>
+      <Section title="Job"><input className={field} value={role} onChange={(e) => setRole(e.target.value)} placeholder="e.g. Chief of Staff" /></Section>
+      <Section title="About" footer="This only changes how the agent looks here, not how it behaves in Hermes.">
+        <textarea rows={3} className="w-full resize-none bg-transparent px-4 py-3 outline-none" value={description} onChange={(e) => setDesc(e.target.value)} />
+      </Section>
+      {msg && <p className="t-sub text-[var(--red)]">{msg}</p>}
+    </Sheet>
   );
 }

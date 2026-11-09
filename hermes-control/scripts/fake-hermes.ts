@@ -24,6 +24,7 @@ const fake = new FakeHermes({
     f.finish(run, 'completed', text);
   },
 });
+fake.runIdPrefix = `run_${Date.now().toString(36)}_`;
 await fake.start(Number(process.env.HC_FAKE_PORT ?? 18642));
 const port = new URL(fake.url).port;
 fake.addTelegram('tg-demo', [{ role: 'user', content: '[FAKE HERMES] Morning Jeff, what is on today?' }, { role: 'assistant', content: '[FAKE HERMES] Two calls and the budget review.' }]);

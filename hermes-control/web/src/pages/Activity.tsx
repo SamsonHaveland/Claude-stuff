@@ -1,41 +1,43 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useServerEvents } from '../lib/events';
 import { useWs } from '../lib/workspace';
-import { PageHeader } from '../components/Shell';
-import { Avatar } from '../components/Avatar';
+import { Avatar, EmptyState, IBack, IClock, LargeTitle, Row, Section, timeLabel } from '../components/ui';
 
-interface Row { seq?: number; event: string; created_at: number; runId: number; agent: string; agentId: number; conversation: string; kind: string; tool: string | null; preview: string | null; error: unknown }
+interface Ev { event: string; created_at: number; agent: string; agentId: number; conversation: string; kind: string; tool: string | null; error: unknown }
+const WORD: Record<string, string> = {
+  'run.started': 'started working', 'run.queued': 'is queued', 'run.completed': 'finished', 'run.failed': 'ran into a problem', 'run.cancelled': 'was stopped',
+  'tool.started': 'is using', 'tool.completed': 'used', 'tool.failed': 'couldn’t use', 'approval.request': 'asked for your OK', 'approval.responded': 'got your answer',
+  'subagent.start': 'asked a helper', 'subagent.complete': 'heard back from a helper',
+};
 
 export function ActivityPage() {
   const { ws, agentById } = useWs();
-  const [rows, setRows] = useState<Row[]>([]);
-  const load = () => api<Row[]>(`/api/w/${ws.slug}/activity`).then(setRows).catch(() => {});
+  const nav = useNavigate();
+  const [rows, setRows] = useState<Ev[] | null>(null);
+  const load = () => api<Ev[]>(`/api/w/${ws.slug}/activity`).then(setRows).catch(() => setRows([]));
   useEffect(() => { void load(); }, [ws.slug]);
   useServerEvents((e) => { if (e.type === 'activity' || e.type === 'reconnected') void load(); });
   return (
-    <div className="flex min-w-0 flex-1 flex-col">
-      <PageHeader title="Activity" subtitle="Run and tool events reported by Hermes for runs started here" />
-      <div className="scroll-thin flex-1 overflow-y-auto p-4 md:p-6">
-        <ol className="mx-auto max-w-3xl space-y-1">
-          {!rows.length && <p className="text-sm text-[var(--muted)]">No activity yet.</p>}
-          {rows.map((r, i) => {
-            const a = agentById(r.agentId);
-            return (
-              <li key={i} className="flex items-start gap-3 rounded-lg px-2 py-2 hover:bg-[var(--hover)]">
-                <Avatar name={r.agent} url={a?.avatarUrl} size={28} />
-                <div className="min-w-0 flex-1 text-sm">
-                  <span className="font-medium">{r.agent}</span> <span className="text-[var(--muted)]">{r.event}</span>
-                  {r.tool && <> · <code className="text-xs">{r.tool}</code></>}
-                  {r.error ? <span className="text-rose-500"> · error</span> : null}
-                  <span className="text-[var(--muted)]"> in {r.kind === 'dm' ? 'DM' : `#${r.conversation}`}</span>
-                  {r.preview && <div className="truncate text-xs text-[var(--muted)]">{r.preview}</div>}
-                </div>
-                <time className="shrink-0 text-xs text-[var(--muted)]">{new Date(r.created_at).toLocaleTimeString()}</time>
-              </li>
-            );
-          })}
-        </ol>
+    <div className="scroll h-full flex-1 bg-[var(--bg-grouped)]">
+      <LargeTitle title="Activity Log" subtitle="What your agents did, as reported by Hermes." leading={<button onClick={() => nav(`/w/${ws.slug}/settings`)} className="press flex items-center text-[17px] text-[var(--blue)]"><IBack size={24} />Settings</button>} />
+      <div className="mx-auto max-w-2xl px-4 pb-10 md:px-8">
+        {rows && !rows.length && <EmptyState icon={<IClock size={56} />} title="Nothing yet" body="Activity appears once you start chatting with your agents." />}
+        {!!rows?.length && (
+          <Section>
+            {rows.map((r, i) => (
+              <Row key={i}>
+                <Avatar name={r.agent} url={agentById(r.agentId)?.avatarUrl} size={30} />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="t-sub truncate"><b>{r.agent}</b> {WORD[r.event] ?? r.event}{r.tool ? <> <code className="t-foot">{r.tool}</code></> : null}{r.error ? <span className="text-[var(--red)]"> (error)</span> : null}</span>
+                  <span className="t-cap text-[var(--label-2)]">{r.kind === 'dm' ? 'Direct chat' : `#${r.conversation}`}</span>
+                </span>
+                <span className="t-foot text-[var(--label-2)]">{timeLabel(r.created_at)}</span>
+              </Row>
+            ))}
+          </Section>
+        )}
       </div>
     </div>
   );

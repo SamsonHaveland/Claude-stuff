@@ -33,6 +33,8 @@ export class FakeHermes {
   runCreates = 0;
   dropStreamAfter: number | null = null;
   approvalStatus = 200;
+  /** Tests expect run_1, run_2…; the dev stand-in uses a random prefix so restarts never reuse ids. */
+  runIdPrefix = 'run_';
   url = '';
   private server = createServer((req, res) => void this.handle(req, res));
   private seq = 0;
@@ -118,7 +120,7 @@ export class FakeHermes {
         return this.json(res, 409, { error: { message: 'session owned by another surface', code: 'permission_denied' } });
       }
       this.runCreates++;
-      const run: FakeRun = { id: `run_${this.runs.size + 1}`, sessionId: b.session_id, input: b.input, events: [], status: 'running', subscribers: new Set() };
+      const run: FakeRun = { id: this.runIdPrefix + (this.runs.size + 1), sessionId: b.session_id, input: b.input, events: [], status: 'running', subscribers: new Set() };
       this.runs.set(run.id, run);
       if (key) this.idem.set(key, run.id);
       this.json(res, 202, { run_id: run.id, status: 'started' });
