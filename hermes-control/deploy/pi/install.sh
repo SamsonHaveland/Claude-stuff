@@ -102,8 +102,11 @@ if ! "$NODE_BIN" --disable-warning=ExperimentalWarning -e '
   const db=new DatabaseSync(process.argv[1]);
   process.exit(db.prepare("SELECT COUNT(*) n FROM users").get().n>0?0:1)' "$BASE/data/hermes-control.db" 2>/dev/null; then
   say "Create your admin login"
+  DEFAULT_USER="$(id -un)"
+  read -rp "Username for signing in [$DEFAULT_USER]: " HC_USER; HC_USER="${HC_USER:-$DEFAULT_USER}"
   echo "Choose a password (12+ characters). It is hashed; never stored in plain text."
-  ( cd "$BASE/app" && HC_CONFIG="$BASE/config.yaml" "$NODE_BIN" --disable-warning=ExperimentalWarning server/dist/cli/create-user.js samson "Samson" admin "*:owner" )
+  ( cd "$BASE/app" && HC_CONFIG="$BASE/config.yaml" "$NODE_BIN" --disable-warning=ExperimentalWarning server/dist/cli/create-user.js "$HC_USER" "$HC_USER" admin "*:owner" )
+  echo "Sign in as: $HC_USER"
 fi
 
 IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
