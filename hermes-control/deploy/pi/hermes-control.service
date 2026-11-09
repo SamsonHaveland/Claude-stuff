@@ -1,0 +1,22 @@
+# Per-user systemd unit (same model as Hermes' own hermes-gateway.service on the Pi).
+# Installed by deploy/pi/install.sh, which fills in @NODE@ and @BASE@.
+[Unit]
+Description=Hermes Control (private agent communication platform)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=@BASE@/app
+Environment=NODE_ENV=production
+Environment=HC_CONFIG=@BASE@/config.yaml
+EnvironmentFile=-@BASE@/.env
+ExecStart=@NODE@ --disable-warning=ExperimentalWarning server/dist/index.js
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+MemoryMax=512M
+
+[Install]
+WantedBy=default.target
