@@ -2,7 +2,24 @@
 
 Nothing in this document has been run.
 
-## 1. Decide what the Pi is actually running (blocking question)
+## 0. Decision (2026-11-09): Home Assistant will be removed from the Pi
+
+The owner decided to remove Home Assistant. The Pi will be reflashed with a general-purpose 64-bit Linux and dedicated to Hermes and Hermes Control. Removing Home Assistant OS **is** an OS reinstall: the SD card or SSD is erased.
+
+### Before wiping (owner's checklist)
+1. In Home Assistant, go to **Settings → System → Backups**, create a full backup and **download it off the Pi**. Without it, the setup can't be restored.
+2. Write down what currently depends on HA: automations, lights and sensors, Zigbee/Z-Wave/Thread USB dongles, and any HA add-ons in use (e.g. Tailscale, Mosquitto). All of it stops when HA is removed.
+3. If you reach the Pi remotely through an HA add-on, set up another way in first (local keyboard and screen work fine on a Pi 500).
+
+### Recommended target OS
+**Raspberry Pi OS Lite (64-bit)**, flashed with Raspberry Pi Imager. In Imager's settings, set the hostname, your user, SSH (key-based) and Wi-Fi.
+- It is Debian-based, with glibc and systemd, which matches Hermes's stated Linux requirements. It also has the best Pi 500 hardware support.
+- Alternative: Ubuntu Server 24.04 LTS (arm64). Upstream says it tests Hermes on Ubuntu, so this is the closest match to that.
+- Put the data on a USB 3 SSD rather than the SD card. SQLite in WAL mode writes often, which wears SD cards.
+
+The rest of this document assumes Raspberry Pi OS Lite 64-bit. §1 is kept for reference.
+
+## 1. Decide what the Pi is actually running (superseded by §0)
 
 | If the Pi runs… | Can it host Hermes and Hermes Control? |
 |---|---|
