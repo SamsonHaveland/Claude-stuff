@@ -189,8 +189,6 @@ describe('approvals', () => {
     const { headers } = await login(app2.app, 'sam');
     const c = convId(app2.db, 'film-lv', 'dm', 'dm-jeff');
     await app2.app.inject({ method: 'POST', url: `/api/w/film-lv/conversations/${c}/messages`, headers, payload: { body: 'clean up' } });
-    const pending = await waitFor(async () => null as any, 1).catch(() => null);
-    void pending;
     const ap = await waitFor(() => app2.db.prepare(`SELECT * FROM approvals WHERE status = 'pending'`).get() as any);
     expect(ap.command).toBe('rm -rf build');
     const list = (await app2.app.inject({ url: '/api/w/film-lv/approvals', headers })).json();

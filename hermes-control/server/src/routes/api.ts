@@ -77,9 +77,10 @@ export async function registerApi(app: FastifyInstance, ctx: AppContext) {
     if (!conv) return reply.code(404).send({ error: 'not_found' });
     const q = z.object({ before: z.coerce.number().optional(), limit: z.coerce.number().min(1).max(200).default(80), thread: z.coerce.number().optional() }).parse(req.query);
     const rows = db.prepare(
-      `SELECT * FROM messages WHERE conversation_id = ? AND workspace_id = ? AND (? IS NULL OR id < ?)
-         AND ((? IS NULL AND parent_id IS NULL) OR parent_id = ? OR id = ?)
-       ORDER BY COALESCE(origin_ts, created_at) DESC, id DESC LIMIT ?`,
+      `SELECT m.*, r.id AS run_id, r.status AS run_status FROM messages m LEFT JOIN runs r ON r.reply_message_id = m.id
+       WHERE m.conversation_id = ? AND m.workspace_id = ? AND (? IS NULL OR m.id < ?)
+         AND ((? IS NULL AND m.parent_id IS NULL) OR m.parent_id = ? OR m.id = ?)
+       ORDER BY COALESCE(m.origin_ts, m.created_at) DESC, m.id DESC LIMIT ?`,
     ).all(conv.id, ws.id, q.before ?? null, q.before ?? null, q.thread ?? null, q.thread ?? null, q.thread ?? null, q.limit) as any[];
     const ids = rows.map((r) => r.id);
     const atts = ids.length ? db.prepare(`SELECT id, message_id, filename, mime, size FROM attachments WHERE workspace_id = ? AND message_id IN (${ids.map(() => '?').join(',')})`).all(ws.id, ...ids) as any[] : [];
@@ -116,7 +117,7 @@ export async function registerApi(app: FastifyInstance, ctx: AppContext) {
     const members = (db.prepare('SELECT a.id, a.profile_name AS profileName, a.display_name AS displayName FROM agents a JOIN conversation_agents ca ON ca.agent_id = a.id WHERE ca.conversation_id = ?').all(conv.id) as unknown as RoutableAgent[]).filter((a) => allowed.has(a.id));
     const targets = resolveTargets(body.body, { kind: conv.kind, dmAgentId: conv.dm_agent_id, defaultAgentId: conv.default_agent_id }, members);
     if (attachmentNote) db.prepare('UPDATE messages SET body = body || ? WHERE id = ?').run(attachmentNote, msgId);
-    const runIds = targets.map((t) => runs.enqueue({ workspaceId: ws.id, conversationId: conv.id, requestMessageId: msgId, agentId: t.id, label: t.displayName }));
+    const runIds = targets.map((t) => runs.enqueue({ workspaceId: ws.id, conversationId: conv.id, requestMessageId: msgId, agentId: t.id, label: t.displayName, parentId: body.parentId ?? null }));
     audit(db, { userId: req.user!.id, workspaceId: ws.id, action: 'message.send', target: `conversation:${conv.id}`, detail: { messageId: msgId, routedTo: targets.map((t) => t.profileName) } });
     return { messageId: msgId, routedTo: targets.map((t) => ({ agentId: t.id, profile: t.profileName })), runIds };
   });

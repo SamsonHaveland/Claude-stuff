@@ -49,12 +49,12 @@ export class RunService {
   }
 
   /** Create the pending reply + run rows and start delivery in the background. */
-  enqueue(opts: { workspaceId: number; conversationId: number; requestMessageId: number; agentId: number; label: string }): number {
+  enqueue(opts: { workspaceId: number; conversationId: number; requestMessageId: number; agentId: number; label: string; parentId?: number | null }): number {
     const t = this.now();
     const reply = this.db.prepare(
       `INSERT INTO messages (conversation_id, workspace_id, parent_id, author_kind, author_agent_id, author_label, body, state, source, created_at, updated_at)
-       VALUES (?, ?, NULL, 'agent', ?, ?, '', 'pending', 'hermes_run', ?, ?)`,
-    ).run(opts.conversationId, opts.workspaceId, opts.agentId, opts.label, t, t);
+       VALUES (?, ?, ?, 'agent', ?, ?, '', 'pending', 'hermes_run', ?, ?)`,
+    ).run(opts.conversationId, opts.workspaceId, opts.parentId ?? null, opts.agentId, opts.label, t, t);
     const replyId = Number(reply.lastInsertRowid);
     const key = `hc-${opts.requestMessageId}-${opts.agentId}-${randomBytes(12).toString('hex')}`;
     const run = this.db.prepare(
@@ -221,7 +221,7 @@ export class RunService {
   }
 
   publishMessage(messageId: number) {
-    const m = this.db.prepare('SELECT * FROM messages WHERE id = ?').get(messageId) as any;
+    const m = this.db.prepare('SELECT m.*, r.id AS run_id, r.status AS run_status FROM messages m LEFT JOIN runs r ON r.reply_message_id = m.id WHERE m.id = ?').get(messageId) as any;
     if (m) this.bus.publish({ type: 'message.upsert', workspaceId: m.workspace_id, conversationId: m.conversation_id, payload: m });
   }
 
