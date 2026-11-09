@@ -48,7 +48,10 @@
   color-scheme: dark;
 }
 
-html, body, #root { height: 100%; }
+html, body { height: 100%; }
+/* dvh tracks Safari's moving toolbars so the message box is never hidden behind them. */
+#root { height: 100vh; height: 100dvh; }
+body { overscroll-behavior: none; }
 body {
   margin: 0;
   background: var(--bg);
@@ -123,3 +126,30 @@ button:focus-visible, a:focus-visible, [role="tab"]:focus-visible, summary:focus
 @media (prefers-contrast: more) {
   :root { --separator: rgba(60, 60, 67, 0.5); --label-2: rgba(60, 60, 67, 0.85); }
 }
+
+/* Markdown inside agent bubbles: compact, message-sized typography. */
+.md { white-space: normal; }
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+.md p { margin: 0.35em 0; }
+.md h1, .md h2, .md h3, .md h4 { font-size: 1em; font-weight: 700; letter-spacing: -0.01em; margin: 0.7em 0 0.25em; line-height: 1.3; }
+.md h1 { font-size: 1.12em; }
+.md ul, .md ol { margin: 0.35em 0; padding-left: 1.35em; }
+.md ul { list-style: disc; }
+.md ol { list-style: decimal; }
+.md li { margin: 0.15em 0; }
+.md li > p { margin: 0; }
+.md li:has(> .md-check) { list-style: none; margin-left: -1.2em; }
+.md-check { margin-right: 0.35em; }
+.md a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; word-break: break-word; }
+.md strong { font-weight: 650; }
+.md blockquote { margin: 0.4em 0; padding-left: 0.75em; border-left: 3px solid var(--label-3); color: var(--label-2); }
+.md hr { border: 0; border-top: 1px solid var(--separator); margin: 0.7em 0; }
+.md code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.86em; background: rgba(127, 127, 127, 0.18); padding: 0.05em 0.3em; border-radius: 5px; }
+.md pre { background: rgba(127, 127, 127, 0.16); padding: 0.6rem 0.75rem; border-radius: 10px; overflow-x: auto; margin: 0.45em 0; white-space: pre; }
+.md pre code { background: none; padding: 0; font-size: 0.84em; }
+.md-table { overflow-x: auto; margin: 0.45em 0; }
+.md table { border-collapse: collapse; font-size: 0.92em; }
+.md th, .md td { border: 1px solid var(--separator); padding: 0.3em 0.55em; text-align: left; vertical-align: top; overflow-wrap: normal; word-break: normal; min-width: 4.5em; }
+.md-table { max-width: 100%; -webkit-overflow-scrolling: touch; }
+.md th { font-weight: 600; background: rgba(127, 127, 127, 0.08); }

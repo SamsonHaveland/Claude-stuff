@@ -24,7 +24,26 @@ const fake = new FakeHermes({
     f.emit(run, 'tool.started', { tool: 'read_file', preview: 'notes.md' });
     await sleep(300);
     f.emit(run, 'tool.completed', { tool: 'read_file', duration: 0.3, error: false });
-    const text = `[FAKE HERMES] Received: "${run.input}". This is a test double, not a real agent reply.`;
+    const text = /hostile/i.test(run.input)
+      ? '[FAKE HERMES] <img src=x onerror="document.title=\'pwned\'"> <script>document.title="pwned"</script> [click me](javascript:document.title="pwned") **bold still works**'
+      : `[FAKE HERMES] **Here's today**, based on what you asked: "${run.input}"
+
+## Priorities
+1. **Budget review** with Debra, 10:00
+2. Send the *FilmLV* deck to Roxy
+3. Follow up on 3 unanswered emails
+
+| Item | Owner | Status |
+|---|---|---|
+| Budget v4 | Debra | Waiting |
+| Deck | Roxy | In progress |
+
+- [x] Calendar checked
+- [ ] Confirm call time
+
+Run \`hermes kanban list\` to see tasks, or read [the docs](https://hermes-agent.nousresearch.com).
+
+> This is a test double, not a real agent reply.`;
     for (const w of text.split(/(?<= )/)) { f.emit(run, 'message.delta', { delta: w }); await sleep(40); }
     f.finish(run, 'completed', text);
   },

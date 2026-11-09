@@ -19,6 +19,8 @@
   - Visual style: system font, iOS colours, translucent bars and grouped lists. Reduced motion, reduced transparency and higher contrast are respected.
 
 ### Fixed
+- **Agent replies now render Markdown**: headings, bold, lists, tables, checklists, code and links. It's done safely: no raw HTML, only http(s) and mailto links, and remote images appear as links. Chat-list previews show plain text.
+- The iPhone toolbar no longer covers the message box (dynamic viewport height), and tables scroll sideways instead of breaking words.
 - The "Live" indicator could stay on "Connecting…" after a page reload even though updates were connected.
 - Base CSS was overriding utility colours on buttons and inputs.
 - The message box now starts fresh for each chat.

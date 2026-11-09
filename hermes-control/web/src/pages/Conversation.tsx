@@ -4,6 +4,7 @@ import { api, ts, type Agent, type Attachment, type Conversation, type Message }
 import { useServerEvents } from '../lib/events';
 import { convTitle, useWs } from '../lib/workspace';
 import { useIsMobile } from '../components/Shell';
+import { Markdown } from '../components/Markdown';
 import { Avatar, AvatarStack, Button, EmptyState, IBack, IClip, IInfo, IPlus, IRetry, IUp, IX, Row, Section, Sheet, STATUS } from '../components/ui';
 
 type Msg = Message & { run_id?: number | null; run_status?: string | null };
@@ -148,7 +149,7 @@ function Bubble({ m, mine, first, last, group, wsSlug, onThread }: { m: Msg; min
           </div>
         ) : (
           <div className={`bubble px-3.5 py-2 text-[17px] leading-[1.3] ${mine ? 'bg-[var(--bubble-me)] text-white' : 'bg-[var(--bubble-them)]'} ${radius}`}>
-            {renderBody(m.body)}
+            {mine ? renderBody(m.body) : <Markdown text={m.body} />}
             {m.state === 'streaming' && <span className="ml-0.5 inline-block h-4 w-[3px] animate-pulse rounded bg-current align-middle opacity-60" />}
           </div>
         )}

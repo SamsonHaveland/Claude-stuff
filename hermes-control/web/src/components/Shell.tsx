@@ -148,7 +148,7 @@ function preview(c: Conversation) {
   if (!c.last) return c.kind === 'channel' ? `${c.agentIds.length} agents` : c.kind === 'telegram_mirror' ? 'Read-only copy of the Telegram chat' : 'Say hello';
   if (c.last.state === 'pending' || c.last.state === 'streaming') return 'Typing…';
   if (c.last.state === 'failed') return 'Didn’t get a reply';
-  return (c.last.authorKind === 'user' ? 'You: ' : '') + c.last.body.replace(/\s+/g, ' ');
+  return (c.last.authorKind === 'user' ? 'You: ' : '') + plainText(c.last.body);
 }
 
 function ChatRow({ c, active, unread, compact }: { c: Conversation; active: boolean; unread: boolean; compact: boolean }) {
@@ -173,4 +173,19 @@ function ChatRow({ c, active, unread, compact }: { c: Conversation; active: bool
       </button>
     </li>
   );
+}
+
+/** Markdown -> plain one-line preview, like Messages shows. */
+export function plainText(md: string) {
+  return md
+    .replace(/```[\s\S]*?```/g, ' [code] ')
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/MEDIA:\S+/g, '[image]')
+    .replace(/^\s{0,3}(#{1,6}|>|[-*+]\s+\[[ xX]\]|[-*+]|\d+[.)])\s+/gm, '')
+    .replace(/^\s*\|?(\s*:?-{2,}:?\s*\|)+\s*:?-*:?\s*$/gm, '')
+    .replace(/\|/g, ' ')
+    .replace(/(\*\*|__|\*|_|~~|`)(?=\S)([^\n]*?\S)\1/g, '$2')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
