@@ -68,7 +68,7 @@ To check without changing anything: in HA, open **Settings → About**. The "Ins
 
 1. Confirm the Pi's OS type (§1).
 2. Install Node and Hermes on the target. Leave the Mac's Hermes running.
-3. Copy Hermes profiles with `hermes profile export` (it strips credentials by design), then re-enter the secrets on the Pi.
+3. Use the documented full-machine path (Hermes FAQ, "Exporting Hermes to another machine", verified at v0.23.0): `hermes backup` on the Mac, then `hermes import <zip>` on the Pi with its gateway stopped. The backup *includes* `.env` and `auth.json`. It excludes browser profiles, symlinks, and any vault key held in the macOS Keychain (check with `hermes vault key`). `hermes profile export` is for sharing a single profile and strips credentials, so don't use it for this migration.
 4. **Telegram cut-over.** Only one poller per bot token is allowed. Stop the Mac gateway, then start the Pi gateway. A brief gap in Telegram is unavoidable; announce it.
 5. Point Hermes Control on the Pi at the Pi's gateway, verify end to end, then decommission the Mac services.
 

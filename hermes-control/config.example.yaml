@@ -13,12 +13,12 @@ hermes:
   multiplex: true        # named profiles at /p/<profile>/ (Hermes default)
   cliPath: hermes        # for `hermes kanban ... --json`
   profiles:              # optional presentation overrides; keys are Hermes profile ids
-    jeff:  { role: Chief of Staff / Orchestrator }
-    harry: { role: Research }
-    roxy:  { role: Creative Director }
+    # Profile ids below are examples: use the ids `hermes profile list` shows on the Pi.
+    jeff:  { role: Chief of Staff }
+    hayes: { role: CEO / Strategy }
+    roxy:  { role: Design & Creative Director }
     debra: { role: Production Accounting }
-    lena:  { role: Social Media }
-    scout: { role: Outreach }
+    marty: { role: Line Producer }
 
 telegramMirror:
   - { profile: jeff, enabled: false, pollSeconds: 5, workspace: general }
@@ -30,16 +30,16 @@ workspaces:
     channels:
       - { name: general, agents: ['*'], defaultAgent: jeff }
       - { name: production, agents: [jeff, debra, roxy] }
-      - { name: research, agents: [jeff, harry] }
+      - { name: strategy, agents: [jeff, hayes] }
   - slug: film-lv
     name: FilmLV
     kanbanTenant: filmlv
-    agents: [jeff, debra, roxy, lena]
+    agents: [jeff, hayes, debra, roxy, marty]
     channels:
       - { name: film-lv, agents: ['*'], defaultAgent: jeff }
   - slug: atomic-fox
     name: Atomic Fox
     kanbanTenant: atomicfox
-    agents: [jeff, harry, lena, scout]
+    agents: [jeff, hayes, debra, roxy]
     channels:
       - { name: atomic-fox, agents: ['*'], defaultAgent: jeff }
