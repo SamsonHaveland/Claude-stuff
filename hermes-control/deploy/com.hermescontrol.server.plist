@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- OPTIONAL macOS LaunchAgent for running Hermes Control on login. NOT INSTALLED.
+     Edit paths, then: launchctl load ~/Library/LaunchAgents/com.hermescontrol.server.plist
+     Keys are read from ~/hermes-control/.env by scripts/start.sh (never put them here). -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.hermescontrol.server</string>
+  <key>ProgramArguments</key>
+  <array><string>/bin/bash</string><string>/Users/samsonhaveland/hermes-control/scripts/start.sh</string></array>
+  <key>WorkingDirectory</key><string>/Users/samsonhaveland/hermes-control</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/Users/samsonhaveland/hermes-control/data/server.log</string>
+  <key>StandardErrorPath</key><string>/Users/samsonhaveland/hermes-control/data/server.log</string>
+</dict>
+</plist>
