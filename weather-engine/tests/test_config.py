@@ -23,3 +23,12 @@ def test_env_overrides(monkeypatch, tmp_path):
     s = load_settings()
     assert s.data_dir == Path(tmp_path)
     assert s.log_level == "DEBUG"
+
+
+def test_models_and_db_path(monkeypatch, tmp_path):
+    monkeypatch.setenv("WE_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("WE_MODELS", "gfs_seamless, icon_seamless")
+    monkeypatch.delenv("WE_DB_PATH", raising=False)
+    s = load_settings()
+    assert s.models == ("gfs_seamless", "icon_seamless")
+    assert s.db_path == tmp_path / "weather.db"

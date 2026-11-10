@@ -1,0 +1,10 @@
+# Forecast points. `station` is the ASOS station used as ground truth
+# (Iowa Environmental Mesonet); pick one close to the point you care about.
+# Example only: replace or add your own locations.
+
+[[location]]
+id = "nyc"
+name = "New York (Central Park)"
+latitude = 40.7789
+longitude = -73.9692
+station = "KNYC"
