@@ -410,6 +410,7 @@ export async function registerApi(app: FastifyInstance, ctx: AppContext) {
       hermesMode: cfg.hermes.mode, hermesHome: cfg.hermes.home, profiles,
       telegramMirror: cfg.telegramMirror.map((t) => ({ ...t, twoWay: t.enabled && ctx.mirror.twoWay(t.profile), status: ctx.mirror.lastStatus.get(`${t.profile}@${t.workspace}`) ?? null, lastCopy: ctx.mirror.lastCopy.get(t.profile) ?? null })),
       autoUpdate: readAutoUpdate(cfg.autoUpdate.statusFile),
+      taskFeed: ctx.taskFeed.lastStatus,
       openRuns: (db.prepare(`SELECT COUNT(*) n FROM runs WHERE status NOT IN ('completed','failed','cancelled','interrupted')`).get() as any).n,
       sseClients: bus.size,
     };

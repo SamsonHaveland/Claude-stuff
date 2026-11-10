@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- **Task work shows in the agents' chats.** When an agent gets a card on the task board, starts it, finishes it or gets stuck, a line appears in that agent's one-to-one chat. The finished result (or the blocking reason) is also posted into the chat of the agent that asked for it, so "Jeff, ask Harry…" comes back to Jeff's chat. Cards that existed before this version are not announced. A business's cards only appear in that business's workspace.
 - **Start Fresh.** One-to-one chats have a button that starts the agent on a new Hermes conversation. History stays visible, a "New conversation" divider marks the break, and the agent keeps its long-term memory. Hermes never starts a new conversation by itself, and measurements on the Pi showed one two-day chat costing about 15–20 cents a message. The app flags long chats (30 turns or 60,000 characters) with a banner. Start Fresh is refused while a reply is still running.
 - **Live progress on replies.** While an agent works, the bubble shows what it is doing ("Running a command", "Searching", "Asking a teammate") and a running clock. It says "taking a while" after two minutes, and "Waiting for your OK" with a link when the reply is blocked on an approval.
 - **Listen.** Agent replies have a read-aloud button that uses the device's built-in voice.

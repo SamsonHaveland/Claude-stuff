@@ -16,6 +16,7 @@ app.log.info({ hermesMode: cfg.hermes.mode, profiles: discovered.map((p) => p.id
 const resumed = ctx.runs.resumeOpenRuns();
 if (resumed) app.log.info({ resumed }, 'resuming unfinished Hermes runs');
 if (cfg.hermes.mode === 'live') ctx.mirror.start(cfg.telegramMirror.filter((t) => t.enabled));
+if (cfg.hermes.mode === 'live') ctx.taskFeed.start(30); // Kanban work shown in the agents' chats
 
 await app.listen({ host: cfg.server.host, port: cfg.server.port });
 

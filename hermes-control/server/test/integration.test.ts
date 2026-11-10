@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FakeHermes, sleep } from './fakeHermes.js';
-import { convId, login, makeApp, waitFor } from './helpers.js';
+import { convId, login, makeApp, testConfig, waitFor } from './helpers.js';
 import { RunService } from '../src/services/runs.js';
 
 let fake: FakeHermes;
@@ -245,6 +245,54 @@ describe('approvals', () => {
     const { headers } = await login(env.app, 'fox');
     const r = await env.app.inject({ method: 'POST', url: '/api/w/atomic-fox/approvals/1/decision', headers, payload: { choice: 'once' } });
     expect(r.statusCode).toBe(403);
+  });
+});
+
+describe('task feed (Kanban work shown in chats)', () => {
+  it('announces new work in the assignee chat, returns results to the asker, never repeats, never crosses businesses', async () => {
+    let tasks: any[] = [{ id: 'old1', title: 'Old finished card', assignee: 'debra', status: 'done', tenant: 'filmlv', result: 'old result' }];
+    const detail: Record<string, any> = {};
+    const cfg = testConfig(fake.url, { workspaces: [
+      { slug: 'film-lv', name: 'FilmLV', kanbanTenant: 'filmlv', agents: ['jeff', 'debra', 'roxy'], channels: [] },
+      { slug: 'atomic-fox', name: 'Atomic Fox', kanbanTenant: 'atomicfox', agents: ['jeff', 'harry'], channels: [] },
+    ] });
+    const app2 = await makeApp({ cfg, key: 'secret-key', kanbanRunner: async (_f, args) => (args.includes('list') ? JSON.stringify(tasks) : JSON.stringify(detail[args[args.length - 1]] ?? { task: {}, comments: [], events: [], runs: [] })) });
+    const feed = app2.ctx.taskFeed;
+    const bodies = (ws: string, name: string) => (app2.db.prepare(`SELECT m.body FROM messages m WHERE m.conversation_id = ? AND m.source = 'kanban' ORDER BY m.id`).all(convId(app2.db, ws, 'dm', name)) as any[]).map((r) => r.body);
+
+    expect(await feed.pollOnce()).toBe(0); // first run: existing cards recorded, not announced
+    expect(bodies('film-lv', 'dm-debra')).toEqual([]);
+
+    tasks = [...tasks, { id: 't1', title: 'Three trending film topics', body: 'With sources', assignee: 'debra', status: 'ready', tenant: 'filmlv', created_by: 'jeff' }];
+    expect(await feed.pollOnce()).toBe(1);
+    expect(bodies('film-lv', 'dm-debra')[0]).toContain('New task from Jeff:** Three trending film topics');
+    expect(await feed.pollOnce()).toBe(0); // unchanged: nothing repeated
+
+    tasks[1] = { ...tasks[1], status: 'running' };
+    expect(await feed.pollOnce()).toBe(1);
+    tasks[1] = { ...tasks[1], status: 'done' };
+    detail.t1 = { task: { ...tasks[1], result: null }, comments: [], events: [], runs: [{ summary: '1. Topic A (https://a.example)' }] };
+    expect(await feed.pollOnce()).toBe(2); // Debra's chat + back to Jeff, who asked
+    expect(bodies('film-lv', 'dm-debra').map((b) => b.split(':**')[0])).toEqual(['📋 **New task from Jeff', '⏳ **Working on', '✅ **Finished']);
+    expect(bodies('film-lv', 'dm-debra')[2]).toContain('Topic A');
+    expect(bodies('film-lv', 'dm-jeff')).toEqual([expect.stringContaining('Debra finished:** Three trending film topics')]);
+
+    // Another business's card stays in that business; an unknown tenant or a non-member assignee is ignored.
+    tasks = [...tasks,
+      { id: 't2', title: 'Fox research', assignee: 'harry', status: 'blocked', tenant: 'atomicfox', last_failure_error: 'needs login' },
+      { id: 't3', title: 'Stray', assignee: 'harry', status: 'ready', tenant: 'filmlv' },   // harry is not in FilmLV
+      { id: 't4', title: 'Nowhere', assignee: 'jeff', status: 'ready', tenant: 'somewhere-else' }];
+    expect(await feed.pollOnce()).toBe(1);
+    expect(bodies('atomic-fox', 'dm-harry')).toEqual([expect.stringContaining('Stuck on:** Fox research')]);
+    expect(bodies('atomic-fox', 'dm-harry')[0]).toContain('needs login');
+    expect(bodies('film-lv', 'dm-jeff')).toHaveLength(1);
+    expect((app2.db.prepare(`SELECT COUNT(*) n FROM messages WHERE source = 'kanban'`).get() as any).n).toBe(5);
+
+    // A CLI failure is recorded, not thrown.
+    const broken = await makeApp({ cfg: testConfig(fake.url), key: 'secret-key', kanbanRunner: async () => { throw new Error('hermes not found'); } });
+    expect(await broken.ctx.taskFeed.pollOnce()).toBe(0);
+    expect(broken.ctx.taskFeed.lastStatus).toMatchObject({ ok: false });
+    await broken.app.close(); await app2.app.close();
   });
 });
 

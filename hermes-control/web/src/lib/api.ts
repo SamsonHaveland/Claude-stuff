@@ -45,7 +45,7 @@ export interface Message {
   body: string;
   state: 'pending' | 'streaming' | 'final' | 'failed' | 'cancelled';
   error: string | null;
-  source: 'hc' | 'hermes_run' | 'telegram_mirror';
+  source: 'hc' | 'hermes_run' | 'telegram_mirror' | 'kanban';
   origin_ts: number | null;
   created_at: number;
   attachments?: Attachment[];

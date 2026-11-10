@@ -12,6 +12,7 @@ import { KanbanAdapter } from './hermes/kanban.js';
 import { EventBus } from './services/bus.js';
 import { RunService } from './services/runs.js';
 import { TelegramMirror, cliSender } from './services/telegramMirror.js';
+import { TaskFeed } from './services/taskFeed.js';
 import { newToken, sha256, verifyPassword } from './lib/auth.js';
 import { audit } from './lib/audit.js';
 import { registerApi } from './routes/api.js';
@@ -51,6 +52,7 @@ export interface AppContext {
   bus: EventBus;
   runs: RunService;
   mirror: TelegramMirror;
+  taskFeed: TaskFeed;
   uploadsDir: string;
   avatarsDir: string;
 }
@@ -73,7 +75,8 @@ export async function buildApp(deps: AppDeps): Promise<{ app: FastifyInstance; c
   const avatarsDir = join(cfg.dataDir, 'avatars');
   mkdirSync(uploadsDir, { recursive: true });
   mkdirSync(avatarsDir, { recursive: true });
-  const ctx: AppContext = { cfg, db, hermes, kanban, bus, runs, mirror, uploadsDir, avatarsDir };
+  const taskFeed = new TaskFeed(db, cfg, kanban, bus, log);
+  const ctx: AppContext = { cfg, db, hermes, kanban, bus, runs, mirror, taskFeed, uploadsDir, avatarsDir };
 
   await app.register(cookie);
   await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024, files: 1 } });
@@ -161,6 +164,7 @@ export async function buildApp(deps: AppDeps): Promise<{ app: FastifyInstance; c
 
   app.addHook('onClose', async () => {
     mirror.stop();
+    taskFeed.stop();
     runs.stopAll();
   });
 

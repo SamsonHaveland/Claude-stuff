@@ -260,6 +260,7 @@ function Bubble({ m, mine, first, last, group, wsSlug, onThread, doing }: { m: M
         {m.state === 'cancelled' && <span className="t-cap mt-1 ml-3 text-[var(--label-2)]">Stopped</span>}
         {m.state === 'failed' && m.body && <span className="t-cap mt-1 ml-3 text-[var(--red)]">Didn’t finish. {m.run_id && <button onClick={retry} className="font-semibold text-[var(--blue)]">Try Again</button>}</span>}
         {m.source === 'telegram_mirror' && last && <span className="t-cap mt-0.5 px-2 text-[var(--label-2)]">via Telegram</span>}
+        {m.source === 'kanban' && last && <Link to={`/w/${wsSlug}/todos`} className="t-cap mt-0.5 px-2 text-[var(--label-2)]">from the task board ›</Link>}
         {!!m.replyCount && onThread && <button onClick={() => onThread(m)} className="press t-foot mt-1 px-2 font-semibold text-[var(--blue)]">{m.replyCount} {m.replyCount === 1 ? 'Reply' : 'Replies'}</button>}
       </div>
     </div>
