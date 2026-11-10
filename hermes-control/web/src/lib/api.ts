@@ -13,6 +13,8 @@ export interface Conversation {
   defaultAgentId: number | null;
   agentIds: number[];
   readOnly: boolean;
+  /** Long one-to-one chat: slower and costlier, so the app offers a fresh start. */
+  long?: boolean;
   /** Telegram copy that also sends what you type here to Telegram. */
   twoWay?: boolean;
   lastMessageId: number | null;

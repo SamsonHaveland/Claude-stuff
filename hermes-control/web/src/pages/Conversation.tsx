@@ -3,11 +3,26 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, ts, type Agent, type Attachment, type Conversation, type Message } from '../lib/api';
 import { useServerEvents } from '../lib/events';
 import { convTitle, useWs } from '../lib/workspace';
-import { useIsMobile } from '../components/Shell';
+import { plainText, useIsMobile } from '../components/Shell';
 import { Markdown } from '../components/Markdown';
-import { Avatar, AvatarStack, Button, EmptyState, IBack, IClip, IInfo, IPlus, IRetry, IUp, IX, Row, Section, Sheet, STATUS } from '../components/ui';
+import { Avatar, AvatarStack, Button, EmptyState, IBack, IClip, ICompose, IInfo, IMic, IPlus, IRetry, ISpeaker, IStop, IUp, IX, Row, Section, Sheet, STATUS } from '../components/ui';
 
 type Msg = Message & { run_id?: number | null; run_status?: string | null };
+/** Latest thing each running reply is doing, keyed by run id (from live activity events). */
+type Activity = Record<number, { tool: string | null; event: string }>;
+
+const TOOL_WORDS: [RegExp, string][] = [
+  [/^terminal|execute_code|process/, 'Running a command'], [/web_search|search/, 'Searching'], [/web_extract|browser|fetch/, 'Reading a web page'],
+  [/read_file|skill_view|session_search/, 'Reading'], [/write_file|patch|edit/, 'Writing a file'], [/^kanban/, 'Updating the task board'],
+  [/delegate|subagent/, 'Asking a teammate'], [/memory/, 'Updating memory'], [/image|vision/, 'Working on an image'], [/^mcp/, 'Using a connected service'],
+];
+function activityWords(a?: { tool: string | null; event: string }) {
+  if (!a) return 'Thinking';
+  if (a.event.startsWith('subagent')) return 'Asking a teammate';
+  if (!a.tool || a.event === 'tool.completed') return 'Thinking';
+  return TOOL_WORDS.find(([re]) => re.test(a.tool!))?.[1] ?? 'Working';
+}
+const clock = (ms: number) => { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
 export function ConversationPage() {
   const { convId } = useParams();
@@ -20,6 +35,8 @@ export function ConversationPage() {
   const [loaded, setLoaded] = useState(false);
   const [thread, setThread] = useState<Msg | null>(null);
   const [info, setInfo] = useState(false);
+  const [fresh, setFresh] = useState(false);
+  const [activity, setActivity] = useState<Activity>({});
 
   const load = useCallback(() => {
     api<Msg[]>(`/api/w/${ws.slug}/conversations/${id}/messages`).then((m) => { setMessages(m); setLoaded(true); }).catch(() => setLoaded(true));
@@ -28,6 +45,10 @@ export function ConversationPage() {
 
   useServerEvents((e) => {
     if (e.type === 'reconnected') return load();
+    if (e.type === 'activity' && e.conversationId === id) {
+      const a = e.payload as { runId: number; tool: string | null; event: string };
+      return setActivity((m) => ({ ...m, [a.runId]: { tool: a.tool, event: a.event } }));
+    }
     if (e.type !== 'message.upsert' || e.conversationId !== id) return;
     const m = e.payload as Msg;
     setMessages((list) => {
@@ -54,13 +75,51 @@ export function ConversationPage() {
           <span className="t-foot mt-0.5 flex items-center gap-0.5 font-semibold">{title}<span className="text-[var(--label-3)]">›</span></span>
           <span className="max-w-[60vw] truncate text-[11px] text-[var(--label-2)] md:max-w-sm">{subtitle}</span>
         </button>
-        <div className="flex justify-end"><button aria-label="Details" onClick={openInfo} className="press flex h-11 w-11 items-center justify-center text-[var(--blue)]"><IInfo size={24} /></button></div>
+        <div className="flex justify-end">
+          {conv.kind !== 'channel' && !conv.readOnly && <button aria-label="Start a fresh conversation" title="Start fresh" onClick={() => setFresh(true)} className="press flex h-11 w-11 items-center justify-center text-[var(--blue)]"><ICompose size={23} /></button>}
+          <button aria-label="Details" onClick={openInfo} className="press flex h-11 w-11 items-center justify-center text-[var(--blue)]"><IInfo size={24} /></button>
+        </div>
       </header>
-      <MessageList messages={messages} loaded={loaded} conv={conv} onThread={setThread} />
+      <MessageList messages={messages} loaded={loaded} conv={conv} onThread={setThread} activity={activity} />
+      {conv.long && !conv.readOnly && (
+        <button onClick={() => setFresh(true)} className="press flex items-center gap-2 bg-[color-mix(in_srgb,var(--orange)_14%,var(--bg))] px-4 py-2 text-left">
+          <span className="t-foot flex-1"><b>This chat is getting long.</b> Long chats are slower and cost more.</span>
+          <span className="t-foot shrink-0 font-semibold text-[var(--blue)]">Start Fresh</span>
+        </button>
+      )}
+      {fresh && <FreshSheet conv={conv} name={dmAgent?.displayName ?? 'the agent'} onClose={() => setFresh(false)} />}
       {conv.readOnly ? <MirrorFooter conv={conv} /> : <>{conv.twoWay && <p className="t-cap bg-[var(--bg)] px-4 pt-1 text-center text-[var(--label-2)]">Sent from here, copied to Telegram</p>}<Composer key={conv.id} conv={conv} /></>}
       {thread && <ThreadSheet parent={thread} conv={conv} onClose={() => setThread(null)} />}
       {info && <GroupInfo conv={conv} members={members} messages={messages} onClose={() => setInfo(false)} />}
     </div>
+  );
+}
+
+function FreshSheet({ conv, name, onClose }: { conv: Conversation; name: string; onClose: () => void }) {
+  const { ws, refresh } = useWs();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const go = async () => {
+    setBusy(true); setErr('');
+    try { await api(`/api/w/${ws.slug}/conversations/${conv.id}/fresh`, { method: 'POST', json: {} }); refresh(); onClose(); }
+    catch (e) { setErr((e as Error).message); setBusy(false); }
+  };
+  return (
+    <Sheet title="Start Fresh?" onClose={onClose}>
+      <div className="px-5 pb-6">
+        <p className="t-sub">{name} starts the next message with a clean slate, so replies are faster and cost less.</p>
+        <ul className="t-sub mt-3 list-disc space-y-1 pl-5 text-[var(--label-2)]">
+          <li>Everything above stays here for you to read.</li>
+          <li>{name} keeps long-term memory, but won’t remember the details of this chat.</li>
+          <li>Tip: first ask {name} to “remember anything important from this chat”.</li>
+        </ul>
+        {err && <p className="t-foot mt-3 text-[var(--red)]">{err}</p>}
+        <div className="mt-5 flex gap-3">
+          <Button variant="tinted" onClick={onClose} className="flex-1">Not Now</Button>
+          <Button onClick={go} disabled={busy} className="flex-1">{busy ? 'Starting…' : 'Start Fresh'}</Button>
+        </div>
+      </div>
+    </Sheet>
   );
 }
 
@@ -76,7 +135,7 @@ function MirrorFooter({ conv }: { conv: Conversation }) {
   );
 }
 
-function MessageList({ messages, loaded, conv, onThread }: { messages: Msg[]; loaded: boolean; conv: Conversation; onThread: (m: Msg) => void }) {
+function MessageList({ messages, loaded, conv, onThread, activity }: { messages: Msg[]; loaded: boolean; conv: Conversation; onThread: (m: Msg) => void; activity: Activity }) {
   const { agentById, ws } = useWs();
   const ref = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
@@ -107,7 +166,9 @@ function MessageList({ messages, loaded, conv, onThread }: { messages: Msg[]; lo
       {rows.map(({ m, first, last, showTime }) => (
         <div key={m.id}>
           {showTime && <div className="t-cap mt-4 mb-2 text-center text-[var(--label-2)]"><span className="font-semibold">{dayWord(ts(m))}</span> {new Date(ts(m)).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</div>}
-          <Bubble m={m} mine={mine(m)} first={first} last={last} group={conv.kind === 'channel'} wsSlug={ws.slug} onThread={conv.readOnly ? undefined : onThread} />
+          {m.author_kind === 'system'
+            ? <div className="my-3 flex items-center gap-3 px-2" role="separator"><span className="h-px flex-1 bg-[var(--separator)]" /><span className="t-cap font-semibold text-[var(--label-2)]">{m.body}</span><span className="h-px flex-1 bg-[var(--separator)]" /></div>
+            : <Bubble m={m} mine={mine(m)} first={first} last={last} group={conv.kind === 'channel'} wsSlug={ws.slug} onThread={conv.readOnly ? undefined : onThread} doing={m.run_id ? activity[m.run_id] : undefined} />}
         </div>
       ))}
     </div>
@@ -121,7 +182,7 @@ function dayWord(t: number) {
   return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-function Bubble({ m, mine, first, last, group, wsSlug, onThread }: { m: Msg; mine: boolean; first: boolean; last: boolean; group: boolean; wsSlug: string; onThread?: (m: Msg) => void }) {
+function Bubble({ m, mine, first, last, group, wsSlug, onThread, doing }: { m: Msg; mine: boolean; first: boolean; last: boolean; group: boolean; wsSlug: string; onThread?: (m: Msg) => void; doing?: { tool: string | null; event: string } }) {
   const { agentById } = useWs();
   const agent = agentById(m.author_agent_id);
   const name = agent?.displayName ?? m.author_label ?? 'Agent';
@@ -129,6 +190,20 @@ function Bubble({ m, mine, first, last, group, wsSlug, onThread }: { m: Msg; min
   const retry = () => m.run_id && api(`/api/w/${wsSlug}/runs/${m.run_id}/retry`, { method: 'POST' }).catch(() => {});
   const stop = () => m.run_id && api(`/api/w/${wsSlug}/runs/${m.run_id}/stop`, { method: 'POST' }).catch(() => {});
   const thinking = (m.state === 'pending' || m.state === 'streaming') && !m.body;
+  const running = m.state === 'pending' || m.state === 'streaming';
+  // While a reply is in progress, tick once a second so the elapsed time stays honest.
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { if (!running) return; const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, [running]);
+  const elapsed = now - m.created_at;
+  const [speaking, setSpeaking] = useState(false);
+  const canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window;
+  const speak = () => {
+    if (speaking) { speechSynthesis.cancel(); return setSpeaking(false); }
+    const u = new SpeechSynthesisUtterance(plainText(m.body).slice(0, 4000));
+    u.onend = u.onerror = () => setSpeaking(false);
+    speechSynthesis.cancel(); speechSynthesis.speak(u); setSpeaking(true);
+  };
+  useEffect(() => () => { if (speaking) speechSynthesis.cancel(); }, [speaking]);
   const radius = mine ? `rounded-[20px] ${last ? 'rounded-br-[6px]' : ''}` : `rounded-[20px] ${last ? 'rounded-bl-[6px]' : ''}`;
 
   return (
@@ -154,7 +229,20 @@ function Bubble({ m, mine, first, last, group, wsSlug, onThread }: { m: Msg; min
           </div>
         )}
         {!!m.attachments?.length && <Attachments list={m.attachments} wsSlug={wsSlug} mine={mine} />}
-        {(m.state === 'pending' || m.state === 'streaming') && m.run_id && <button onClick={stop} className="press t-cap mt-1 ml-3 text-[var(--label-2)]">Stop</button>}
+        {running && m.run_id && (
+          <span className="t-cap mt-1 ml-3 flex items-center gap-2 text-[var(--label-2)]">
+            {m.run_status === 'waiting_for_approval'
+              ? <Link to={`/w/${wsSlug}/needs-you`} className="font-semibold text-[var(--orange)]">Waiting for your OK ›</Link>
+              : <>
+                  {elapsed >= 4000 && <span aria-live="off">{activityWords(doing)} · {clock(elapsed)}</span>}
+                  {elapsed >= 120_000 && <span className="text-[var(--orange)]">taking a while</span>}
+                </>}
+            <button onClick={stop} className="press font-semibold text-[var(--blue)]">Stop</button>
+          </span>
+        )}
+        {!mine && !running && m.state === 'final' && m.body && canSpeak && last && (
+          <button onClick={speak} aria-label={speaking ? 'Stop reading aloud' : 'Read aloud'} className="press t-cap mt-0.5 ml-2 flex items-center gap-1 text-[var(--label-2)]">{speaking ? <IStop size={13} /> : <ISpeaker size={15} />}{speaking ? 'Stop' : 'Listen'}</button>
+        )}
         {m.state === 'cancelled' && <span className="t-cap mt-1 ml-3 text-[var(--label-2)]">Stopped</span>}
         {m.state === 'failed' && m.body && <span className="t-cap mt-1 ml-3 text-[var(--red)]">Didn’t finish. {m.run_id && <button onClick={retry} className="font-semibold text-[var(--blue)]">Try Again</button>}</span>}
         {m.source === 'telegram_mirror' && last && <span className="t-cap mt-0.5 px-2 text-[var(--label-2)]">via Telegram</span>}
@@ -200,6 +288,21 @@ function Composer({ conv, parentId, onSent }: { conv: Conversation; parentId?: n
   const ta = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const isGroup = conv.kind === 'channel';
+  // Dictation: only where the browser offers speech recognition (Safari and Chrome do; it is hidden otherwise).
+  const SR = typeof window !== 'undefined' ? ((window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition) : undefined;
+  const rec = useRef<any>(null);
+  const [listening, setListening] = useState(false);
+  const dictate = () => {
+    if (listening) { rec.current?.stop(); return; }
+    const r = new SR(); rec.current = r;
+    const base = text.trim() ? text.trimEnd() + ' ' : '';
+    r.lang = navigator.language || 'en-US'; r.interimResults = true; r.continuous = false;
+    r.onresult = (e: any) => setText(base + Array.from(e.results as ArrayLike<any>).map((x: any) => x[0].transcript).join(''));
+    r.onerror = (e: any) => { setListening(false); if (e.error === 'not-allowed' || e.error === 'service-not-allowed') setErr('Microphone access is off for this app. You can also use the microphone key on the keyboard.'); };
+    r.onend = () => { setListening(false); ta.current?.focus(); };
+    try { r.start(); setListening(true); setErr(''); } catch { setListening(false); }
+  };
+  useEffect(() => () => rec.current?.abort?.(), []);
   useEffect(() => { const t = ta.current; if (t) { t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 180) + 'px'; } }, [text]);
 
   const needsPick = isGroup && !to.length && !defaultAgent && !/@\w/.test(text);
@@ -247,6 +350,7 @@ function Composer({ conv, parentId, onSent }: { conv: Conversation; parentId?: n
         <button aria-label="Add a file" onClick={() => fileRef.current?.click()} className="press mb-[3px] flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--fill)] text-[var(--label-2)]"><IPlus size={20} /></button>
         <div className="flex min-h-[40px] flex-1 items-end rounded-[20px] border-[0.5px] border-[var(--separator)] bg-[var(--bg)] pr-1 pl-3.5 focus-within:border-[var(--blue)]">
           <textarea ref={ta} rows={1} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onKey} placeholder={placeholder} aria-label="Message" className="max-h-[180px] flex-1 resize-none bg-transparent py-2 text-[17px] outline-none placeholder:text-[var(--label-3)]" />
+          {SR && (listening || !text.trim()) && <button aria-label={listening ? 'Stop dictation' : 'Dictate a message'} aria-pressed={listening} onClick={dictate} className={`press mr-1 mb-1 flex h-8 w-8 items-center justify-center rounded-full ${listening ? 'bg-[var(--red)] text-white' : 'text-[var(--label-2)]'}`}>{listening ? <IStop size={14} /> : <IMic size={20} />}</button>}
           <button aria-label="Send" disabled={!canSend} onClick={send} className={`press mb-1 flex h-8 w-8 items-center justify-center rounded-full text-white transition-opacity ${canSend ? 'bg-[var(--blue)]' : 'bg-[var(--label-3)] opacity-60'}`}><IUp size={20} /></button>
         </div>
       </div>

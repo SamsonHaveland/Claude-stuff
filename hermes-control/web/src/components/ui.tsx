@@ -26,6 +26,9 @@ export const IStop = icon('M7 7h10v10H7z', true);
 export const IRetry = icon('M4 12a8 8 0 1 0 2.5-5.8L4 8.5M4 4v4.5h4.5');
 export const IPaper = icon('m21.5 2.5-9.8 19-2.6-8.1-8.1-2.6 20.5-8.3Z');
 export const IPeople = icon('M16 20v-1.2a3.8 3.8 0 0 0-3.8-3.8H6.8A3.8 3.8 0 0 0 3 18.8V20M9.5 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm11.5 9v-1.2a3.8 3.8 0 0 0-2.9-3.7M15.5 4.1a3.5 3.5 0 0 1 0 6.8');
+export const ICompose = icon('M12 20h8M4 20l1-4.5L16.5 4a2.1 2.1 0 0 1 3 3L8 18.5 4 20Z');
+export const IMic = icon('M12 15a3.5 3.5 0 0 0 3.5-3.5v-5a3.5 3.5 0 0 0-7 0v5A3.5 3.5 0 0 0 12 15Zm-6.5-3.5a6.5 6.5 0 0 0 13 0M12 18v3');
+export const ISpeaker = icon('M4 9.5v5h3.5L12 18V6L7.5 9.5H4Zm11.5-.5a4 4 0 0 1 0 6m2.5-8.5a7.5 7.5 0 0 1 0 11');
 export const IClock = icon('M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-13v4.5l3 2');
 
 /* ---------- Avatar ---------- */

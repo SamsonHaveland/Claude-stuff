@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Added
+- **Start Fresh.** One-to-one chats have a button that starts the agent on a new Hermes conversation. History stays visible, a "New conversation" divider marks the break, and the agent keeps its long-term memory. Hermes never starts a new conversation by itself, and measurements on the Pi showed one two-day chat costing about 15–20 cents a message. The app flags long chats (30 turns or 60,000 characters) with a banner. Start Fresh is refused while a reply is still running.
+- **Live progress on replies.** While an agent works, the bubble shows what it is doing ("Running a command", "Searching", "Asking a teammate") and a running clock. It says "taking a while" after two minutes, and "Waiting for your OK" with a link when the reply is blocked on an approval.
+- **Listen.** Agent replies have a read-aloud button that uses the device's built-in voice.
+- **Dictation.** A microphone in the message box, shown where the browser supports speech recognition; it falls back to the keyboard microphone.
 - **`deploy/pi/speed-check.sh`** (read-only): shows why agents are slow. Covers Pi load, text sent with every message per agent, tools switched on, Telegram streaming mode, grouped gateway warnings, scheduled-job health and 7-day usage. `--ping` also times a one-word reply per agent.
 - **`deploy/pi/setup-night-shift.sh`**: creates a six-job night shift for one business (research, website, outreach, ads, quality pass, morning brief). All jobs are created **paused**. They write drafts only, into `~/hermes-work/<tenant>/tonight/`. The script refuses to run without nightly backups, or if an agent has approvals switched off.
 - **Phase 0 scripts for the Pi** (`deploy/pi/`), each backing up what it changes and printing an undo:

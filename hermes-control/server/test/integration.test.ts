@@ -224,6 +224,47 @@ describe('approvals', () => {
   });
 });
 
+describe('fresh start', () => {
+  it('starts a new Hermes session, keeps history, and is refused mid-reply or from another business', async () => {
+    const { headers } = await login(env.app, 'sam');
+    const c = convId(env.db, 'film-lv', 'dm', 'dm-debra');
+    const session = () => (env.db.prepare('SELECT hermes_session_id s FROM hermes_bindings WHERE conversation_id = ?').get(c) as any)?.s;
+    const done = () => (env.db.prepare(`SELECT COUNT(*) n FROM messages WHERE conversation_id = ? AND source = 'hermes_run' AND state = 'final'`).get(c) as any).n;
+    await env.app.inject({ method: 'POST', url: `/api/w/film-lv/conversations/${c}/messages`, headers, payload: { body: 'first' } });
+    await waitFor(() => done() === 1);
+    const before = session();
+    expect(before).toBeTruthy();
+
+    const fox = await login(env.app, 'fox');
+    expect((await env.app.inject({ method: 'POST', url: `/api/w/atomic-fox/conversations/${c}/fresh`, headers: fox.headers, payload: {} })).statusCode).toBe(404);
+    expect((await env.app.inject({ method: 'POST', url: `/api/w/film-lv/conversations/${c}/fresh`, headers: { cookie: headers.cookie }, payload: {} })).statusCode).toBe(403); // no CSRF token
+
+    const res = await env.app.inject({ method: 'POST', url: `/api/w/film-lv/conversations/${c}/fresh`, headers, payload: {} });
+    expect(res.json()).toMatchObject({ ok: true, sessionsDropped: 1 });
+    expect(session()).toBeUndefined();
+    const msgs = (await env.app.inject({ url: `/api/w/film-lv/conversations/${c}/messages`, headers })).json();
+    expect(msgs.map((m: any) => m.author_kind)).toEqual(['user', 'agent', 'system']); // history kept, divider added
+
+    await env.app.inject({ method: 'POST', url: `/api/w/film-lv/conversations/${c}/messages`, headers, payload: { body: 'second' } });
+    await waitFor(() => done() === 2);
+    expect(session()).toBeTruthy();
+    expect(session()).not.toBe(before);
+
+    // Refused while a reply is still running.
+    env.db.prepare(`UPDATE runs SET status = 'running' WHERE conversation_id = ?`).run(c);
+    expect((await env.app.inject({ method: 'POST', url: `/api/w/film-lv/conversations/${c}/fresh`, headers, payload: {} })).statusCode).toBe(409);
+    env.db.prepare(`UPDATE runs SET status = 'completed' WHERE conversation_id = ?`).run(c);
+
+    // Long chats are flagged; a fresh start clears the flag.
+    const listed = () => env.app.inject({ url: '/api/w/film-lv/conversations', headers }).then((r) => r.json().find((x: any) => x.id === c));
+    expect((await listed()).long).toBe(false);
+    env.db.prepare(`UPDATE messages SET body = ? WHERE conversation_id = ? AND source = 'hermes_run' AND id = (SELECT MAX(id) FROM messages WHERE conversation_id = ?)`).run('x'.repeat(61_000), c, c);
+    expect((await listed()).long).toBe(true);
+    await env.app.inject({ method: 'POST', url: `/api/w/film-lv/conversations/${c}/fresh`, headers, payload: {} });
+    expect((await listed()).long).toBe(false);
+  });
+});
+
 describe('telegram mirror (read-only)', () => {
   it('mirrors Jeff Telegram messages once, in order, and refuses writes into the mirror', async () => {
     fake.addTelegram('tg-123', [{ role: 'user', content: 'Morning Jeff' }, { role: 'tool', content: 'ignored' }, { role: 'assistant', content: [{ type: 'text', text: 'Morning! 3 items today.' }] }]);

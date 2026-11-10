@@ -202,6 +202,7 @@ export class RunService {
       typeof ev.command === 'string' ? ev.command : null, typeof ev.description === 'string' ? ev.description : null,
       JSON.stringify(choices), JSON.stringify(ev), this.now());
     this.db.prepare(`UPDATE runs SET status = 'waiting_for_approval', updated_at = ? WHERE id = ?`).run(this.now(), run.id);
+    this.publishMessage(run.reply_message_id); // lets the chat say "waiting for your OK" instead of "thinking"
     this.bus.publish({ type: 'approvals.changed', workspaceId: run.workspace_id, payload: { runId: run.id } });
   }
 

@@ -18,6 +18,10 @@ interface WsRow { id: number; slug: string; name: string; role: string }
 const AVATAR_MIME: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 const ATTACH_MAX = 25 * 1024 * 1024;
 
+/** A one-to-one chat counts as long after this many turns or this much visible text since its last fresh start. */
+const LONG_CHAT_TURNS = 30;
+const LONG_CHAT_CHARS = 60_000;
+
 export async function registerApi(app: FastifyInstance, ctx: AppContext) {
   const { db, bus, runs, hermes, kanban, cfg } = ctx;
   const auth = { preHandler: app.authenticate };
@@ -66,13 +70,19 @@ export async function registerApi(app: FastifyInstance, ctx: AppContext) {
               (SELECT MAX(id) FROM messages m WHERE m.conversation_id = c.id) AS lastMessageId,
               (SELECT json_object('body', substr(m.body, 1, 140), 'at', COALESCE(m.origin_ts, m.created_at), 'authorKind', m.author_kind, 'state', m.state)
                  FROM messages m WHERE m.conversation_id = c.id AND m.parent_id IS NULL
-                 ORDER BY COALESCE(m.origin_ts, m.created_at) DESC, m.id DESC LIMIT 1) AS lastJson
+                 ORDER BY COALESCE(m.origin_ts, m.created_at) DESC, m.id DESC LIMIT 1) AS lastJson,
+              (SELECT COUNT(*) FROM runs r WHERE r.conversation_id = c.id AND r.request_message_id >
+                 COALESCE((SELECT MAX(f.id) FROM messages f WHERE f.conversation_id = c.id AND f.author_kind = 'system' AND f.author_label = 'fresh-start'), 0)) AS turnsSinceFresh,
+              (SELECT COALESCE(SUM(length(m.body)), 0) FROM messages m WHERE m.conversation_id = c.id AND m.source IN ('hc','hermes_run') AND m.id >
+                 COALESCE((SELECT MAX(f.id) FROM messages f WHERE f.conversation_id = c.id AND f.author_kind = 'system' AND f.author_label = 'fresh-start'), 0)) AS charsSinceFresh
        FROM conversations c WHERE c.workspace_id = ? AND c.archived = 0
          AND (c.kind <> 'dm' OR c.dm_agent_id IN (SELECT agent_id FROM workspace_agents WHERE workspace_id = c.workspace_id))
        ORDER BY c.kind, c.name`,
     ).all(ws.id) as any[];
     const members = db.prepare('SELECT conversation_id AS c, agent_id AS a FROM conversation_agents ca JOIN conversations c ON c.id = ca.conversation_id WHERE c.workspace_id = ?').all(ws.id) as { c: number; a: number }[];
-    return convs.map(({ lastJson, ...c }) => ({ ...c, last: lastJson ? JSON.parse(lastJson) : null, agentIds: members.filter((m) => m.c === c.id).map((m) => m.a), readOnly: !ctx.mirror.writable(c), twoWay: c.kind === 'telegram_mirror' && ctx.mirror.writable(c) }));
+    // Hermes resends the whole conversation on every turn and never starts a new one by itself, so
+    // long chats get slower and cost more. Flag them so the app can offer a fresh start.
+    return convs.map(({ lastJson, turnsSinceFresh, charsSinceFresh, ...c }) => ({ ...c, long: c.kind !== 'channel' && (turnsSinceFresh >= LONG_CHAT_TURNS || charsSinceFresh >= LONG_CHAT_CHARS), last: lastJson ? JSON.parse(lastJson) : null, agentIds: members.filter((m) => m.c === c.id).map((m) => m.a), readOnly: !ctx.mirror.writable(c), twoWay: c.kind === 'telegram_mirror' && ctx.mirror.writable(c) }));
   });
 
   app.get('/api/w/:ws/conversations/:id/messages', auth, async (req, reply) => {
@@ -91,6 +101,25 @@ export async function registerApi(app: FastifyInstance, ctx: AppContext) {
     const atts = ids.length ? db.prepare(`SELECT id, message_id, filename, mime, size FROM attachments WHERE workspace_id = ? AND message_id IN (${ids.map(() => '?').join(',')})`).all(ws.id, ...ids) as any[] : [];
     const replyCounts = ids.length ? db.prepare(`SELECT parent_id, COUNT(*) n FROM messages WHERE parent_id IN (${ids.map(() => '?').join(',')}) GROUP BY parent_id`).all(...ids) as any[] : [];
     return rows.reverse().map((m) => ({ ...m, attachments: atts.filter((a) => a.message_id === m.id), replyCount: replyCounts.find((r) => r.parent_id === m.id)?.n ?? 0 }));
+  });
+
+  // Start the agent(s) of this chat on a new Hermes session. History stays in Hermes Control and in
+  // Hermes; only the binding is dropped, so the next message opens a fresh session.
+  app.post('/api/w/:ws/conversations/:id/fresh', auth, async (req, reply) => {
+    const ws = requireWorkspace(req, reply, 'member'); if (!ws) return;
+    const conv = convInWorkspace(ws.id, Number((req.params as any).id));
+    if (!conv) return reply.code(404).send({ error: 'not_found' });
+    if (!ctx.mirror.writable(conv)) return reply.code(409).send({ error: 'read_only', message: 'This chat is read-only.' });
+    const open = db.prepare(`SELECT COUNT(*) n FROM runs WHERE conversation_id = ? AND status NOT IN ('completed','failed','cancelled','interrupted','unknown')`).get(conv.id) as { n: number };
+    if (open.n > 0) return reply.code(409).send({ error: 'busy', message: 'Wait for the current reply to finish (or stop it) first.' });
+    const dropped = db.prepare('DELETE FROM hermes_bindings WHERE conversation_id = ?').run(conv.id).changes;
+    const now = Date.now();
+    const r = db.prepare(
+      `INSERT INTO messages (conversation_id, workspace_id, author_kind, author_user_id, author_label, body, state, source, created_at, updated_at) VALUES (?,?,'system',?,'fresh-start','New conversation','final','hc',?,?)`,
+    ).run(conv.id, ws.id, req.user!.id, now, now);
+    runs.publishMessage(Number(r.lastInsertRowid));
+    audit(db, { userId: req.user!.id, workspaceId: ws.id, action: 'conversation.fresh', target: `conversation:${conv.id}`, detail: { sessionsDropped: dropped } });
+    return { ok: true, sessionsDropped: Number(dropped) };
   });
 
   const SendBody = z.object({ body: z.string().trim().min(1).max(20_000), parentId: z.number().int().optional(), attachmentIds: z.array(z.number().int()).max(10).default([]) });
