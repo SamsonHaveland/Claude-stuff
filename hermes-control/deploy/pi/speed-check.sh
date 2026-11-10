@@ -35,7 +35,7 @@ done
 echo "(sizes in characters; every connected service adds its tool list to each request)"
 
 sec "Jeff: tools switched on per platform (fewer = faster and cheaper)"
-"$HB" -p jeff tools --summary 2>&1 | head -40
+for PL in telegram api_server cron; do echo "--- $PL"; "$HB" -p jeff tools list --platform "$PL" 2>&1 | head -45; done
 
 sec "Streaming to Telegram (auto/draft = you see the reply as it is written)"
 for P in default $PROFILES; do printf '%-8s enabled=%s transport=%s\n' "$P" "$(cfg "$P" gateway.streaming.enabled)" "$(cfg "$P" gateway.streaming.transport)"; done
@@ -52,8 +52,13 @@ echo "restarts in 7 days: $(journalctl --user -u hermes-gateway --since '-7d' --
 sec "Scheduled jobs: health"
 "$HB" cron doctor 2>&1 | head -25
 
-sec "Usage, last 7 days (tokens per conversation show context bloat)"
-"$HB" insights --days 7 2>&1 | head -45
+sec "Usage per agent, last 7 days (tokens per message show context bloat)"
+for P in $PROFILES; do
+  echo "--- $P"
+  "$HB" -p "$P" insights --days 7 2>&1 | grep -E "Sessions:|Tool calls:|Total tokens:|Estimated:|Avg msgs|^  (oneshot|subagent|api_server|local|telegram|cron|cli) |claude-|mcp__" | head -22
+done
+sec "Context compression settings per agent (blank = Hermes default: compress at 50% of the model's window)"
+for P in $PROFILES; do printf '%-7s threshold=%s threshold_tokens=%s\n' "$P" "$(cfg "$P" compression.threshold)" "$(cfg "$P" compression.threshold_tokens)"; done
 
 if [ "$PING" = 1 ]; then
   sec "Timed one-word reply per agent (real AI call)"

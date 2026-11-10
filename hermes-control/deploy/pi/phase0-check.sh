@@ -68,7 +68,7 @@ for path in sorted(glob.glob(root + "/cron/jobs.json") + glob.glob(root + "/prof
 PY
 
 sec "Jeff's tools (is kanban already on?)"
-"$HB" -p jeff tools --summary 2>&1 | head -40
+for PL in telegram api_server; do echo "--- $PL"; "$HB" -p jeff tools list --platform "$PL" 2>&1 | grep -iE "kanban|enabled|disabled" | head -12; done
 
 sec "Listeners (127.0.0.1 = Pi only; 0.0.0.0 = whole network)"
 ss -tln 2>/dev/null | awk 'NR==1 || /LISTEN/'
