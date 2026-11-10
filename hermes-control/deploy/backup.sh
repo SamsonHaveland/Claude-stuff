@@ -8,8 +8,9 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$DEST"
 node --disable-warning=ExperimentalWarning -e '
   const { DatabaseSync } = require("node:sqlite");
+  const q = String.fromCharCode(39); // VACUUM INTO needs a SQL string literal, not an identifier
   const db = new DatabaseSync(process.argv[1], { readOnly: false });
-  db.exec(`VACUUM INTO ${JSON.stringify(process.argv[2])}`);
+  db.exec("VACUUM INTO " + q + process.argv[2].split(q).join(q + q) + q);
 ' "$DATA_DIR/hermes-control.db" "$DEST/hermes-control-$STAMP.db"
 tar -C "$DATA_DIR" -czf "$DEST/files-$STAMP.tar.gz" uploads avatars 2>/dev/null || true
 find "$DEST" -type f -mtime +14 -delete

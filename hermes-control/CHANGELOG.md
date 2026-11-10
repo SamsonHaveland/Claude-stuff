@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Added
+- **Phase 0 scripts for the Pi** (`deploy/pi/`), each backing up what it changes and printing an undo:
+  - `phase0-check.sh`: read-only checks. Is a second machine polling the Telegram bots? Approval modes, connected-service trust levels, scheduled jobs that mention Hayes or Marty, listening ports, backups.
+  - `enable-hermes-backup.sh`: a nightly 03:30 `hermes backup` of every agent (keeps 14) plus a Hermes Control database copy. Files are private and timer-driven; the first backup runs straight away and is checked.
+  - `lockdown-mcp-trust.sh`: sets `trust: untrusted` on every connected service, so writes ask first. Flags agents whose approvals are switched off.
+  - `enable-jeff-delegation.sh`: Kanban tools for Jeff (Telegram and Hermes Control), plus a chain-of-command section appended to his SOUL.md. Safe to run twice.
+  - `add-business-workspaces.sh`: adds Atomic Fox Media and Vegas Couples Clash workspaces, each with its own Kanban tenant, and renames Atomic Fox to Atomic Fox Mitigation.
 - **Two-way Telegram sync** for agents with their own bot (Jeff and Debra):
   - Their Telegram chats show up in Hermes Control as before.
   - With **Settings › Telegram › Two-way** on, you can also type in that chat. The agent gets your recent Telegram messages as context, and the exchange is copied into Telegram from the agent's bot using Hermes's own `hermes send`. There's no bot token in Hermes Control and no second poller.
@@ -26,6 +32,7 @@
   - Visual style: system font, iOS colours, translucent bars and grouped lists. Reduced motion, reduced transparency and higher contrast are respected.
 
 ### Fixed
+- `deploy/backup.sh` never worked: `VACUUM INTO` was given a double-quoted name, which SQLite reads as a column. It now uses a string literal, and the result was verified with an integrity check.
 - **Agent replies now render Markdown**: headings, bold, lists, tables, checklists, code and links. It's done safely: no raw HTML, only http(s) and mailto links, and remote images appear as links. Chat-list previews show plain text.
 - The iPhone toolbar no longer covers the message box (dynamic viewport height), and tables scroll sideways instead of breaking words.
 - The "Live" indicator could stay on "Connecting…" after a page reload even though updates were connected.
