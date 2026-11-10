@@ -11,7 +11,7 @@
  │  ├─ auth (scrypt, httpOnly cookie, CSRF token, rate-limited login, audit log)          │
  │  ├─ workspace guard (every /api/w/:ws route; 404 on non-membership)                    │
  │  ├─ RunService ─────── POST /v1/runs · GET /v1/runs/{id}/events · /approval ───────┐   │
- │  ├─ TelegramMirror ─── GET /api/sessions?source=telegram · /messages (read-only) ─┤   │
+ │  ├─ TelegramMirror ─── GET /api/sessions?source=telegram · /messages; two-way copy via `hermes send` ─┤   │
  │  ├─ KanbanAdapter ──── execFile("hermes", ["kanban", …, "--json"]) ───────────────┤   │
  │  ├─ discovery ──────── read-only scan of ~/.hermes (marker files, profile.yaml)   │   │
  │  └─ SQLite (node:sqlite, WAL): Hermes Control's own state only                    │   │

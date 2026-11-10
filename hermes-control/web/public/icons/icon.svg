@@ -1,1 +1,39 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b9bff"/><stop offset="1" stop-color="#0063e6"/></linearGradient></defs><rect width="512" height="512" rx="114" fill="url(#g)"/><ellipse cx="256" cy="244" rx="150" ry="122" fill="#fff"/><path d="M150 330 L128 392 L210 352 Z" fill="#fff"/><circle cx="206" cy="244" r="17" fill="#0a7bff"/><circle cx="256" cy="244" r="17" fill="#0a7bff"/><circle cx="306" cy="244" r="17" fill="#0a7bff"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2f8bff"/>
+      <stop offset="0.5" stop-color="#0a5ad6"/>
+      <stop offset="1" stop-color="#06265e"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.28" cy="0.18" r="0.8">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="wing" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffc35a"/>
+      <stop offset="1" stop-color="#ffe2a3"/>
+    </linearGradient>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="20" stdDeviation="24" flood-color="#021638" flood-opacity="0.38"/>
+    </filter>
+  </defs>
+  <clipPath id="r"><rect width="1024" height="1024" rx="230"/></clipPath><g clip-path="url(#r)"><rect width="1024" height="1024" fill="url(#bg)"/>
+  <rect width="1024" height="1024" fill="url(#glow)"/></g>
+  <g filter="url(#sh)" transform="translate(40 -6)">
+    <!-- one wing with four feathers, rooted behind the bubble's upper right -->
+    <path d="M600 600
+             C 650 430, 760 300, 905 220
+             C 900 275, 880 315, 850 345
+             C 885 345, 905 350, 925 362
+             C 895 410, 850 435, 805 445
+             C 835 455, 855 470, 870 488
+             C 830 520, 785 530, 740 532
+             C 760 548, 772 565, 780 584
+             C 720 606, 660 612, 600 600 Z" fill="url(#wing)"/>
+    <!-- speech bubble -->
+    <path d="M420 270 C 595 270, 712 372, 712 500 C 712 628, 595 730, 420 730 C 384 730, 350 726, 320 717 L 196 796 L 226 672 C 166 625, 128 566, 128 500 C 128 372, 245 270, 420 270 Z" fill="#fff"/>
+    <circle cx="320" cy="500" r="36" fill="#0a5ad6"/>
+    <circle cx="420" cy="500" r="36" fill="#0a5ad6"/>
+    <circle cx="520" cy="500" r="36" fill="#0a5ad6"/>
+  </g>
+</svg>

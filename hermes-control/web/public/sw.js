@@ -1,6 +1,6 @@
 // Minimal service worker: caches the static app shell only. API responses are NEVER
 // cached, so the UI can't show stale agent or approval state while offline.
-const SHELL = 'hc-shell-v1';
+const SHELL = 'hc-shell-v2';
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(SHELL).then((c) => c.addAll(['/', '/manifest.webmanifest', '/icons/icon.svg'])));
   self.skipWaiting();

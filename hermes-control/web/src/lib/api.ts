@@ -13,6 +13,8 @@ export interface Conversation {
   defaultAgentId: number | null;
   agentIds: number[];
   readOnly: boolean;
+  /** Telegram copy that also sends what you type here to Telegram. */
+  twoWay?: boolean;
   lastMessageId: number | null;
   last: { body: string; at: number; authorKind: string; state: string } | null;
 }

@@ -44,6 +44,8 @@ const ConfigSchema = z.object({
   telegramMirror: z.array(z.object({
     profile: z.string(),
     enabled: z.boolean().default(false),
+    /** Also copy chats typed in Hermes Control into Telegram. Can be switched in Settings. */
+    twoWay: z.boolean().default(false),
     pollSeconds: z.number().int().min(2).default(5),
     workspace: z.string().default('general'),
   })).default([]),

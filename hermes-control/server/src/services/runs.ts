@@ -19,7 +19,7 @@ import type { EventBus } from './bus.js';
 const TERMINAL = new Set(['completed', 'failed', 'cancelled', 'interrupted']);
 const MAX_STREAM_ATTEMPTS = 6;
 
-interface RunRow {
+export interface RunRow {
   id: number;
   agent_id: number;
   conversation_id: number;
@@ -33,8 +33,16 @@ interface RunRow {
   last_seq: number;
 }
 
+export interface RunHooks {
+  /** Rewrite the text sent to Hermes (the stored message is unchanged). */
+  input?: (run: RunRow, body: string) => string;
+  /** Called once a reply completed, with its final text. Must not throw. */
+  completed?: (run: RunRow, replyText: string) => void | Promise<void>;
+}
+
 export class RunService {
   private active = new Map<number, AbortController>();
+  public hooks: RunHooks = {};
 
   constructor(private db: DB, private hermes: HermesClient, private bus: EventBus, private log: (msg: string, extra?: unknown) => void = () => {}) {}
 
@@ -109,7 +117,7 @@ export class RunService {
         const ws = this.db.prepare('SELECT slug FROM workspaces WHERE id = ?').get(run.workspace_id) as { slug: string };
         // Same key on every retry: Hermes dedupes durably, so a crash between submit and
         // persisting the run id can never execute the turn twice.
-        const created = await this.hermes.createRun(profile, { input: req.body, session_id: sessionId }, run.idempotency_key, `hermes-control:${ws.slug}:${run.conversation_id}`);
+        const created = await this.hermes.createRun(profile, { input: this.hooks.input ? this.hooks.input(run, req.body) : req.body, session_id: sessionId }, run.idempotency_key, `hermes-control:${ws.slug}:${run.conversation_id}`);
         this.db.prepare(`UPDATE runs SET hermes_run_id = ?, hermes_session_id = ?, status = ?, updated_at = ? WHERE id = ?`).run(created.run_id, sessionId, created.status || 'started', this.now(), runId);
         run = this.get(runId);
       }
@@ -208,6 +216,10 @@ export class RunService {
     this.setReply(runId, patch);
     this.db.prepare(`UPDATE approvals SET status = 'expired' WHERE run_id = ? AND status = 'pending'`).run(runId);
     this.bus.publish({ type: 'approvals.changed', workspaceId: run.workspace_id, payload: { runId } });
+    if (status === 'completed' && this.hooks.completed) {
+      const reply = this.db.prepare('SELECT body FROM messages WHERE id = ?').get(run.reply_message_id) as { body: string };
+      void Promise.resolve().then(() => this.hooks.completed!(run, reply.body)).catch((e) => this.log('completed hook failed', { runId, error: (e as Error).message }));
+    }
   }
 
   private setReply(runId: number, patch: { state: string; error?: string | null; body?: string }) {

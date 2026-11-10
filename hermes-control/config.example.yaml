@@ -21,8 +21,9 @@ hermes:
     lena:  { role: Social Media }
     scout: { role: Outreach }
 
-telegramMirror:
-  - { profile: jeff, enabled: false, pollSeconds: 5, workspace: general }
+telegramMirror:          # agents with their own Telegram bot; deploy/pi/enable-telegram-sync.sh turns these on
+  - { profile: jeff, enabled: false, twoWay: false, pollSeconds: 5, workspace: general }
+  - { profile: debra, enabled: false, twoWay: false, pollSeconds: 5, workspace: general }
 
 workspaces:
   - slug: general

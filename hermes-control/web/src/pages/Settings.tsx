@@ -9,17 +9,30 @@ import { Avatar, LargeTitle, Row, Section } from '../components/ui';
 interface SystemStatus {
   hermesMode: string;
   profiles: { profile: string; discovered: boolean; keyPresent: boolean; reachable: boolean | null }[];
-  telegramMirror: { profile: string; enabled: boolean; workspace: string; status: { ok: boolean; at: number; error?: string } | null }[];
+  telegramMirror: { profile: string; enabled: boolean; twoWay: boolean; workspace: string; status: { ok: boolean; at: number; error?: string } | null; lastCopy: { ok: boolean; at: number; error?: string } | null }[];
   autoUpdate: { result: string; note?: string; version_before?: string; version_after?: string; finished_at?: string } | null;
 }
 
 export function SettingsPage() {
-  const { me, ws, agents } = useWs();
+  const { me, ws, agents, refresh } = useWs();
   const nav = useNavigate();
   const [theme, setTheme] = useState<Theme>(getTheme());
   const [sys, setSys] = useState<SystemStatus | null>(null);
   const [switching, setSwitching] = useState(false);
-  useEffect(() => { if (me.user.role === 'admin') api<SystemStatus>('/api/system/status').then(setSys).catch(() => {}); }, [me.user.role]);
+  const loadSys = () => api<SystemStatus>('/api/system/status').then(setSys).catch(() => {});
+  useEffect(() => { if (me.user.role === 'admin') loadSys(); }, [me.user.role]);
+  const [twoWayError, setTwoWayError] = useState<string | null>(null);
+  const setTwoWay = async (profile: string, on: boolean) => {
+    setTwoWayError(null);
+    setSys((s) => s && { ...s, telegramMirror: s.telegramMirror.map((t) => (t.profile === profile ? { ...t, twoWay: on } : t)) });
+    try {
+      await api(`/api/system/telegram/${encodeURIComponent(profile)}/two-way`, { method: 'POST', json: { on } });
+    } catch (e) {
+      setTwoWayError((e as Error).message);
+    }
+    await loadSys();
+    refresh();
+  };
   const signOut = async () => { await api('/api/auth/logout', { method: 'POST' }).catch(() => {}); disconnectEvents(); location.href = '/'; };
   const connected = (p: string) => sys?.profiles.find((x) => x.profile === p);
 
@@ -77,13 +90,26 @@ export function SettingsPage() {
               </Row>
             </Section>
             {sys.telegramMirror.length > 0 && (
-              <Section title="Telegram copy">
-                {sys.telegramMirror.map((t) => (
-                  <Row key={t.profile + t.workspace}>
-                    <span className="flex-1">{agents.find((a) => a.profileName === t.profile)?.displayName ?? t.profile}</span>
-                    <span className="t-sub text-[var(--label-2)]">{!t.enabled ? 'Off' : !t.status ? 'Starting…' : t.status.ok ? 'On' : 'Having trouble'}</span>
-                  </Row>
-                ))}
+              <Section title="Telegram" footer="Two-way: what you type in an agent’s Telegram chat here is also sent to Telegram, from the agent’s bot. Their Telegram replies show up here either way.">
+                {sys.telegramMirror.map((t) => {
+                  const name = agents.find((a) => a.profileName === t.profile)?.displayName ?? t.profile;
+                  const reading = !t.enabled ? 'Off' : !t.status ? 'Starting…' : t.status.ok ? 'Showing here' : 'Having trouble';
+                  const copy = t.lastCopy && !t.lastCopy.ok ? 'Last copy to Telegram failed' : null;
+                  return (
+                    <Row key={t.profile + t.workspace}>
+                      <span className="flex flex-1 flex-col">
+                        <span>{name}</span>
+                        <span className="t-foot text-[var(--label-2)]">{reading}</span>
+                        {copy && <span className="t-cap text-[var(--red)]">{copy}</span>}
+                      </span>
+                      <label className="flex items-center gap-2">
+                        <span className="t-sub text-[var(--label-2)]">Two-way</span>
+                        <input type="checkbox" role="switch" aria-label={`Two-way Telegram for ${name}`} disabled={!t.enabled} checked={t.twoWay} onChange={(e) => setTwoWay(t.profile, e.target.checked)} className="switch" />
+                      </label>
+                    </Row>
+                  );
+                })}
+                {twoWayError && <p className="t-foot px-4 py-2 text-[var(--red)]">Couldn’t change that: {twoWayError}</p>}
               </Section>
             )}
           </>

@@ -12,8 +12,8 @@ It is a separate application. It **never modifies your Hermes installation**. It
 | Read-only discovery of Hermes profiles | Built and unit-tested. **Not yet run against your Mac.** |
 | DM / @mention routing to the right Hermes profile, with streaming and the real final reply | Built and tested against a contract-faithful fake. **Needs the API server enabled on your Mac for a real test.** |
 | Approvals for runs started here (only "confirmed" after Hermes accepts the decision) | Built and tested against the fake |
-| Jeff's Telegram chat mirrored into Hermes Control (read-only, deduplicated) | Built and tested against the fake |
-| Hermes Control → Telegram chat | **Not supported by verified Hermes interfaces.** See `docs/INTEGRATION_PLAN.md`. |
+| Telegram chats (Jeff, Debra) shown in Hermes Control, deduplicated | Built and tested against the fake |
+| Two-way Telegram sync (type in the app, copy posted to Telegram from the agent's bot) | Built and tested; off until switched on in Settings. See `docs/INTEGRATION_PLAN.md` |
 | Kanban board, create, assign, comment, block/unblock/complete/archive | Built (via the CLI). **Needs `hermes` on PATH.** |
 | Agent portraits (upload, circular, replaceable without touching Hermes) | Built |
 

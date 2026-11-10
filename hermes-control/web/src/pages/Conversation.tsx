@@ -42,7 +42,7 @@ export function ConversationPage() {
   const dmAgent = agentById(conv.dmAgentId);
   const title = convTitle(conv, (x) => agentById(x)?.displayName);
   const members = conv.agentIds.map((x) => agentById(x)).filter(Boolean) as Agent[];
-  const subtitle = conv.kind === 'telegram_mirror' ? 'Copy of your Telegram chat' : conv.kind === 'dm' ? (dmAgent ? STATUS[dmAgent.status].label : '') : members.map((m) => m.displayName).join(', ');
+  const subtitle = conv.kind === 'telegram_mirror' ? (conv.twoWay ? 'Synced with Telegram' : 'Copy of your Telegram chat') : conv.kind === 'dm' ? (dmAgent ? STATUS[dmAgent.status].label : '') : members.map((m) => m.displayName).join(', ');
   const openInfo = () => (conv.kind === 'dm' && dmAgent ? nav(`/w/${ws.slug}/agents/${dmAgent.id}`) : setInfo(true));
 
   return (
@@ -57,7 +57,7 @@ export function ConversationPage() {
         <div className="flex justify-end"><button aria-label="Details" onClick={openInfo} className="press flex h-11 w-11 items-center justify-center text-[var(--blue)]"><IInfo size={24} /></button></div>
       </header>
       <MessageList messages={messages} loaded={loaded} conv={conv} onThread={setThread} />
-      {conv.readOnly ? <MirrorFooter conv={conv} /> : <Composer key={conv.id} conv={conv} />}
+      {conv.readOnly ? <MirrorFooter conv={conv} /> : <>{conv.twoWay && <p className="t-cap bg-[var(--bg)] px-4 pt-1 text-center text-[var(--label-2)]">Sent from here, copied to Telegram</p>}<Composer key={conv.id} conv={conv} /></>}
       {thread && <ThreadSheet parent={thread} conv={conv} onClose={() => setThread(null)} />}
       {info && <GroupInfo conv={conv} members={members} messages={messages} onClose={() => setInfo(false)} />}
     </div>
@@ -70,7 +70,7 @@ function MirrorFooter({ conv }: { conv: Conversation }) {
   const dm = conversations.find((c) => c.kind === 'dm' && c.dmAgentId === conv.dmAgentId);
   return (
     <div className="material-bar safe-bottom border-t-[0.5px] border-[var(--separator)] px-4 py-3 text-center">
-      <p className="t-foot text-[var(--label-2)]">This is a copy of your Telegram chat. Reply in Telegram.</p>
+      <p className="t-foot text-[var(--label-2)]">This is a copy of your Telegram chat. Reply in Telegram, or turn on Two-way in Settings.</p>
       {dm && <Link to={`/w/${ws.slug}/c/${dm.id}`} className="t-sub mt-1 inline-block font-semibold text-[var(--blue)]">Message {a?.displayName ?? 'this agent'} here instead</Link>}
     </div>
   );
@@ -221,7 +221,7 @@ function Composer({ conv, parentId, onSent }: { conv: Conversation; parentId?: n
   };
 
   if (!canWrite) return <p className="t-foot safe-bottom px-4 py-3 text-center text-[var(--label-2)]">You can read this chat but not send messages.</p>;
-  const placeholder = conv.kind === 'dm' ? 'Message' : to.length ? `Ask ${to.map((x) => agentById(x)?.displayName).join(' & ')}` : defaultAgent ? `Message (goes to ${defaultAgent.displayName})` : 'Choose who to ask first';
+  const placeholder = !isGroup ? 'Message' : to.length ? `Ask ${to.map((x) => agentById(x)?.displayName).join(' & ')}` : defaultAgent ? `Message (goes to ${defaultAgent.displayName})` : 'Choose who to ask first';
   return (
     <div className="material-bar safe-bottom border-t-[0.5px] border-[var(--separator)] px-2 pt-2 pb-2 md:px-4">
       {isGroup && (

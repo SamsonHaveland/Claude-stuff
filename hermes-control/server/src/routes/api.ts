@@ -72,7 +72,7 @@ export async function registerApi(app: FastifyInstance, ctx: AppContext) {
        ORDER BY c.kind, c.name`,
     ).all(ws.id) as any[];
     const members = db.prepare('SELECT conversation_id AS c, agent_id AS a FROM conversation_agents ca JOIN conversations c ON c.id = ca.conversation_id WHERE c.workspace_id = ?').all(ws.id) as { c: number; a: number }[];
-    return convs.map(({ lastJson, ...c }) => ({ ...c, last: lastJson ? JSON.parse(lastJson) : null, agentIds: members.filter((m) => m.c === c.id).map((m) => m.a), readOnly: c.kind === 'telegram_mirror' }));
+    return convs.map(({ lastJson, ...c }) => ({ ...c, last: lastJson ? JSON.parse(lastJson) : null, agentIds: members.filter((m) => m.c === c.id).map((m) => m.a), readOnly: !ctx.mirror.writable(c), twoWay: c.kind === 'telegram_mirror' && ctx.mirror.writable(c) }));
   });
 
   app.get('/api/w/:ws/conversations/:id/messages', auth, async (req, reply) => {
@@ -99,7 +99,7 @@ export async function registerApi(app: FastifyInstance, ctx: AppContext) {
     const ws = requireWorkspace(req, reply, 'member'); if (!ws) return;
     const conv = convInWorkspace(ws.id, Number((req.params as any).id));
     if (!conv) return reply.code(404).send({ error: 'not_found' });
-    if (conv.kind === 'telegram_mirror') return reply.code(409).send({ error: 'read_only', message: 'Telegram mirrors are read-only. Message the agent from its DM, or reply in Telegram.' });
+    if (!ctx.mirror.writable(conv)) return reply.code(409).send({ error: 'read_only', message: 'This Telegram copy is read-only. Switch on two-way in Settings, or reply in Telegram.' });
     const body = SendBody.parse(req.body);
     if (body.parentId && !db.prepare('SELECT 1 FROM messages WHERE id = ? AND conversation_id = ?').get(body.parentId, conv.id)) return reply.code(400).send({ error: 'bad_parent' });
     const now = Date.now();
@@ -382,11 +382,20 @@ export async function registerApi(app: FastifyInstance, ctx: AppContext) {
     })));
     return {
       hermesMode: cfg.hermes.mode, hermesHome: cfg.hermes.home, profiles,
-      telegramMirror: cfg.telegramMirror.map((t) => ({ ...t, status: ctx.mirror.lastStatus.get(`${t.profile}@${t.workspace}`) ?? null })),
+      telegramMirror: cfg.telegramMirror.map((t) => ({ ...t, twoWay: t.enabled && ctx.mirror.twoWay(t.profile), status: ctx.mirror.lastStatus.get(`${t.profile}@${t.workspace}`) ?? null, lastCopy: ctx.mirror.lastCopy.get(t.profile) ?? null })),
       autoUpdate: readAutoUpdate(cfg.autoUpdate.statusFile),
       openRuns: (db.prepare(`SELECT COUNT(*) n FROM runs WHERE status NOT IN ('completed','failed','cancelled','interrupted')`).get() as any).n,
       sseClients: bus.size,
     };
+  });
+
+  app.post('/api/system/telegram/:profile/two-way', auth, async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
+    const { profile } = req.params as { profile: string };
+    const { on } = z.object({ on: z.boolean() }).parse(req.body);
+    try { ctx.mirror.setTwoWay(profile, on); } catch (e) { return reply.code(404).send({ error: 'not_configured', message: (e as Error).message }); }
+    audit(db, { userId: req.user!.id, action: 'telegram.two_way', target: `profile:${profile}`, detail: { on } });
+    return { profile, twoWay: ctx.mirror.twoWay(profile) };
   });
 
   app.get('/api/admin/audit', auth, async (req, reply) => {

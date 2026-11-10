@@ -3,6 +3,13 @@
 ## Unreleased
 
 ### Added
+- **Two-way Telegram sync** for agents with their own bot (Jeff and Debra):
+  - Their Telegram chats show up in Hermes Control as before.
+  - With **Settings › Telegram › Two-way** on, you can also type in that chat. The agent gets your recent Telegram messages as context, and the exchange is copied into Telegram from the agent's bot using Hermes's own `hermes send`. There's no bot token in Hermes Control and no second poller.
+  - Copies are never mirrored back. Each exchange is copied at most once, and failures show in Settings.
+  - Off by default. `deploy/pi/enable-telegram-sync.sh` turns the Telegram chats on and leaves two-way off.
+- **New app icon:** a speech bubble with a messenger's wing, with a separate version for Android's round mask.
+
 - **Create Character.** On an agent's profile, or for everyone at once from Agents, Hermes Control asks each agent in its chat to design its own name, job title, bio and a photorealistic portrait, using the agent's own image tool.
   - You preview each result and choose Use This, Try Again or Keep Current.
   - Presentation only: the Hermes profile is never changed.

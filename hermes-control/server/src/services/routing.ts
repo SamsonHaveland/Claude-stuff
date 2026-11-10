@@ -26,8 +26,8 @@ export function resolveTargets(
   conv: { kind: 'channel' | 'dm' | 'telegram_mirror'; dmAgentId?: number | null; defaultAgentId?: number | null },
   members: RoutableAgent[],
 ): RoutableAgent[] {
-  if (conv.kind === 'telegram_mirror') return [];
-  if (conv.kind === 'dm') return members.filter((m) => m.id === conv.dmAgentId);
+  // A mirror chat is writable only when two-way is on (checked by the route); it behaves like a DM.
+  if (conv.kind === 'dm' || conv.kind === 'telegram_mirror') return members.filter((m) => m.id === conv.dmAgentId);
 
   const text = body.trim();
   const hits = new Map<number, RoutableAgent>();

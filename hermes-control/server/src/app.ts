@@ -11,7 +11,7 @@ import { HermesClient, HermesError } from './hermes/client.js';
 import { KanbanAdapter } from './hermes/kanban.js';
 import { EventBus } from './services/bus.js';
 import { RunService } from './services/runs.js';
-import { TelegramMirror } from './services/telegramMirror.js';
+import { TelegramMirror, cliSender } from './services/telegramMirror.js';
 import { newToken, sha256, verifyPassword } from './lib/auth.js';
 import { audit } from './lib/audit.js';
 import { registerApi } from './routes/api.js';
@@ -40,6 +40,7 @@ export interface AppDeps {
   kanban?: KanbanAdapter;
   webDist?: string;
   logger?: boolean;
+  mirror?: TelegramMirror;
 }
 
 export interface AppContext {
@@ -62,7 +63,12 @@ export async function buildApp(deps: AppDeps): Promise<{ app: FastifyInstance; c
   const bus = new EventBus();
   const log = (m: string, x?: unknown) => app.log.warn({ detail: x }, m);
   const runs = new RunService(db, hermes, bus, log);
-  const mirror = new TelegramMirror(db, hermes, bus, log);
+  const mirror = deps.mirror ?? new TelegramMirror(db, hermes, bus, log, cliSender(cfg.hermes.cliPath));
+  mirror.configure(cfg.telegramMirror.filter((t) => t.enabled));
+  runs.hooks = {
+    input: (run, body) => mirror.buildInput(run.conversation_id, run.request_message_id, body),
+    completed: (run, text) => mirror.copyToTelegram(run, text),
+  };
   const uploadsDir = join(cfg.dataDir, 'uploads');
   const avatarsDir = join(cfg.dataDir, 'avatars');
   mkdirSync(uploadsDir, { recursive: true });

@@ -245,6 +245,63 @@ describe('telegram mirror (read-only)', () => {
     expect((await env.app.inject({ url: `/api/w/atomic-fox/conversations/${c}/messages`, headers: fox.headers })).statusCode).toBe(404);
   });
 
+  it('two-way: off by default, then sends with Telegram context, copies once, never echoes back', async () => {
+    const sent: { profile: string; text: string }[] = [];
+    let fail = false;
+    (env.ctx.mirror as any).sender = async (profile: string, text: string) => { if (fail) throw new Error('telegram home channel not set'); sent.push({ profile, text }); };
+    fake.addTelegram('tg-2w', [{ role: 'user', content: 'Jeff, budget is due Friday' }, { role: 'assistant', content: 'Noted, Friday.' }]);
+    const target = { profile: 'jeff', workspace: 'film-lv', pollSeconds: 60 };
+    await env.ctx.mirror.pollOnce(target);
+    const c = convId(env.db, 'film-lv', 'telegram_mirror', 'telegram-jeff');
+    const { headers } = await login(env.app, 'sam');
+    const listed = () => env.app.inject({ url: '/api/w/film-lv/conversations', headers }).then((r) => r.json().find((x: any) => x.id === c));
+
+    expect((await listed()).readOnly).toBe(true);
+    expect((await env.app.inject({ method: 'POST', url: `/api/w/film-lv/conversations/${c}/messages`, headers, payload: { body: 'hi' } })).statusCode).toBe(409);
+
+    const on = await env.app.inject({ method: 'POST', url: '/api/system/telegram/jeff/two-way', headers, payload: { on: true } });
+    expect(on.json().twoWay).toBe(true);
+    expect((await listed())).toMatchObject({ readOnly: false, twoWay: true });
+    expect((await env.app.inject({ method: 'POST', url: '/api/system/telegram/harry/two-way', headers, payload: { on: true } })).statusCode).toBe(404);
+    const fox = await login(env.app, 'fox');
+    expect((await env.app.inject({ method: 'POST', url: '/api/system/telegram/jeff/two-way', headers: fox.headers, payload: { on: false } })).statusCode).toBe(403);
+
+    const res = await env.app.inject({ method: 'POST', url: `/api/w/film-lv/conversations/${c}/messages`, headers, payload: { body: 'What did I say is due?' } });
+    expect(res.json().routedTo.map((r: any) => r.profile)).toEqual(['jeff']);
+    await waitFor(() => sent.length === 1);
+    const reply = env.db.prepare(`SELECT body FROM messages WHERE conversation_id = ? AND source = 'hermes_run'`).get(c) as any;
+    // The agent's API session received the Telegram turns as context; the stored message did not change.
+    expect(reply.body).toContain('Me: Jeff, budget is due Friday');
+    expect(reply.body).toContain('You: Noted, Friday.');
+    expect(reply.body).toContain('What did I say is due?');
+    expect(sent[0].profile).toBe('jeff');
+    expect(sent[0].text.startsWith('💻 From Hermes Control')).toBe(true);
+    expect(sent[0].text).toContain('You: What did I say is due?');
+
+    // Telegram's transcript now holds the copy (Hermes mirrors it); the poller must not import it back.
+    fake.addTelegram('tg-2w', [{ role: 'assistant', content: sent[0].text }, { role: 'user', content: 'Thanks from Telegram' }]);
+    env.db.prepare('DELETE FROM mirror_cursors WHERE key LIKE ?').run('tg:%');
+    expect(await env.ctx.mirror.pollOnce(target)).toBe(1);
+
+    // Second turn: only the Telegram messages since the last Hermes Control turn are sent as context.
+    await env.app.inject({ method: 'POST', url: `/api/w/film-lv/conversations/${c}/messages`, headers, payload: { body: 'Second' } });
+    await waitFor(() => sent.length === 2);
+    const second = env.db.prepare(`SELECT body FROM messages WHERE conversation_id = ? AND source = 'hermes_run' ORDER BY id DESC`).get(c) as any;
+    expect(second.body).toContain('Me: Thanks from Telegram');
+    expect(second.body).not.toContain('budget is due Friday');
+
+    // A failed copy is recorded and shown, not retried silently.
+    fail = true;
+    await env.app.inject({ method: 'POST', url: `/api/w/film-lv/conversations/${c}/messages`, headers, payload: { body: 'Third' } });
+    await waitFor(() => env.ctx.mirror.lastCopy.get('jeff')?.ok === false);
+    const status = (await env.app.inject({ url: '/api/system/status', headers })).json();
+    expect(status.telegramMirror[0]).toMatchObject({ twoWay: true, lastCopy: { ok: false } });
+    expect(JSON.stringify(status)).not.toContain('token');
+
+    await env.app.inject({ method: 'POST', url: '/api/system/telegram/jeff/two-way', headers, payload: { on: false } });
+    expect((await listed()).readOnly).toBe(true);
+  });
+
   it('records mirror failure status instead of throwing', async () => {
     await fake.stop();
     await env.ctx.mirror.pollOnce({ profile: 'jeff', workspace: 'film-lv', pollSeconds: 60 });

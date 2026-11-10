@@ -145,7 +145,7 @@ export function ChatList({ compact = false }: { compact?: boolean }) {
 }
 
 function preview(c: Conversation) {
-  if (!c.last) return c.kind === 'channel' ? `${c.agentIds.length} agents` : c.kind === 'telegram_mirror' ? 'Read-only copy of the Telegram chat' : 'Say hello';
+  if (!c.last) return c.kind === 'channel' ? `${c.agentIds.length} agents` : c.kind === 'telegram_mirror' ? (c.twoWay ? 'Synced with Telegram' : 'Copy of your Telegram chat') : 'Say hello';
   if (c.last.state === 'pending' || c.last.state === 'streaming') return 'Typing…';
   if (c.last.state === 'failed') return 'Didn’t get a reply';
   return (c.last.authorKind === 'user' ? 'You: ' : '') + plainText(c.last.body);

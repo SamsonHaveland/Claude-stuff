@@ -178,4 +178,15 @@ CREATE TABLE audit_log (
 CREATE INDEX audit_ts ON audit_log(ts);
 `,
   },
+  {
+    version: 2,
+    sql: `
+-- Small switches changed from Settings (e.g. telegram.twoWay.<profile> = on|off).
+CREATE TABLE app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+`,
+  },
 ];

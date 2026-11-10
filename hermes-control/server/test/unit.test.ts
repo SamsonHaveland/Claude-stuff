@@ -57,8 +57,9 @@ describe('routing', () => {
     expect(resolveTargets('status?', { kind: 'channel', defaultAgentId: 1 }, members).map((x) => x.id)).toEqual([1]);
     expect(resolveTargets('status?', ch, members)).toEqual([]);
   });
-  it('DM always targets the DM agent; mirrors never route', () => {
+  it('DM and two-way Telegram chats always target their own agent', () => {
     expect(resolveTargets('@roxy hi', { kind: 'dm', dmAgentId: 2 }, members).map((x) => x.id)).toEqual([2]);
+    expect(resolveTargets('@roxy hi', { kind: 'telegram_mirror', dmAgentId: 1 }, members).map((x) => x.id)).toEqual([1]);
     expect(resolveTargets('@jeff hi', { kind: 'telegram_mirror' }, members)).toEqual([]);
   });
 });
@@ -119,5 +120,18 @@ describe('hidden profiles', () => {
     expect(names('SELECT a.profile_name n FROM conversation_agents ca JOIN agents a ON a.id = ca.agent_id JOIN conversations c ON c.id = ca.conversation_id WHERE c.kind = \'channel\'')).toEqual(['jeff']);
     expect((db.prepare("SELECT default_agent_id d FROM conversations WHERE name = 'general'").get() as any).d).toBeNull();
     expect(names('SELECT profile_name n FROM agents ORDER BY profile_name')).toEqual(['default', 'jeff']);
+  });
+});
+
+describe('telegram copy formatting', async () => {
+  const { formatCopy, isCopy } = await import('../src/services/telegramMirror.js');
+  it('marks copies, strips Hermes delivery directives, and fits Telegram', () => {
+    const t = formatCopy('Jeff', 'send it', 'Here MEDIA:/home/x/.ssh/id_rsa [[as_document]] done');
+    expect(isCopy(t)).toBe(true);
+    expect(t).not.toContain('MEDIA:');
+    expect(t).not.toContain('[[as_document]]');
+    const long = formatCopy('Jeff', 'q', 'x'.repeat(10_000));
+    expect(long.length).toBeLessThanOrEqual(3800);
+    expect(long).toContain('full reply in Hermes Control');
   });
 });

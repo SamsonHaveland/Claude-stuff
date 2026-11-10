@@ -17,11 +17,19 @@ This plan uses only the interfaces verified in `HERMES_AUDIT.md`. It is ordered 
 
 | Direction | Status |
 |---|---|
-| Telegram → Hermes Control | **Supported (read-only mirror).** Each message in Jeff's Telegram session appears once, in order and with its original timestamp, in "Jeff · Telegram". The mirror is keyed by Hermes message id, so restarts and re-polls never duplicate. |
-| Hermes Control → Jeff | **Supported, in a separate session.** The DM with Jeff uses an API-owned Hermes session, and Jeff's real reply appears in Hermes Control. |
-| Hermes Control → *into* the Telegram chat, as you | **Not supported by verified interfaces.** The API server refuses to write to the Telegram-owned session (409 `permission_denied`). `hermes send` would post as the **bot**, not as you. |
-| Hermes Control → Telegram chat, as the bot | Possible with `hermes send`. **Not implemented**, because it sends external messages and needs your approval. |
-| Same conversation context on both surfaces | **No.** Telegram and Hermes Control are separate Hermes sessions, though Jeff's long-term memory spans both. |
+| Telegram → Hermes Control | **Supported.** Each message in an agent's Telegram session appears once, in order and with its original timestamp, in "<Agent> on Telegram". It's keyed by Hermes message id, so restarts and re-polls never duplicate. Configured for Jeff and Debra, the two agents with their own bots (checked on hermes-pi). |
+| Hermes Control → Telegram (two-way, off by default) | **Supported, as the bot.** With Two-way on (Settings › Telegram), you can type in "<Agent> on Telegram". The turn runs in Hermes Control's own API session for that chat. The Telegram messages since your last Hermes Control turn go along as context, so the agent knows what was said in Telegram. When the reply completes, the exchange (`💻 From Hermes Control` / You / Agent) is posted to the agent's Telegram home chat with `hermes -p <agent> send --to telegram`. |
+| Agent remembers Hermes Control turns in Telegram | **Yes, with a delay.** `hermes send` also writes the copy into the agent's Telegram session transcript. Verified on hermes-pi v0.23.0: the test message was stored in Jeff's current Telegram session. The live gateway keeps an active conversation in memory, so the agent may only see the copy after its session is reloaded (a quiet period or a gateway restart). |
+| Hermes Control → Telegram *as you* | **Not possible.** Telegram doesn't let a bot post as a user, and the API server refuses writes into a Telegram-owned session (409 `permission_denied`). |
+| One single Hermes session for both | **No.** Context crosses in both directions (as described above), but there are two sessions underneath. |
+
+How two-way is kept safe:
+
+- Copies start with `💻 From Hermes Control`, and the mirror skips those lines, so a copy never comes back as a new message (no echo loop).
+- Each completed run is copied at most once (`mirror_cursors` key `tgcopy:run:<id>`), including across restarts. A failed copy is recorded in the audit log and shown in Settings. It is never retried silently.
+- The text goes to `hermes send` on stdin, never as command arguments. `MEDIA:` and `[[as_document]]` directives are neutralised, so a reply can't make Hermes attach a local file. Copies are capped below Telegram's 4,096-character limit.
+- Only admins can switch Two-way. Each switch is audit-logged.
+- Enable it with `deploy/pi/enable-telegram-sync.sh`. The script backs up the config, changes only the `telegramMirror` lines, leaves two-way off, and can be undone with one command.
 
 These rules hold regardless:
 
@@ -29,7 +37,7 @@ These rules hold regardless:
 - No second poller is created.
 - The bot token never leaves Hermes.
 
-**Candidate for later (needs a test on your Mac and your approval):** the gateway WebSocket (`hermes gateway attach --json` → `prompt.submit` on the Telegram session). The docs point cross-surface writers to it, but its behaviour with messaging-owned sessions is unconfirmed. If a test shows that it drives Jeff's Telegram session *and* delivers replies to Telegram, it would give true two-way sync without touching the Telegram gateway.
+**Candidate for later:** a single shared session through the gateway WebSocket (`hermes gateway attach --json` → `prompt.submit` on the Telegram session). The docs point cross-surface writers to it, but its behaviour with messaging-owned sessions is unconfirmed. If a test shows that it drives Jeff's Telegram session *and* delivers replies to Telegram, it would give true two-way sync without touching the Telegram gateway.
 
 ## Steps that need your approval (in order)
 
