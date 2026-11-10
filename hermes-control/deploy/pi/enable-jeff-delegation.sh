@@ -12,7 +12,9 @@
 set -euo pipefail
 die() { printf '\nSTOPPED: %s\nNothing more was changed.\n' "$*" >&2; exit 1; }
 HB="$(command -v hermes || echo "$HOME/.local/bin/hermes")"
-J="${HERMES_HOME:-$HOME/.hermes}/profiles/jeff"
+H="${HERMES_HOME:-$HOME/.hermes}"; case "$H" in */profiles/*) H="${H%/profiles/*}";; esac
+export HERMES_HOME="$H"   # an agent running this has HERMES_HOME set to its own profile; use the real root
+J="$H/profiles/jeff"
 [ -d "$J" ] || die "Jeff's profile not found at $J"
 SOUL="$J/SOUL.md"; [ -f "$SOUL" ] || die "Jeff has no SOUL.md at $SOUL"
 STAMP="$(date +%Y%m%d-%H%M%S)"

@@ -12,7 +12,8 @@
 # not covered by this — see the Phase 1 email plan.
 set -uo pipefail
 HB="$(command -v hermes || echo "$HOME/.local/bin/hermes")"
-H="${HERMES_HOME:-$HOME/.hermes}"
+H="${HERMES_HOME:-$HOME/.hermes}"; case "$H" in */profiles/*) H="${H%/profiles/*}";; esac
+export HERMES_HOME="$H"   # an agent running this has HERMES_HOME set to its own profile; use the real root
 STAMP="$(date +%Y%m%d-%H%M%S)"
 PROFILES="default $(ls "$H/profiles" 2>/dev/null | grep -vE '^\.|^default$' | tr '\n' ' ')"
 changed=0; skipped=0; backups=()

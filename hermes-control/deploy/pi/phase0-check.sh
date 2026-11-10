@@ -5,10 +5,12 @@
 # Review before sharing: job names and log lines are business information.
 set -u
 HB="$(command -v hermes || echo "$HOME/.local/bin/hermes")"
-H="${HERMES_HOME:-$HOME/.hermes}"
+H="${HERMES_HOME:-$HOME/.hermes}"; case "$H" in */profiles/*) H="${H%/profiles/*}";; esac
+export HERMES_HOME="$H"   # an agent running this has HERMES_HOME set to its own profile; use the real root
 sec() { printf '\n==================== %s ====================\n' "$1"; }
 cfg() { "$HB" -p "$1" config get "$2" --json 2>/dev/null; }
 PROFILES="default $(ls "$H/profiles" 2>/dev/null | grep -vE '^\.|^default$' | tr '\n' ' ')"
+echo "Hermes root: $H   agents found: $PROFILES"
 
 sec "Is anything else polling the Telegram bots? (0 = no)"
 if journalctl --user -u hermes-gateway -n 1 --no-pager >/dev/null 2>&1; then
@@ -43,10 +45,30 @@ for P in $PROFILES; do
   [ -n "$out" ] && { echo "[$P]"; echo "$out"; found=1; }
 done
 [ "$found" = 0 ] && echo "(none found in 'hermes cron list' output)"
-grep -rliE 'hayes|marty' "$H"/cron "$H"/profiles/*/cron 2>/dev/null | sed 's/^/mentioned in file: /' | head
+echo "--- every scheduled job on file (name, schedule, state), and where hayes/marty appear"
+python3 - "$H" <<'PY'
+import glob, json, os, re, sys
+root = sys.argv[1]
+for path in sorted(glob.glob(root + "/cron/jobs.json") + glob.glob(root + "/profiles/*/cron/jobs.json")):
+    who = "default" if path.startswith(root + "/cron") else path.split("/profiles/")[1].split("/")[0]
+    try: data = json.load(open(path))
+    except Exception as e: print("[%s] unreadable: %s" % (who, e)); continue
+    jobs = data.get("jobs", data) if isinstance(data, dict) else data
+    if isinstance(jobs, dict): jobs = list(jobs.values())
+    jobs = [j for j in (jobs or []) if isinstance(j, dict)]
+    print("[%s] %d job(s)" % (who, len(jobs)))
+    for j in jobs:
+        text = json.dumps(j)
+        sched = j.get("schedule"); sched = sched.get("display", sched.get("expr", sched)) if isinstance(sched, dict) else sched
+        state = "paused" if j.get("paused") or j.get("enabled") is False else j.get("state", "active")
+        hits = sorted(set(m.lower() for m in re.findall(r"hayes|marty", text, re.I)))
+        print("  - %s | %s | %s | deliver=%s%s" % (j.get("name") or j.get("id"), sched, state, j.get("deliver"), (" | MENTIONS " + ",".join(hits)) if hits else ""))
+        for m in list(re.finditer(r"hayes|marty", text, re.I))[:2]:
+            print("      ...%s..." % text[max(0, m.start() - 70):m.end() + 70].replace("\\n", " "))
+PY
 
 sec "Jeff's tools (is kanban already on?)"
-"$HB" -p jeff tools --summary 2>&1 | grep -iE 'kanban|telegram|api_server|platform' | head -15
+"$HB" -p jeff tools --summary 2>&1 | head -40
 
 sec "Listeners (127.0.0.1 = Pi only; 0.0.0.0 = whole network)"
 ss -tln 2>/dev/null | awk 'NR==1 || /LISTEN/'

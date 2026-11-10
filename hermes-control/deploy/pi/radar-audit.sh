@@ -12,7 +12,8 @@
 # Review before sharing: job names, SOUL.md headings and log lines are business information.
 set -u
 HB="$(command -v hermes || echo "$HOME/.local/bin/hermes")"
-H="${HERMES_HOME:-$HOME/.hermes}"
+H="${HERMES_HOME:-$HOME/.hermes}"; case "$H" in */profiles/*) H="${H%/profiles/*}";; esac
+export HERMES_HOME="$H"   # an agent running this has HERMES_HOME set to its own profile; use the real root
 sec() { printf '\n==================== %s ====================\n' "$1"; }
 sub() { printf '\n--- %s ---\n' "$1"; }
 cfg() { "$HB" -p "$1" config get "$2" --json 2>/dev/null; }

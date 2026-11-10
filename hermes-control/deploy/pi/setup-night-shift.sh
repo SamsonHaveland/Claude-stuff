@@ -20,7 +20,8 @@
 set -euo pipefail
 die() { printf '\nSTOPPED: %s\nNothing was changed.\n' "$*" >&2; exit 1; }
 HB="$(command -v hermes || echo "$HOME/.local/bin/hermes")"
-H="${HERMES_HOME:-$HOME/.hermes}"
+H="${HERMES_HOME:-$HOME/.hermes}"; case "$H" in */profiles/*) H="${H%/profiles/*}";; esac
+export HERMES_HOME="$H"   # an agent running this has HERMES_HOME set to its own profile; use the real root
 BUSINESS="${BUSINESS:-FilmLV}"
 TENANT="${TENANT:-filmlv}"
 SITE="${SITE:-https://filmlv.com}"
