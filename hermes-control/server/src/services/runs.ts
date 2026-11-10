@@ -114,8 +114,17 @@ export class RunService {
     if (existing) return existing.hermes_session_id;
     const conv = this.db.prepare('SELECT c.name, c.kind, w.slug FROM conversations c JOIN workspaces w ON w.id = c.workspace_id WHERE c.id = ?').get(conversationId) as { name: string; kind: string; slug: string };
     const sessionId = `hc_${conv.slug}_${conversationId}_${agentId}_${randomBytes(4).toString('hex')}`.replace(/[^A-Za-z0-9_-]/g, '_');
-    const title = `Hermes Control · ${conv.slug} · ${conv.kind === 'dm' ? 'DM' : '#' + conv.name}`;
-    return this.hermes.createSession(profile, { id: sessionId, title }).then((id) => {
+    // Hermes requires session titles to be unique per profile. A chat gets a new session after
+    // "Start Fresh", so later sessions carry a date, and any clash is retried with a unique suffix.
+    const base = `Hermes Control · ${conv.slug} · ${conv.kind === 'dm' ? 'DM' : conv.kind === 'telegram_mirror' ? 'Telegram chat' : '#' + conv.name}`;
+    const earlier = (this.db.prepare(`SELECT COUNT(*) n FROM messages WHERE conversation_id = ? AND author_kind = 'system' AND author_label = 'fresh-start'`).get(conversationId) as { n: number }).n;
+    const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    const title = earlier ? `${base} · ${stamp}` : base;
+    const create = (t: string) => this.hermes.createSession(profile, { id: sessionId, title: t });
+    return create(title).catch((e) => {
+      if (!/already in use|title/i.test((e as Error).message)) throw e;
+      return create(`${base} · ${stamp} · ${sessionId.slice(-8)}`);
+    }).then((id) => {
       this.db.prepare('INSERT OR IGNORE INTO hermes_bindings (conversation_id, agent_id, hermes_session_id, created_at) VALUES (?,?,?,?)').run(conversationId, agentId, id, this.now());
       const bound = this.db.prepare('SELECT hermes_session_id FROM hermes_bindings WHERE conversation_id = ? AND agent_id = ?').get(conversationId, agentId) as { hermes_session_id: string };
       return bound.hermes_session_id;

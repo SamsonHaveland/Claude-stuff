@@ -38,6 +38,8 @@
   - Visual style: system font, iOS colours, translucent bars and grouped lists. Reduced motion, reduced transparency and higher contrast are respected.
 
 ### Fixed
+- **Start Fresh failed on real Hermes** with "Title … is already in use". Hermes requires unique conversation titles, and the fresh conversation reused the old one. Later conversations are now dated, and any clash is retried with a unique suffix. The test stand-in now enforces the same rule.
+- The installer no longer says "Hermes integration is OFF" or shows a home-network address when your kept settings say otherwise.
 From an independent code review, which found no access-control, injection or script-injection problems:
 - **Login guessing limit could be bypassed** from the home network by faking a forwarding header. Only the local Tailscale proxy is trusted for it now.
 - **Approvals could get stuck or be mislabelled.** A network hiccup left an approval unanswerable, and two taps at once could both be sent. An approval is now claimed once, and handed back if Hermes couldn't be reached.

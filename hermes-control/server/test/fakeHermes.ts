@@ -95,6 +95,9 @@ export class FakeHermes {
       const b = await this.body(req);
       const id = b.id ?? `api_${Date.now()}`;
       if (this.sessions.has(id)) return this.json(res, 409, { error: { message: 'exists', code: 'session_exists' } });
+      // Real Hermes refuses a title another session of the profile already holds (hermes_state_titles.py).
+      const holder = b.title && [...this.sessions.values()].find((s) => s.title === b.title);
+      if (holder) return this.json(res, 400, { error: { message: `Title '${b.title}' is already in use by session ${holder.id}`, code: 'invalid_request' } });
       this.sessions.set(id, { id, source: 'api_server', title: b.title, last_active: Date.now() / 1000 });
       return this.json(res, 201, { object: 'hermes.session', session: { id, source: 'api_server', title: b.title } });
     }

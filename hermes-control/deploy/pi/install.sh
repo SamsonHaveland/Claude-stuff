@@ -111,7 +111,17 @@ fi
 
 IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 say "Done"
-echo "Open from a device on your home network:  http://hermes-pi.local:$PORT   (or http://$IP:$PORT)"
-echo "Hermes integration is OFF. Nothing in ~/.hermes was changed."
+# Say what is true for THIS install: the config is kept on upgrade, so read it back.
+ORIGIN="$(grep -E '^\s*allowedOrigins:' "$BASE/config.yaml" | grep -oE 'https://[A-Za-z0-9.-]+' | head -1 || true)"
+if grep -qE '^\s*host:\s*127\.0\.0\.1' "$BASE/config.yaml"; then
+  echo "Open: ${ORIGIN:-your Tailscale address} (this install only answers through Tailscale)"
+else
+  echo "Open from a device on your home network:  http://hermes-pi.local:$PORT   (or http://$IP:$PORT)"
+fi
+if grep -qE '^\s*mode:\s*live' "$BASE/config.yaml"; then
+  echo "Hermes integration is ON (your settings were kept). Nothing in ~/.hermes was changed."
+else
+  echo "Hermes integration is OFF. Nothing in ~/.hermes was changed."
+fi
 echo "Rollback: systemctl --user stop hermes-control && mv $BASE/app $BASE/app.bad && mv $BASE/app.prev $BASE/app && systemctl --user start hermes-control"
 echo "Uninstall: systemctl --user disable --now hermes-control && rm ~/.config/systemd/user/hermes-control.service  (then delete ~/hermes-control if wanted)"

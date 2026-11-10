@@ -297,6 +297,17 @@ describe('fresh start', () => {
     await waitFor(() => done() === 2);
     expect(session()).toBeTruthy();
     expect(session()).not.toBe(before);
+    // Hermes insists on unique session titles: the fresh session must not reuse the first one's.
+    const titles = [before, session()].map((id) => fake.sessions.get(id)?.title);
+    expect(titles[0]).toBe('Hermes Control · film-lv · DM');
+    expect(titles[1]).not.toBe(titles[0]);
+    expect(titles[1]).toContain('Hermes Control · film-lv · DM · ');
+
+    // A second fresh start in the same minute would produce the same dated title: the clash is retried.
+    await env.app.inject({ method: 'POST', url: `/api/w/film-lv/conversations/${c}/fresh`, headers, payload: {} });
+    await env.app.inject({ method: 'POST', url: `/api/w/film-lv/conversations/${c}/messages`, headers, payload: { body: 'third' } });
+    await waitFor(() => done() === 3);
+    expect(new Set([...fake.sessions.values()].map((x: any) => x.title)).size).toBe(fake.sessions.size);
 
     // Refused while a reply is still running.
     env.db.prepare(`UPDATE runs SET status = 'running' WHERE conversation_id = ?`).run(c);
