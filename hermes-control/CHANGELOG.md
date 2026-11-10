@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Added
+- **`deploy/pi/speed-check.sh`** (read-only): shows why agents are slow. Covers Pi load, text sent with every message per agent, tools switched on, Telegram streaming mode, grouped gateway warnings, scheduled-job health and 7-day usage. `--ping` also times a one-word reply per agent.
+- **`deploy/pi/setup-night-shift.sh`**: creates a six-job night shift for one business (research, website, outreach, ads, quality pass, morning brief). All jobs are created **paused**. They write drafts only, into `~/hermes-work/<tenant>/tonight/`. The script refuses to run without nightly backups, or if an agent has approvals switched off.
 - **Phase 0 scripts for the Pi** (`deploy/pi/`), each backing up what it changes and printing an undo:
   - `phase0-check.sh`: read-only checks. Is a second machine polling the Telegram bots? Approval modes, connected-service trust levels, scheduled jobs that mention Hayes or Marty, listening ports, backups.
   - `enable-hermes-backup.sh`: a nightly 03:30 `hermes backup` of every agent (keeps 14) plus a Hermes Control database copy. Files are private and timer-driven; the first backup runs straight away and is checked.
