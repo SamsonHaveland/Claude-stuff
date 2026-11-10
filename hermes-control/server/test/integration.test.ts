@@ -101,7 +101,8 @@ describe('message delivery to Hermes', () => {
     expect(fake.runs.get('run_1')!.input).toBe('Summarise today');
     // tool activity recorded from real events
     const events = env.db.prepare('SELECT event FROM run_events WHERE run_id = ? ORDER BY seq').all(runId).map((r: any) => r.event);
-    expect(events).toEqual(['run.started', 'tool.started', 'tool.completed', 'message.delta', 'message.delta', 'run.completed']);
+    // Text deltas are applied to the message body but no longer stored as event rows.
+    expect(events).toEqual(['run.started', 'tool.started', 'tool.completed', 'run.completed']);
   });
 
   it('channel delegation message reaches Jeff only; no reply is fabricated for Debra or Roxy', async () => {
@@ -217,10 +218,57 @@ describe('approvals', () => {
     await app2.app.close();
   });
 
+  it('a transient failure hands the approval back, and two taps cannot both decide', async () => {
+    await fake.stop();
+    fake = await new FakeHermes({ key: 'secret-key', script: (run, f) => { run.status = 'waiting_for_approval'; f.emit(run, 'approval.request', { request_id: 'p-3', command: 'post update', choices: ['once', 'deny'] }); } }).start();
+    fake.approvalStatus = 503;
+    const app2 = await makeApp({ hermesUrl: fake.url, key: 'secret-key' });
+    const { headers } = await login(app2.app, 'sam');
+    const c = convId(app2.db, 'film-lv', 'dm', 'dm-jeff');
+    await app2.app.inject({ method: 'POST', url: `/api/w/film-lv/conversations/${c}/messages`, headers, payload: { body: 'post it' } });
+    const ap = await waitFor(() => app2.db.prepare(`SELECT * FROM approvals WHERE status = 'pending'`).get() as any);
+    const status = () => (app2.db.prepare('SELECT status, decision FROM approvals WHERE id = ?').get(ap.id) as any);
+    const decide = (choice: string) => app2.app.inject({ method: 'POST', url: `/api/w/film-lv/approvals/${ap.id}/decision`, headers, payload: { choice } });
+
+    expect((await decide('once')).statusCode).toBeGreaterThanOrEqual(500);
+    expect(status()).toMatchObject({ status: 'pending', decision: null }); // answerable again, not stuck
+
+    fake.approvalStatus = 200;
+    const [a, b] = await Promise.all([decide('once'), decide('deny')]);
+    expect([a.statusCode, b.statusCode].sort()).toEqual([200, 409]);
+    expect(fake.approvalCalls.filter((x) => x.body.request_id === 'p-3' && fake.approvalStatus === 200).length).toBeGreaterThanOrEqual(1);
+    expect(status().status).toBe('confirmed');
+    await app2.app.close();
+  });
+
   it('only workspace owners can decide', async () => {
     const { headers } = await login(env.app, 'fox');
     const r = await env.app.inject({ method: 'POST', url: '/api/w/atomic-fox/approvals/1/decision', headers, payload: { choice: 'once' } });
     expect(r.statusCode).toBe(403);
+  });
+});
+
+describe('retry', () => {
+  it('a reply Hermes itself failed is retried as a NEW run; other runs are left alone', async () => {
+    await fake.stop();
+    let n = 0;
+    fake = await new FakeHermes({ key: 'secret-key', script: (run, f) => { n++; f.emit(run, 'run.started'); n === 1 ? f.finish(run, 'failed', '', 'model overloaded') : f.finish(run, 'completed', 'second attempt worked'); } }).start();
+    const app2 = await makeApp({ hermesUrl: fake.url, key: 'secret-key' });
+    const { headers } = await login(app2.app, 'sam');
+    const c = convId(app2.db, 'film-lv', 'dm', 'dm-jeff');
+    await app2.app.inject({ method: 'POST', url: `/api/w/film-lv/conversations/${c}/messages`, headers, payload: { body: 'try me' } });
+    const run = await waitFor(() => app2.db.prepare(`SELECT * FROM runs WHERE status = 'failed'`).get() as any);
+    const first = run.hermes_run_id;
+    expect((await app2.app.inject({ method: 'POST', url: `/api/w/film-lv/runs/${run.id}/retry`, headers })).statusCode).toBe(200);
+    const done = await waitFor(() => app2.db.prepare(`SELECT * FROM runs WHERE id = ? AND status = 'completed'`).get(run.id) as any);
+    expect(done.hermes_run_id).not.toBe(first);
+    expect(done.idempotency_key).not.toBe(run.idempotency_key);
+    expect((app2.db.prepare('SELECT body, state FROM messages WHERE id = ?').get(run.reply_message_id) as any)).toMatchObject({ body: 'second attempt worked', state: 'final' });
+    expect(n).toBe(2);
+    expect((await app2.app.inject({ method: 'POST', url: `/api/w/film-lv/runs/${run.id}/retry`, headers })).statusCode).toBe(409); // not failed any more
+    await app2.app.close();
+    await fake.stop();
+    fake = await new FakeHermes({ key: 'secret-key' }).start();
   });
 });
 

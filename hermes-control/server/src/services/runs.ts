@@ -82,6 +82,24 @@ export class RunService {
     return rows.length;
   }
 
+  /**
+   * Try a failed reply again. If Hermes never accepted the turn, resend it with the SAME idempotency
+   * key (Hermes dedupes, so it cannot run twice). If Hermes accepted and ended it, following the old
+   * run would only fail again, so submit a new turn with a new key.
+   */
+  retry(runId: number) {
+    const run = this.get(runId);
+    if (run.hermes_run_id) {
+      const key = `hc-${run.request_message_id}-${run.agent_id}-${randomBytes(12).toString('hex')}`;
+      this.db.prepare(`UPDATE runs SET hermes_run_id = NULL, idempotency_key = ?, last_seq = 0, last_event = NULL WHERE id = ?`).run(key, runId);
+      this.db.prepare(`UPDATE messages SET body = '' WHERE id = ?`).run(run.reply_message_id);
+    }
+    this.db.prepare(`UPDATE runs SET status = 'submitting', error = NULL, updated_at = ? WHERE id = ?`).run(this.now(), runId);
+    this.db.prepare(`UPDATE messages SET state = 'pending', error = NULL WHERE id = ?`).run(run.reply_message_id);
+    this.publishMessage(run.reply_message_id);
+    void this.drive(runId);
+  }
+
   stopAll() {
     for (const c of this.active.values()) c.abort();
     this.active.clear();
@@ -134,9 +152,13 @@ export class RunService {
   }
 
   private async follow(run: RunRow, profile: string, signal: AbortSignal) {
+    // The attempt budget is for consecutive failures only: any progress, or Hermes confirming the run
+    // is still alive (long tool calls, waiting for an approval), resets it.
+    let lastSeq = this.get(run.id).last_seq;
     for (let attempt = 0; attempt < MAX_STREAM_ATTEMPTS && !signal.aborted; attempt++) {
       const current = this.get(run.id);
       if (TERMINAL.has(current.status)) return;
+      if (current.last_seq > lastSeq) { lastSeq = current.last_seq; attempt = 0; }
       try {
         await this.hermes.streamRunEvents(profile, run.hermes_run_id!, current.last_seq, (ev) => this.onEvent(run.id, ev), signal);
       } catch (e) {
@@ -152,6 +174,7 @@ export class RunService {
         this.finish(run.id, status.status, typeof status.output === 'string' ? status.output : null, status.error ?? null);
         return;
       }
+      if (status && typeof status.status === 'string') { await sleep(2000, signal); attempt = -1; continue; } // alive: keep following
       await sleep(Math.min(1000 * 2 ** attempt, 15_000), signal);
     }
     if (!TERMINAL.has(this.get(run.id).status) && !signal.aborted) {
@@ -165,7 +188,8 @@ export class RunService {
     const run = this.get(runId);
     if (typeof ev.seq === 'number') {
       if (ev.seq <= run.last_seq) return; // duplicate after reconnect
-      this.db.prepare('INSERT OR IGNORE INTO run_events (run_id, seq, event, payload, created_at) VALUES (?,?,?,?,?)').run(runId, ev.seq, ev.event, JSON.stringify(ev), this.now());
+      // Text deltas are not kept as events: the text is in messages.body, and a long reply is thousands of rows.
+      if (ev.event !== 'message.delta') this.db.prepare('INSERT OR IGNORE INTO run_events (run_id, seq, event, payload, created_at) VALUES (?,?,?,?,?)').run(runId, ev.seq, ev.event, JSON.stringify(ev), this.now());
       this.db.prepare('UPDATE runs SET last_seq = ?, last_event = ?, updated_at = ? WHERE id = ?').run(ev.seq, ev.event, this.now(), runId);
     }
     const name = ev.event;
@@ -242,9 +266,11 @@ export class RunService {
   async decide(approvalId: number, choice: string, userId: number) {
     const ap = this.db.prepare('SELECT * FROM approvals WHERE id = ?').get(approvalId) as any;
     if (!ap) throw new HermesError('Approval not found', 404, 'not_found');
-    if (ap.status !== 'pending') throw new HermesError(`Approval is ${ap.status}`, 409, 'not_pending');
     const allowed: string[] = JSON.parse(ap.choices);
     if (!allowed.includes(choice)) throw new HermesError(`Choice must be one of ${allowed.join(', ')}`, 400, 'invalid_choice');
+    // Claim before the first await, so two taps (or two devices) can never both post a decision.
+    const claim = this.db.prepare(`UPDATE approvals SET status = 'submitted', decision = ?, decided_by = ?, decided_at = ? WHERE id = ? AND status = 'pending'`).run(choice, userId, this.now(), approvalId);
+    if (!claim.changes) throw new HermesError(`Approval is ${ap.status === 'pending' ? 'already being answered' : ap.status}`, 409, 'not_pending');
     const run = this.get(ap.run_id);
     const profile = this.profileOf(run.agent_id);
     // Canonical gateways require the CURRENT prompt identity from pending_controls.
@@ -257,7 +283,6 @@ export class RunService {
       requestId = ctl.prompt_id ?? ctl.request_id ?? requestId;
       generation = typeof ctl.execution_generation === 'number' ? ctl.execution_generation : generation;
     }
-    this.db.prepare(`UPDATE approvals SET status = 'submitted', decision = ?, decided_by = ?, decided_at = ? WHERE id = ?`).run(choice, userId, this.now(), approvalId);
     this.bus.publish({ type: 'approvals.changed', workspaceId: ap.workspace_id, payload: { runId: run.id } });
     const body: Record<string, unknown> = { choice };
     if (requestId) body.request_id = requestId;
@@ -269,8 +294,9 @@ export class RunService {
     } catch (e) {
       const err = e as HermesError;
       // 409 = stale / already settled elsewhere (e.g. answered on Telegram). Report, don't guess.
-      const next = err.status === 409 ? 'rejected' : 'error';
-      this.db.prepare(`UPDATE approvals SET status = ?, hermes_response = ? WHERE id = ?`).run(next, JSON.stringify({ error: err.message, code: err.code, status: err.status }), approvalId);
+      // Anything else (timeout, 5xx) did not reach a decision: hand it back so it can be answered again.
+      const next = err.status === 409 ? 'rejected' : 'pending';
+      this.db.prepare(`UPDATE approvals SET status = ?, decision = CASE WHEN ? = 'pending' THEN NULL ELSE decision END, hermes_response = ? WHERE id = ? AND status = 'submitted'`).run(next, next, JSON.stringify({ error: err.message, code: err.code, status: err.status }), approvalId);
       throw err;
     } finally {
       this.bus.publish({ type: 'approvals.changed', workspaceId: ap.workspace_id, payload: { runId: run.id } });

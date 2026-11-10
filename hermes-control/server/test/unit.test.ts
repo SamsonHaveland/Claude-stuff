@@ -135,3 +135,11 @@ describe('telegram copy formatting', async () => {
     expect(long).toContain('full reply in Hermes Control');
   });
 });
+
+describe('SSRF guard', async () => {
+  const { isPrivateAddress } = await import('../src/services/character.js');
+  it('treats mapped, hex-mapped and wrapped private addresses as private', () => {
+    for (const ip of ['127.0.0.1', '10.1.2.3', '192.168.1.5', '100.70.155.72', '::1', '::ffff:127.0.0.1', '::ffff:7f00:1', '::ffff:c0a8:105', 'fd7a:115c:a1e0::1', '64:ff9b::7f00:1']) expect(isPrivateAddress(ip), ip).toBe(true);
+    for (const ip of ['8.8.8.8', '1.1.1.1', '2606:4700:4700::1111', '::ffff:808:808']) expect(isPrivateAddress(ip), ip).toBe(false);
+  });
+});

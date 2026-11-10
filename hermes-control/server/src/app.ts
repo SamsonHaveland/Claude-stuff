@@ -57,7 +57,7 @@ export interface AppContext {
 
 export async function buildApp(deps: AppDeps): Promise<{ app: FastifyInstance; ctx: AppContext }> {
   const { cfg, db } = deps;
-  const app = Fastify({ logger: deps.logger ?? false, bodyLimit: 1024 * 1024, trustProxy: true });
+  const app = Fastify({ logger: deps.logger ?? false, bodyLimit: 1024 * 1024, trustProxy: '127.0.0.1' });
   const hermes = deps.hermes ?? new HermesClient(cfg);
   const kanban = deps.kanban ?? new KanbanAdapter(cfg);
   const bus = new EventBus();

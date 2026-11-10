@@ -38,6 +38,17 @@
   - Visual style: system font, iOS colours, translucent bars and grouped lists. Reduced motion, reduced transparency and higher contrast are respected.
 
 ### Fixed
+From an independent code review, which found no access-control, injection or script-injection problems:
+- **Login guessing limit could be bypassed** from the home network by faking a forwarding header. Only the local Tailscale proxy is trusted for it now.
+- **Approvals could get stuck or be mislabelled.** A network hiccup left an approval unanswerable, and two taps at once could both be sent. An approval is now claimed once, and handed back if Hermes couldn't be reached.
+- **Long replies were marked "Lost contact"** after six stream reconnects, even while Hermes was still working (long tools, waiting for an approval). Progress now resets the count.
+- **Try Again** on a reply that Hermes itself had failed just failed again. It now starts a new attempt, and no longer touches other chats' stuck replies.
+- **Thread reply counts** grew with every streamed word ("200 Replies" for one reply).
+- **The Chats badge** counted messages from other businesses.
+- **Switching chats quickly** could show the previous chat's messages; a failed load now says so, with Try Again.
+- **Portrait downloads:** a disguised local address could get past the private-address check, and a download without a stated size could grow unbounded. Both closed.
+- **Speed:** three missing database indexes added. Streamed text is no longer stored a second time as thousands of event rows; old rows are cleaned up.
+- Task text starting with "-" could be misread as a command option. `?archived=false` was read as true.
 - `deploy/backup.sh` never worked: `VACUUM INTO` was given a double-quoted name, which SQLite reads as a column. It now uses a string literal, and the result was verified with an integrity check.
 - **Agent replies now render Markdown**: headings, bold, lists, tables, checklists, code and links. It's done safely: no raw HTML, only http(s) and mailto links, and remote images appear as links. Chat-list previews show plain text.
 - The iPhone toolbar no longer covers the message box (dynamic viewport height), and tables scroll sideways instead of breaking words.

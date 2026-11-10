@@ -189,4 +189,15 @@ CREATE TABLE app_settings (
 );
 `,
   },
+  {
+    version: 3,
+    sql: `
+-- Hot-path lookups: every streamed delta joins runs by reply message; thread counts; activity feed.
+CREATE INDEX runs_reply ON runs(reply_message_id);
+CREATE INDEX messages_parent ON messages(parent_id) WHERE parent_id IS NOT NULL;
+CREATE INDEX run_events_created ON run_events(created_at);
+-- Streamed text deltas were stored per event and never read; the text lives in messages.body.
+DELETE FROM run_events WHERE event = 'message.delta';
+`,
+  },
 ];

@@ -86,7 +86,7 @@ export class KanbanAdapter {
   async create(input: { title: string; body?: string; assignee?: string; priority?: number; tenant?: string; idempotencyKey: string }): Promise<KanbanTask> {
     const args = ['create', '--json', '--idempotency-key', input.idempotencyKey];
     if (input.tenant) args.push('--tenant', input.tenant);
-    if (input.body) args.push('--body', input.body);
+    if (input.body) args.push(`--body=${input.body}`);
     if (input.assignee) { assertProfile(input.assignee); args.push('--assignee', input.assignee); }
     if (input.priority !== undefined) args.push('--priority', String(Math.trunc(input.priority)));
     args.push('--', input.title);
@@ -101,14 +101,14 @@ export class KanbanAdapter {
 
   async comment(id: string, text: string, author: string) {
     assertTaskId(id);
-    return this.plain(['comment', '--author', author, '--', id, text]);
+    return this.plain(['comment', `--author=${author}`, '--', id, text]);
   }
 
   /** Only the verified status-transition subcommands; Hermes enforces the workflow rules. */
   async transition(id: string, action: 'block' | 'unblock' | 'complete' | 'archive', reason?: string) {
     assertTaskId(id);
     if (action === 'block') return this.plain(['block', '--', id, reason || 'Blocked from Hermes Control']);
-    if (action === 'complete' && reason) return this.plain(['complete', '--result', reason, '--', id]);
+    if (action === 'complete' && reason) return this.plain(['complete', `--result=${reason}`, '--', id]);
     return this.plain([action, '--', id]);
   }
 }

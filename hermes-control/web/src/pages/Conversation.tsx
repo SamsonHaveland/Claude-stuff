@@ -38,10 +38,17 @@ export function ConversationPage() {
   const [fresh, setFresh] = useState(false);
   const [activity, setActivity] = useState<Activity>({});
 
+  const seenReplies = useRef(new Set<number>());
+  const [loadError, setLoadError] = useState(false);
+  const current = useRef(id);
+  current.current = id;
   const load = useCallback(() => {
-    api<Msg[]>(`/api/w/${ws.slug}/conversations/${id}/messages`).then((m) => { setMessages(m); setLoaded(true); }).catch(() => setLoaded(true));
+    // A slow answer for a chat you already left must not replace the one on screen.
+    api<Msg[]>(`/api/w/${ws.slug}/conversations/${id}/messages`)
+      .then((m) => { if (current.current !== id) return; setMessages(m); setLoaded(true); setLoadError(false); })
+      .catch(() => { if (current.current !== id) return; setLoaded(true); setLoadError(true); });
   }, [ws.slug, id]);
-  useEffect(() => { setMessages([]); setLoaded(false); setThread(null); load(); markRead(id); return () => markRead(null); }, [load, id]);
+  useEffect(() => { setMessages([]); setLoaded(false); setLoadError(false); setThread(null); setActivity({}); seenReplies.current.clear(); load(); markRead(id); return () => markRead(null); }, [load, id]);
 
   useServerEvents((e) => {
     if (e.type === 'reconnected') return load();
@@ -51,9 +58,14 @@ export function ConversationPage() {
     }
     if (e.type !== 'message.upsert' || e.conversationId !== id) return;
     const m = e.payload as Msg;
+    if (m.parent_id) {
+      // A thread reply streams as many updates; count it once.
+      if (seenReplies.current.has(m.id)) return;
+      seenReplies.current.add(m.id);
+      return setMessages((list) => list.map((x) => (x.id === m.parent_id ? { ...x, replyCount: (x.replyCount ?? 0) + 1 } : x)));
+    }
     setMessages((list) => {
       const i = list.findIndex((x) => x.id === m.id);
-      if (m.parent_id) return list.map((x) => (x.id === m.parent_id && i < 0 ? { ...x, replyCount: (x.replyCount ?? 0) + 1 } : x));
       if (i >= 0) { const copy = list.slice(); copy[i] = { ...list[i], ...m }; return copy; }
       return [...list, m];
     });
@@ -80,7 +92,9 @@ export function ConversationPage() {
           <button aria-label="Details" onClick={openInfo} className="press flex h-11 w-11 items-center justify-center text-[var(--blue)]"><IInfo size={24} /></button>
         </div>
       </header>
-      <MessageList messages={messages} loaded={loaded} conv={conv} onThread={setThread} activity={activity} />
+      {loadError && !messages.length
+        ? <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center"><p className="t-sub text-[var(--label-2)]">Couldn’t load this chat.</p><Button variant="tinted" onClick={load}>Try Again</Button></div>
+        : <MessageList messages={messages} loaded={loaded} conv={conv} onThread={setThread} activity={activity} />}
       {conv.long && !conv.readOnly && (
         <button onClick={() => setFresh(true)} className="press flex items-center gap-2 bg-[color-mix(in_srgb,var(--orange)_14%,var(--bg))] px-4 py-2 text-left">
           <span className="t-foot flex-1"><b>This chat is getting long.</b> Long chats are slower and cost more.</span>

@@ -161,11 +161,8 @@ export async function registerApi(app: FastifyInstance, ctx: AppContext) {
     const run = db.prepare('SELECT * FROM runs WHERE id = ? AND workspace_id = ?').get(Number((req.params as any).id), ws.id) as any;
     if (!run) return reply.code(404).send({ error: 'not_found' });
     if (run.status !== 'failed' && run.status !== 'unknown') return reply.code(409).send({ error: 'not_retryable' });
-    // Same idempotency key: if Hermes already ran the first attempt it replays instead of re-running.
-    db.prepare(`UPDATE runs SET status = 'submitting', error = NULL, updated_at = ? WHERE id = ?`).run(Date.now(), run.id);
-    db.prepare(`UPDATE messages SET state = 'pending', error = NULL WHERE id = ?`).run(run.reply_message_id);
-    runs.publishMessage(run.reply_message_id);
-    runs.resumeOpenRuns();
+    audit(db, { userId: req.user!.id, workspaceId: ws.id, action: 'run.retry', target: `run:${run.id}` });
+    runs.retry(run.id); // only this run; never re-drives other workspaces' runs
     return { ok: true };
   });
 
@@ -321,7 +318,7 @@ export async function registerApi(app: FastifyInstance, ctx: AppContext) {
 
   app.get('/api/w/:ws/tasks', auth, async (req, reply) => {
     const ws = requireWorkspace(req, reply); if (!ws) return;
-    const q = z.object({ status: z.string().regex(/^[a-z_]+$/).optional(), archived: z.coerce.boolean().optional() }).parse(req.query);
+    const q = z.object({ status: z.string().regex(/^[a-z_]+$/).optional(), archived: z.enum(['true', 'false', '1', '0']).transform((v) => v === 'true' || v === '1').optional() }).parse(req.query);
     const tenant = wsCfg(ws.slug)?.kanbanTenant;
     const tasks = await kanban.list({ status: q.status, archived: q.archived, tenant });
     return tasks.filter((t) => taskVisible(t, ws.id, ws.slug));

@@ -49,8 +49,8 @@ function Badge({ n }: { n: number }) {
 }
 
 function TabBar() {
-  const { ws, pendingApprovals, unread } = useWs();
-  const unreadCount = Object.values(unread).filter(Boolean).length;
+  const { ws, pendingApprovals, unread, conversations } = useWs();
+  const unreadCount = conversations.filter((c) => unread[c.id]).length; // only chats of this workspace
   return (
     <nav className="material-bar safe-bottom flex border-t-[0.5px] border-[var(--separator)]">
       {TABS.map(({ to, label, Icon, end }) => (

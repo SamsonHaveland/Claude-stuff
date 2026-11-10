@@ -59,7 +59,11 @@ export function isPrivateAddress(ip: string): boolean {
     const v = ip.toLowerCase();
     if (v === '::1' || v === '::' || v.startsWith('fc') || v.startsWith('fd') || v.startsWith('fe80')) return true;
     const mapped = /::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(v);
-    return mapped ? isPrivateAddress(mapped[1]) : false;
+    if (mapped) return isPrivateAddress(mapped[1]);
+    // The URL parser rewrites ::ffff:127.0.0.1 as ::ffff:7f00:1, so decode the hex form too.
+    const hex = /::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(v);
+    if (hex) { const hi = parseInt(hex[1], 16), lo = parseInt(hex[2], 16); return isPrivateAddress(`${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`); }
+    return v.startsWith('64:ff9b:') || v.startsWith('2002:'); // NAT64 / 6to4 can also wrap private IPv4
   }
   const [a, b] = ip.split('.').map(Number);
   return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224;
@@ -91,7 +95,14 @@ export async function loadPortrait(src: string, hermesHome: string, fetchImpl: t
       if (res.status >= 300 && res.status < 400 && res.headers.get('location') && hop < 3) { url = new URL(res.headers.get('location')!, url); continue; }
       if (!res.ok) throw new Error(`Couldn't download the picture (HTTP ${res.status}).`);
       if (Number(res.headers.get('content-length') ?? 0) > MAX_BYTES) throw new Error('The picture is larger than 10 MB.');
-      buf = Buffer.from(await res.arrayBuffer());
+      // Read with a hard cap: a missing or false content-length must not let a download fill memory.
+      const chunks: Buffer[] = []; let size = 0;
+      for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
+        size += chunk.byteLength;
+        if (size > MAX_BYTES) throw new Error('The picture is larger than 10 MB.');
+        chunks.push(Buffer.from(chunk));
+      }
+      buf = Buffer.concat(chunks);
       break;
     }
   }
