@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, ts, type Agent, type Attachment, type Conversation, type Message } from '../lib/api';
 import { useServerEvents } from '../lib/events';
-import { convTitle, useWs } from '../lib/workspace';
+import { chatFor, convTitle, useWs } from '../lib/workspace';
 import { plainText, useIsMobile } from '../components/Shell';
 import { Markdown } from '../components/Markdown';
 import { Avatar, AvatarStack, Button, EmptyState, IBack, IClip, ICompose, IInfo, IMic, IPlus, IRetry, ISpeaker, IStop, IUp, IX, Row, Section, Sheet, STATUS } from '../components/ui';
@@ -76,7 +76,7 @@ export function ConversationPage() {
   const title = convTitle(conv, (x) => agentById(x)?.displayName);
   const members = conv.agentIds.map((x) => agentById(x)).filter(Boolean) as Agent[];
   const subtitle = conv.kind === 'telegram_mirror' ? (conv.twoWay ? 'Synced with Telegram' : 'Copy of your Telegram chat') : conv.kind === 'dm' ? (dmAgent ? STATUS[dmAgent.status].label : '') : members.map((m) => m.displayName).join(', ');
-  const openInfo = () => (conv.kind === 'dm' && dmAgent ? nav(`/w/${ws.slug}/agents/${dmAgent.id}`) : setInfo(true));
+  const openInfo = () => (conv.kind !== 'channel' && dmAgent ? nav(`/w/${ws.slug}/agents/${dmAgent.id}`) : setInfo(true));
 
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col">
@@ -92,6 +92,9 @@ export function ConversationPage() {
           <button aria-label="Details" onClick={openInfo} className="press flex h-11 w-11 items-center justify-center text-[var(--blue)]"><IInfo size={24} /></button>
         </div>
       </header>
+      {conv.mergedFrom && (
+        <Link to={`/w/${ws.slug}/c/${conv.mergedFrom}`} className="press t-foot block border-b-[0.5px] border-[var(--separator)] bg-[var(--bg)] px-4 py-2 text-center text-[var(--blue)]">Earlier messages from the app-only chat ›</Link>
+      )}
       {loadError && !messages.length
         ? <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center"><p className="t-sub text-[var(--label-2)]">Couldn’t load this chat.</p><Button variant="tinted" onClick={load}>Try Again</Button></div>
         : <MessageList messages={messages} loaded={loaded} conv={conv} onThread={setThread} activity={activity} />}
@@ -102,7 +105,7 @@ export function ConversationPage() {
         </button>
       )}
       {fresh && <FreshSheet conv={conv} name={dmAgent?.displayName ?? 'the agent'} onClose={() => setFresh(false)} />}
-      {conv.readOnly ? <MirrorFooter conv={conv} /> : <>{conv.twoWay && <p className="t-cap bg-[var(--bg)] px-4 pt-1 text-center text-[var(--label-2)]">Sent from here, copied to Telegram</p>}<Composer key={conv.id} conv={conv} /></>}
+      {conv.mergedInto ? <MergedFooter conv={conv} /> : conv.readOnly ? <MirrorFooter conv={conv} /> : <>{conv.twoWay && <p className="t-cap bg-[var(--bg)] px-4 pt-1 text-center text-[var(--label-2)]">Sent from here, copied to Telegram</p>}<Composer key={conv.id} conv={conv} /></>}
       {thread && <ThreadSheet parent={thread} conv={conv} onClose={() => setThread(null)} />}
       {info && <GroupInfo conv={conv} members={members} messages={messages} onClose={() => setInfo(false)} />}
     </div>
@@ -137,10 +140,21 @@ function FreshSheet({ conv, name, onClose }: { conv: Conversation; name: string;
   );
 }
 
+function MergedFooter({ conv }: { conv: Conversation }) {
+  const { ws, agentById } = useWs();
+  const a = agentById(conv.dmAgentId);
+  return (
+    <div className="material-bar safe-bottom border-t-[0.5px] border-[var(--separator)] px-4 py-3 text-center">
+      <p className="t-foot text-[var(--label-2)]">These are earlier app-only messages. {a?.displayName ?? 'This agent'}’s chat is now shared with Telegram.</p>
+      <Link to={`/w/${ws.slug}/c/${conv.mergedInto}`} className="t-sub mt-1 inline-block font-semibold text-[var(--blue)]">Go to {a?.displayName ?? 'the'} chat ›</Link>
+    </div>
+  );
+}
+
 function MirrorFooter({ conv }: { conv: Conversation }) {
   const { ws, conversations, agentById } = useWs();
   const a = agentById(conv.dmAgentId);
-  const dm = conversations.find((c) => c.kind === 'dm' && c.dmAgentId === conv.dmAgentId);
+  const dm = conversations.find((c) => c.kind === 'dm' && c.dmAgentId === conv.dmAgentId) ?? chatFor(conversations, conv.dmAgentId);
   return (
     <div className="material-bar safe-bottom border-t-[0.5px] border-[var(--separator)] px-4 py-3 text-center">
       <p className="t-foot text-[var(--label-2)]">This is a copy of your Telegram chat. Reply in Telegram, or turn on Two-way in Settings.</p>

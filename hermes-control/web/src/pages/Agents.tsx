@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, type Agent } from '../lib/api';
-import { useWs } from '../lib/workspace';
+import { useWs, chatFor } from '../lib/workspace';
 import { useIsMobile } from '../components/Shell';
 import { Avatar, Button, IBack, IChat, LargeTitle, Row, Section, Sheet, STATUS, timeLabel } from '../components/ui';
 
@@ -144,7 +144,7 @@ export function AgentProfilePage() {
   const [edit, setEdit] = useState(false);
   const load = () => api<AgentDetail>(`/api/w/${ws.slug}/agents/${agentId}`).then(setA).catch((e) => setErr(e.message));
   useEffect(() => { void load(); }, [agentId, ws.slug]);
-  const dm = a && conversations.find((c) => c.kind === 'dm' && c.dmAgentId === a.id);
+  const dm = a && chatFor(conversations, a.id);
   const s = a ? STATUS[a.status] : null;
 
   return (

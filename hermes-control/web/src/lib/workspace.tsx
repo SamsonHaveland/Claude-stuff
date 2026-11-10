@@ -82,5 +82,12 @@ export function getTheme(): Theme {
 export function convTitle(c: Conversation, agentName: (id: number | null) => string | undefined) {
   if (c.kind === 'channel') return c.name.split('-').map((w) => (w.length <= 2 ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1))).join(' ');
   const n = agentName(c.dmAgentId) ?? c.name;
-  return c.kind === 'telegram_mirror' ? `${n} on Telegram` : n;
+  return c.kind === 'telegram_mirror' && !c.twoWay ? `${n} on Telegram` : n;
+}
+
+/** The chat to open for an agent: its synced Telegram chat when two-way is on, else its app chat. */
+export function chatFor(conversations: Conversation[], agentId: number | null | undefined) {
+  if (!agentId) return undefined;
+  return conversations.find((c) => c.kind === 'telegram_mirror' && c.twoWay && c.dmAgentId === agentId)
+    ?? conversations.find((c) => c.kind === 'dm' && c.dmAgentId === agentId);
 }

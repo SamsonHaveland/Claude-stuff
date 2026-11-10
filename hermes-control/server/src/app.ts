@@ -75,7 +75,10 @@ export async function buildApp(deps: AppDeps): Promise<{ app: FastifyInstance; c
   const avatarsDir = join(cfg.dataDir, 'avatars');
   mkdirSync(uploadsDir, { recursive: true });
   mkdirSync(avatarsDir, { recursive: true });
-  const taskFeed = new TaskFeed(db, cfg, kanban, bus, log);
+  const taskFeed = new TaskFeed(db, cfg, kanban, bus, log, (wsId, agentId) => {
+    const c = db.prepare(`SELECT id, kind, dm_agent_id FROM conversations WHERE workspace_id = ? AND kind = 'telegram_mirror' AND dm_agent_id = ?`).get(wsId, agentId) as any;
+    return c && mirror.writable(c) ? c.id : null;
+  });
   const ctx: AppContext = { cfg, db, hermes, kanban, bus, runs, mirror, taskFeed, uploadsDir, avatarsDir };
 
   await app.register(cookie);

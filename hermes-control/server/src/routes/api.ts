@@ -82,7 +82,16 @@ export async function registerApi(app: FastifyInstance, ctx: AppContext) {
     const members = db.prepare('SELECT conversation_id AS c, agent_id AS a FROM conversation_agents ca JOIN conversations c ON c.id = ca.conversation_id WHERE c.workspace_id = ?').all(ws.id) as { c: number; a: number }[];
     // Hermes resends the whole conversation on every turn and never starts a new one by itself, so
     // long chats get slower and cost more. Flag them so the app can offer a fresh start.
-    return convs.map(({ lastJson, turnsSinceFresh, charsSinceFresh, ...c }) => ({ ...c, long: c.kind !== 'channel' && (turnsSinceFresh >= LONG_CHAT_TURNS || charsSinceFresh >= LONG_CHAT_CHARS), last: lastJson ? JSON.parse(lastJson) : null, agentIds: members.filter((m) => m.c === c.id).map((m) => m.a), readOnly: !ctx.mirror.writable(c), twoWay: c.kind === 'telegram_mirror' && ctx.mirror.writable(c) }));
+    // One chat per agent: when an agent's Telegram chat is two-way here, it IS the agent's chat.
+    // The app-only DM is folded into it (kept readable, hidden from the list).
+    const synced = new Map<number, number>();
+    for (const c of convs) if (c.kind === 'telegram_mirror' && c.dmAgentId && ctx.mirror.writable(c)) synced.set(c.dmAgentId, c.id);
+    const plainDm = new Map<number, number>();
+    for (const c of convs) if (c.kind === 'dm' && c.dmAgentId) plainDm.set(c.dmAgentId, c.id);
+    return convs.map(({ lastJson, turnsSinceFresh, charsSinceFresh, ...c }) => ({ ...c,
+      mergedInto: c.kind === 'dm' && c.dmAgentId ? synced.get(c.dmAgentId) ?? null : null,
+      mergedFrom: c.kind === 'telegram_mirror' && c.dmAgentId && synced.get(c.dmAgentId) === c.id ? plainDm.get(c.dmAgentId) ?? null : null,
+      long: c.kind !== 'channel' && (turnsSinceFresh >= LONG_CHAT_TURNS || charsSinceFresh >= LONG_CHAT_CHARS), last: lastJson ? JSON.parse(lastJson) : null, agentIds: members.filter((m) => m.c === c.id).map((m) => m.a), readOnly: !ctx.mirror.writable(c), twoWay: c.kind === 'telegram_mirror' && ctx.mirror.writable(c) }));
   });
 
   app.get('/api/w/:ws/conversations/:id/messages', auth, async (req, reply) => {

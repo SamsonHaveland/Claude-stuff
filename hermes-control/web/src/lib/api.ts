@@ -15,6 +15,10 @@ export interface Conversation {
   readOnly: boolean;
   /** Long one-to-one chat: slower and costlier, so the app offers a fresh start. */
   long?: boolean;
+  /** App-only chat folded into the agent's synced Telegram chat (hidden from the list, still readable). */
+  mergedInto?: number | null;
+  /** For a synced chat: the earlier app-only chat it replaced. */
+  mergedFrom?: number | null;
   /** Telegram copy that also sends what you type here to Telegram. */
   twoWay?: boolean;
   lastMessageId: number | null;

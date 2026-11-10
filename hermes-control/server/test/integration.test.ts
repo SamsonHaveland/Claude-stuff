@@ -288,6 +288,18 @@ describe('task feed (Kanban work shown in chats)', () => {
     expect(bodies('film-lv', 'dm-jeff')).toHaveLength(1);
     expect((app2.db.prepare(`SELECT COUNT(*) n FROM messages WHERE source = 'kanban'`).get() as any).n).toBe(5);
 
+    // With Jeff's Telegram chat two-way, results for Jeff go into that (visible) chat, not the hidden app chat.
+    await app2.ctx.mirror.pollOnce({ profile: 'jeff', workspace: 'film-lv', pollSeconds: 60 });
+    app2.ctx.mirror.setTwoWay('jeff', true);
+    tasks = [...tasks, { id: 't5', title: 'Budget check', assignee: 'debra', status: 'ready', tenant: 'filmlv', created_by: 'jeff' }];
+    await feed.pollOnce();
+    tasks[tasks.length - 1] = { ...tasks[tasks.length - 1], status: 'done', result: 'All sums correct' };
+    await feed.pollOnce();
+    const synced = convId(app2.db, 'film-lv', 'telegram_mirror', 'telegram-jeff');
+    const inSynced = (app2.db.prepare(`SELECT body FROM messages WHERE conversation_id = ? AND source = 'kanban'`).all(synced) as any[]).map((r) => r.body);
+    expect(inSynced).toEqual([expect.stringContaining('Debra finished:** Budget check')]);
+    expect(bodies('film-lv', 'dm-jeff')).toHaveLength(1); // unchanged
+
     // A CLI failure is recorded, not thrown.
     const broken = await makeApp({ cfg: testConfig(fake.url), key: 'secret-key', kanbanRunner: async () => { throw new Error('hermes not found'); } });
     expect(await broken.ctx.taskFeed.pollOnce()).toBe(0);
@@ -410,6 +422,13 @@ describe('telegram mirror (read-only)', () => {
     const on = await env.app.inject({ method: 'POST', url: '/api/system/telegram/jeff/two-way', headers, payload: { on: true } });
     expect(on.json().twoWay).toBe(true);
     expect((await listed())).toMatchObject({ readOnly: false, twoWay: true });
+    // One chat per agent: the app-only DM folds into the synced chat while two-way is on.
+    const all = () => env.app.inject({ url: '/api/w/film-lv/conversations', headers }).then((r) => r.json());
+    const dmId = convId(env.db, 'film-lv', 'dm', 'dm-jeff');
+    expect((await all()).find((x: any) => x.id === dmId).mergedInto).toBe(c);
+    expect((await listed()).mergedFrom).toBe(dmId);
+    expect((await all()).find((x: any) => x.kind === 'dm' && x.name === 'dm-debra').mergedInto).toBeNull(); // Debra has no synced chat here
+
     expect((await env.app.inject({ method: 'POST', url: '/api/system/telegram/harry/two-way', headers, payload: { on: true } })).statusCode).toBe(404);
     const fox = await login(env.app, 'fox');
     expect((await env.app.inject({ method: 'POST', url: '/api/system/telegram/jeff/two-way', headers: fox.headers, payload: { on: false } })).statusCode).toBe(403);
@@ -448,6 +467,7 @@ describe('telegram mirror (read-only)', () => {
 
     await env.app.inject({ method: 'POST', url: '/api/system/telegram/jeff/two-way', headers, payload: { on: false } });
     expect((await listed()).readOnly).toBe(true);
+    expect((await all()).find((x: any) => x.id === dmId).mergedInto).toBeNull(); // the app chat comes back
   });
 
   it('records mirror failure status instead of throwing', async () => {

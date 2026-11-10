@@ -26,7 +26,12 @@ export class TaskFeed {
   private busy = false;
   public lastStatus: { ok: boolean; at: number; error?: string; tasks?: number } | null = null;
 
-  constructor(private db: DB, private cfg: Config, private kanban: KanbanAdapter, private bus: EventBus, private log: (m: string, x?: unknown) => void = () => {}) {}
+  constructor(
+    private db: DB, private cfg: Config, private kanban: KanbanAdapter, private bus: EventBus,
+    private log: (m: string, x?: unknown) => void = () => {},
+    /** The agent's synced (two-way Telegram) chat in a workspace, if it has one: that is its visible chat. */
+    private syncedChat: (workspaceId: number, agentId: number) => number | null = () => null,
+  ) {}
 
   start(pollSeconds = 30) {
     const tick = () => void this.pollOnce();
@@ -56,7 +61,9 @@ export class TaskFeed {
        JOIN conversations c ON c.workspace_id = wa.workspace_id AND c.kind = 'dm' AND c.dm_agent_id = a.id
        WHERE a.profile_name = ?`,
     ).get(workspaceId, profile) as { conversationId: number; agentId: number; name: string } | undefined;
-    return r ?? null;
+    if (!r) return null;
+    const synced = this.syncedChat(workspaceId, r.agentId);
+    return synced ? { ...r, conversationId: synced } : r;
   }
 
   private post(workspaceId: number, conversationId: number, agentId: number, body: string, externalId: string): boolean {

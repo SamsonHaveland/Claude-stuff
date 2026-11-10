@@ -119,7 +119,7 @@ export function ChatList({ compact = false }: { compact?: boolean }) {
   const [q, setQ] = useState('');
   const name = (id: number | null) => agentById(id)?.displayName;
   const rows = useMemo(() => {
-    const list = conversations.filter((c) => c.kind !== 'dm' || agentById(c.dmAgentId));
+    const list = conversations.filter((c) => !c.mergedInto && (c.kind !== 'dm' || agentById(c.dmAgentId)));
     const filtered = q ? list.filter((c) => convTitle(c, name).toLowerCase().includes(q.toLowerCase())) : list;
     return [...filtered].sort((a, b) => (b.last?.at ?? 0) - (a.last?.at ?? 0) || (a.kind === 'channel' ? -1 : 1) - (b.kind === 'channel' ? -1 : 1) || convTitle(a, name).localeCompare(convTitle(b, name)));
   }, [conversations, q, agentById]);
