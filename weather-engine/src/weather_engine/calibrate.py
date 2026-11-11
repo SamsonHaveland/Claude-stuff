@@ -16,6 +16,10 @@ from . import regime
 from .config import MAX_LEAD, MIN_TRAIN_SAMPLES, TRAIN_WINDOW_DAYS
 
 KEYS = ["model", "lead", "var"]
+# Variables corrected with a scale as well as a shift (see fit); others get a shift only.
+# Off until a real-data backtest shows it helps (candidates: "wind", "gust").
+SLOPE_VARS: tuple[str, ...] = ()
+SLOPE_SHRINK_DAYS = 30
 
 
 def obs_long(obs_daily: pd.DataFrame) -> pd.DataFrame:
@@ -43,7 +47,7 @@ def fit(
     rows = []
     for (model, lead, var), g in recent.groupby(KEYS):
         n = len(g)
-        bias, ratio = 0.0, 1.0
+        bias, ratio, slope = 0.0, 1.0, 1.0
         err = g["fcst"] - g["obs"]
         if var == "precip":
             # Multiplicative so corrected rain can never go negative; shrunk toward 1
@@ -53,6 +57,13 @@ def fit(
                 ratio = 1.0 + (ratio - 1.0) * n / (n + 10)
             corrected = g["fcst"] * ratio
         else:
+            if var in SLOPE_VARS and n >= MIN_TRAIN_SAMPLES and g["fcst"].var() > 0:
+                # Models tend to over-forecast light winds and under-forecast strong ones:
+                # scale around the mean as well as shift. The fitted slope is shrunk toward
+                # 1 (no scaling) until there are enough days to trust it.
+                b = float(np.cov(g["fcst"], g["obs"])[0, 1] / g["fcst"].var())
+                slope = float(np.clip(1.0 + (b - 1.0) * n / (n + SLOPE_SHRINK_DAYS), 0.6, 1.4))
+                err = slope * g["fcst"] - g["obs"]
             # Shrink the bias by how well it's determined: a consistent error is
             # trusted even from a few days, a noisy one is scaled down.
             raw_bias = float(err.mean())
@@ -60,17 +71,17 @@ def fit(
             denom = raw_bias**2 + se2
             weight = 1.0 if denom == 0 else raw_bias**2 / denom
             bias = raw_bias * weight
-            corrected = g["fcst"] - bias
+            corrected = slope * g["fcst"] - bias
         rows.append({
             "model": model, "lead": lead, "var": var, "n": n,
-            "bias": bias, "ratio": ratio,
+            "bias": bias, "ratio": ratio, "slope": slope,
             "mae_raw": float((g["fcst"] - g["obs"]).abs().mean()),
             "mae_cal": float((corrected - g["obs"]).abs().mean()),
         })
-    stats = pd.DataFrame(rows, columns=KEYS + ["n", "bias", "ratio", "mae_raw", "mae_cal"])
+    stats = pd.DataFrame(rows, columns=KEYS + ["n", "bias", "ratio", "slope", "mae_raw", "mae_cal"])
     # Too few samples: keep the stats for reporting but don't correct or weight.
     thin = stats["n"] < min_samples
-    stats.loc[thin, ["bias", "ratio", "mae_cal"]] = [0.0, 1.0, np.nan]
+    stats.loc[thin, ["bias", "ratio", "slope", "mae_cal"]] = [0.0, 1.0, 1.0, np.nan]
     return stats
 
 
@@ -85,13 +96,17 @@ def apply(raw: pd.DataFrame, stats: pd.DataFrame | None, pattern=None, feats: pd
     if stats is None or stats.empty:
         df["value_cal"], df["mae_cal"] = df["value"], np.nan
         return df.drop(columns="stats_lead")
-    s = stats.rename(columns={"lead": "stats_lead"})[["model", "stats_lead", "var", "bias", "ratio", "mae_cal"]]
+    if "slope" not in stats:  # stats saved by an older version
+        stats = stats.assign(slope=1.0)
+    s = stats.rename(columns={"lead": "stats_lead"})[["model", "stats_lead", "var", "bias", "ratio", "slope", "mae_cal"]]
     df = df.merge(s, on=["model", "stats_lead", "var"], how="left")
     if pattern is not None and feats is not None:
         df = regime.adjust(pattern, df, feats)
-    df["value_cal"] = df["value"] * df["ratio"].fillna(1.0) - df["bias"].fillna(0.0)
+        # A pattern correction is learned on unscaled errors, so it replaces the scaling too.
+        df.loc[df["pattern_n"].notna(), "slope"] = 1.0
+    df["value_cal"] = df["value"] * df["ratio"].fillna(1.0) * df["slope"].fillna(1.0) - df["bias"].fillna(0.0)
     df.loc[df["var"] == "precip", "value_cal"] = df["value_cal"].clip(lower=0)
-    return df.drop(columns=["stats_lead", "bias", "ratio"])
+    return df.drop(columns=["stats_lead", "bias", "ratio", "slope"])
 
 
 def blend(corrected: pd.DataFrame) -> pd.DataFrame:

@@ -83,3 +83,32 @@ def test_blend_never_puts_gust_below_wind():
     ])
     out = calibrate.blend(calibrate.apply(raw, None)).set_index("var")
     assert out.loc["gust", "value"] == 15.0
+
+
+def test_wind_gets_a_speed_dependent_correction():
+    """Model over-forecasts light wind and under-forecasts strong wind: a scale + shift fixes both."""
+    from datetime import date, timedelta
+
+    import numpy as np
+    import pandas as pd
+
+    from weather_engine import calibrate
+
+    calibrate.SLOPE_VARS = ("wind",)
+    rng = np.random.default_rng(0)
+    as_of = date(2026, 10, 1)
+    fcst = rng.uniform(3, 30, 60)
+    obs = 0.7 * fcst + 2 + rng.normal(0, 0.5, 60)  # light: model too high; strong: still too high, more so
+    pairs = pd.DataFrame({"date": [as_of - timedelta(days=i) for i in range(60)], "lead": 1, "model": "m",
+                          "var": "wind", "fcst": fcst, "obs": obs})
+    try:
+        stats = calibrate.fit(pairs, as_of)
+    finally:
+        calibrate.SLOPE_VARS = ()
+    row = stats.iloc[0]
+    assert 0.7 < row["slope"] < 0.85  # shrunk toward 1 from the true 0.7
+    raw = pd.DataFrame({"date": [as_of] * 2, "lead": 1, "model": "m", "var": "wind", "value": [5.0, 30.0]})
+    out = calibrate.apply(raw, stats)["value_cal"].to_numpy()
+    truth = 0.7 * np.array([5.0, 30.0]) + 2
+    additive = np.array([5.0, 30.0]) - float((pairs["fcst"] - pairs["obs"]).mean())
+    assert (np.abs(out - truth) < np.abs(additive - truth)).all()
