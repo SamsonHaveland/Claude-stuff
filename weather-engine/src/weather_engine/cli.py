@@ -105,12 +105,14 @@ def _prepare(loc: Location) -> None:
     loc.elevation = loc.elevation if loc.elevation is not None else meta.get("elevation")
 
 
-def _backfill(loc: Location) -> None:
+def _backfill(loc: Location, days: int | None = None) -> None:
     from . import history
     from .config import MODELS
     from .forecast import history_window, training_data
 
     start, end = history_window(date.today())
+    if days:
+        start = max(start, end - timedelta(days=days - 1))
     print(f"Filling in past model runs for {loc.name} from {start} "
           f"(paced to stay inside Open-Meteo's free limits; can take 10+ minutes the first time)...")
     training_data(loc, MODELS, date.today(), [], backfill_chunks=0)  # creates each model's archive
@@ -129,7 +131,7 @@ def _backfill(loc: Location) -> None:
 def cmd_backfill(args: argparse.Namespace) -> None:
     loc = _resolve(args)
     _prepare(loc)
-    _backfill(loc)
+    _backfill(loc, args.days)
 
 
 def cmd_backtest(args: argparse.Namespace) -> None:
@@ -196,6 +198,7 @@ def main(argv: list[str] | None = None) -> None:
 
     p = sub.add_parser("backfill", help="download all available past model runs for a place (since Jan 2024, up to 10 years)")
     place_args(p)
+    p.add_argument("--days", type=int, help="only the most recent N days (default: everything available)")
     p.set_defaults(func=cmd_backfill)
 
     p = sub.add_parser("backtest", help="replay recent days to measure how much each correction helps at a place")
