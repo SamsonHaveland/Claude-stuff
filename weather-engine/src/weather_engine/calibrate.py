@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from . import regime
-from .config import MAX_LEAD, MIN_TRAIN_SAMPLES, TRAIN_WINDOW_DAYS
+from .config import MAX_LEAD, MIN_TRAIN_SAMPLES, train_window
 
 KEYS = ["model", "lead", "var"]
 # Variables corrected with a scale as well as a shift (see fit); others get a shift only.
@@ -41,13 +41,16 @@ def build_pairs(past_runs: pd.DataFrame, obs_daily: pd.DataFrame) -> pd.DataFram
 def fit(
     pairs: pd.DataFrame,
     as_of: date,
-    window_days: int = TRAIN_WINDOW_DAYS,
+    window_days: int | None = None,
     min_samples: int = MIN_TRAIN_SAMPLES,
 ) -> pd.DataFrame:
-    """Correction stats per (model, lead, var) over a rolling window."""
-    recent = pairs[pairs["date"] > as_of - timedelta(days=window_days)]
+    """Correction stats per (model, lead, var) over a rolling window (config.train_window per variable,
+    or `window_days` for every variable)."""
     rows = []
-    for (model, lead, var), g in recent.groupby(KEYS):
+    for (model, lead, var), g in pairs.groupby(KEYS):
+        g = g[g["date"] > as_of - timedelta(days=window_days or train_window(var))]
+        if g.empty:
+            continue
         n = len(g)
         bias, ratio, slope = 0.0, 1.0, 1.0
         err = g["fcst"] - g["obs"]

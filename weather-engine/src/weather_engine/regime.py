@@ -25,7 +25,7 @@ from datetime import date, timedelta
 import numpy as np
 import pandas as pd
 
-from .config import TRAIN_WINDOW_DAYS
+from .config import TRAIN_WINDOW_DAYS, train_window
 
 # How different two days can be and still count as similar (one "standard deviation" each).
 SCALES = {"wind_dir": 45.0, "pressure_anom": 6.0, "tendency": 4.0, "doy": 30.0}
@@ -213,12 +213,12 @@ class RegimeModel:
 
 
 def _window_base(var: str, day: np.ndarray, fcst: np.ndarray, obs: np.ndarray, block_start: np.ndarray) -> np.ndarray:
-    """For each row, the plain correction from the TRAIN_WINDOW_DAYS before its held-out week (rows sorted by day).
+    """For each row, the plain correction from the training window before its held-out week (rows sorted by day).
 
     Same formulas as calibrate.fit (shrunk bias; shrunk, clipped rain ratio), computed for every
     week at once with running sums. NaN where fewer than 5 days are available.
     """
-    lo = np.searchsorted(day, block_start - TRAIN_WINDOW_DAYS, side="left")
+    lo = np.searchsorted(day, block_start - train_window(var), side="left")
     hi = np.searchsorted(day, block_start, side="left")
     n = (hi - lo).astype(float)
 

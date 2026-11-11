@@ -58,6 +58,14 @@ GROUP_LABELS = {"temp": "temperature", "wind": "wind", "precip": "rain"}
 FORECAST_DAYS = 8  # today + 7
 MAX_LEAD = 7
 TRAIN_WINDOW_DAYS = 60  # recent window for the overall bias of each model
+# Rain days are rare, so rain needs a longer window. Chosen by year-long real-data backtests at
+# Las Vegas and San Diego (Nov 2026): 60 days beat 365/730 for temperature, wind and gusts;
+# 365 days beat 60 for rain (error vs the plain model average 0.85-0.93 -> 0.73-0.84).
+TRAIN_WINDOW_BY_VAR = {"precip": 365}
+
+
+def train_window(var: str) -> int:
+    return TRAIN_WINDOW_BY_VAR.get(var, TRAIN_WINDOW_DAYS)
 # How far back the models' past runs are kept, for bias and weather-pattern corrections:
 # up to 10 years. Open-Meteo has kept past runs of most models only since January 2024
 # (GFS temperature since 2021), so the history grows toward 10 years from there.
