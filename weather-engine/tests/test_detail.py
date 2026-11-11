@@ -14,7 +14,10 @@ from conftest import TODAY
 
 @pytest.fixture
 def result(fake_api):
-    return run_forecast(Location("Denver", 39.74, -104.99))
+    r = run_forecast(Location("Denver", 39.74, -104.99))
+    # The fake forecast starts on conftest.TODAY; "now" must fall inside it, or every hour is in the past.
+    r.issued_at = datetime(TODAY.year, TODAY.month, TODAY.day, 15, tzinfo=timezone.utc)
+    return r
 
 
 def test_hourly_matches_calibrated_daily(result):
