@@ -20,6 +20,8 @@ KEYS = ["model", "lead", "var"]
 # Off until a real-data backtest shows it helps (candidates: "wind", "gust").
 SLOPE_VARS: tuple[str, ...] = ()
 SLOPE_SHRINK_DAYS = 30
+# How hard a noisy bias is pulled toward zero: weight = b^2 / (b^2 + BIAS_SHRINK * se^2).
+BIAS_SHRINK = 1.0
 
 
 def obs_long(obs_daily: pd.DataFrame) -> pd.DataFrame:
@@ -68,7 +70,7 @@ def fit(
             # trusted even from a few days, a noisy one is scaled down.
             raw_bias = float(err.mean())
             se2 = float(err.var(ddof=1)) / n if n > 1 else float("inf")
-            denom = raw_bias**2 + se2
+            denom = raw_bias**2 + BIAS_SHRINK * se2
             weight = 1.0 if denom == 0 else raw_bias**2 / denom
             bias = raw_bias * weight
             corrected = slope * g["fcst"] - bias
