@@ -1,0 +1,31 @@
+# Hermes Control — systemd unit (Raspberry Pi / Linux). NOT INSTALLED. See docs/DEPLOYMENT_PI.md.
+[Unit]
+Description=Hermes Control (private agent communication platform)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hermes-control
+Group=hermes-control
+WorkingDirectory=/opt/hermes-control
+Environment=NODE_ENV=production
+Environment=HC_CONFIG=/etc/hermes-control/config.yaml
+EnvironmentFile=/etc/hermes-control/env
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning server/dist/index.js
+Restart=always
+RestartSec=3
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/hermes-control
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target
