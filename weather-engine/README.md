@@ -149,6 +149,23 @@ that won't change much. Calibration data is cached for 6 hours under
    on held-out weeks. Tap a day in the app to see its pattern and what lies upwind.
 4. **Live reading:** the latest reading at the station nudges the next ~12 hours.
 
+### Measured accuracy (real data, November 2026)
+
+Backtests replay past days using only what was known at the time
+(`weather-engine backtest`). Mean absolute error, raw ECMWF → Weather Engine:
+
+| Place (station, days replayed) | Lows, 1–2 days | Highs, 6–7 days | Wind, 1–2 days |
+|---|---|---|---|
+| Las Vegas desert (KVGT, 365) | 2.4 → 1.8 °F | 3.1 → 2.5 °F | 7.1 → 2.7 mph |
+| San Diego coast (KSAN, 300) | 2.6 → 1.5 °F | 6.5 → 2.6 °F | 4.4 → 1.4 mph |
+| Flagstaff mountains (KFLG, 300) | 8.3 → 3.2 °F | 3.5 → 2.9 °F | 6.9 → 2.3 mph |
+
+Settings were chosen on Las Vegas and San Diego and checked on Flagstaff:
+60-day training for temperature and wind, 365 days for rain, weather-pattern
+corrections on (they helped most at the coast and for rain). Tried and
+rejected: a speed-dependent wind scale, equal model weights, stronger
+shrinkage. One station per place, so treat these as indicative.
+
 ### Backfill and backtest
 
 ```
