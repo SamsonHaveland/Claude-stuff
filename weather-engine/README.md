@@ -156,7 +156,7 @@ Backtests replay past days using only what was known at the time
 
 | Place (station, days replayed) | Lows, 1–2 days | Highs, 6–7 days | Wind, 1–2 days |
 |---|---|---|---|
-| Las Vegas desert (KVGT, 365) | 2.4 → 1.8 °F | 3.1 → 2.5 °F | 7.1 → 2.7 mph |
+| Las Vegas desert (KVGT, 365) | 2.4 → 1.8 °F | 3.1 → 2.5 °F | 7.1 → 2.6 mph |
 | San Diego coast (KSAN, 300) | 2.6 → 1.5 °F | 6.5 → 2.6 °F | 4.4 → 1.4 mph |
 | Flagstaff mountains (KFLG, 300) | 8.3 → 3.2 °F | 3.5 → 2.9 °F | 6.9 → 2.3 mph |
 
