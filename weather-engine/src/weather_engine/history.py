@@ -118,7 +118,8 @@ def coverage(loc: Location, models: list[str], start: date, end: date) -> dict:
         if have is not None and not have.empty:
             stored.append((end - max(have.index.min().date(), start)).days + 1)
     least = min(stored) if stored else 0
-    return {"target_days": target, "stored_days": least, "complete": bool(stored) and least >= target}
+    return {"target_days": target, "stored_days": least, "total_days": sum(stored),
+            "complete": bool(stored) and least >= target}
 
 
 def fill(loc: Location, models: list[str], start: date, end: date, budget_s: float = 50, pause_s: float = 3.5) -> dict:
@@ -132,11 +133,14 @@ def fill(loc: Location, models: list[str], start: date, end: date, budget_s: flo
     progress = True
     while progress and time.time() < deadline:
         progress = False
-        for model in models:
+        # Least-covered models first, so every model gets its turn across successive calls.
+        firsts = {m: store.read_runs(archive_name(loc, m)) for m in models}
+        order = sorted(models, key=lambda m: -(firsts[m].index.min().value if firsts[m] is not None
+                                                and not firsts[m].empty else 0))
+        for model in order:
             if time.time() >= deadline:
                 break
-            name = archive_name(loc, model)
-            have = store.read_runs(name)
+            name, have = archive_name(loc, model), firsts[model]
             if have is None or have.empty:
                 continue
             first = have.index.min().date()

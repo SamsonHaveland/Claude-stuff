@@ -121,9 +121,9 @@ def _backfill(loc: Location) -> None:
         if h.get("error"):
             print(f"  stopped: {h['error']}\n  (what's stored is kept; run this again later to continue)")
             break
-        if h["complete"] or h["stored_days"] == last:  # done, or a model can't go further back
+        if h["complete"] or h["total_days"] == last:  # done, or no model can go further back
             break
-        last = h["stored_days"]
+        last = h["total_days"]
 
 
 def cmd_backfill(args: argparse.Namespace) -> None:
