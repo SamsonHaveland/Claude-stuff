@@ -1,38 +1,192 @@
 # Architecture
 
-Proposed design. Nothing below `config.py` exists yet; treat module names as
-placeholders until the first implementation lands.
+## Goal
 
-## Flow
+Forecast **temperature, precipitation and wind** for a configurable set of
+locations, **1–7 days ahead**, more accurately for those locations than any
+single raw weather model.
+
+## Core strategy
+
+We do **not** run a physics weather model (NWP). At a 1–7 day range, national
+centres' global models (ECMWF, NOAA GFS, DWD ICON) are far better than anything
+that can be built from scratch. Instead the engine is a **post-processing
+layer** on top of them:
+
+1. **Ingest** the latest forecast from several global models and their
+   ensembles as each new run is published.
+2. **Correct** each model's systematic errors at each location (e.g. "GFS runs
+   1.5 °C warm here in summer afternoons") by learning from past forecasts vs.
+   what was actually observed. This is the standard MOS / EMOS approach used by
+   national weather services.
+3. **Blend** the corrected models, weighting each by its recent skill at that
+   location and lead time.
+4. **Express uncertainty**: temperature and wind as a central value plus a
+   range; rain as a probability (from the ensembles) plus an expected amount.
+5. **Verify** every forecast against observations and against the raw models,
+   so we know whether the engine is actually adding value.
+
+## How "real-time" works
+
+Forecasts are refreshed **when new model data is published**, not on a fixed
+fast clock. Global models run every 6 hours (00/06/12/18 UTC) and become
+available a few hours after each run. A scheduler checks for new runs roughly
+hourly, ingests anything new, and regenerates forecasts. Updating more often
+than the inputs change adds cost, not accuracy.
+
+## Pipeline
 
 ```
-sources ──► ingest ──► data/raw ──► transform ──► data/processed / Postgres
-                                                        │
-                                                        ▼
-                                  reports ◄── evaluate ◄── models
+ config/locations.yaml
+          │
+          ▼
+ ┌──────────────┐   ┌──────────────────┐
+ │ ingest_models│   │ ingest_obs       │   (scheduled, ~hourly)
+ │ NWP + ensem. │   │ station obs      │
+ └──────┬───────┘   └────────┬─────────┘
+        ▼                    ▼
+ ┌─────────────────────────────────────┐
+ │ archive: every model run + obs,     │   data/cache, data/processed (CSV)
+ │ keyed by location, run time, lead   │
+ └──────┬──────────────────────────────┘
+        ▼
+ ┌──────────────┐   train on rolling 30–60 day windows
+ │ calibrate    │   bias correction + EMOS per variable
+ └──────┬───────┘
+        ▼
+ ┌──────────────┐
+ │ blend        │   skill-weighted combination of models
+ └──────┬───────┘
+        ▼
+ ┌──────────────┐   ┌──────────────────┐
+ │ forecast out │──▶│ verify / score   │──▶ reports/
+ │ (logged)     │   │ vs obs & raw NWP │
+ └──────────────┘   └──────────────────┘
 ```
 
-## Components (planned)
+## Package layout
 
 | Module | Responsibility |
 |---|---|
-| `config` | Settings from env vars (`.env.example`). **Exists.** |
-| `ingest` | One client per source in `DATA_SOURCES.md`; writes raw, immutable snapshots with fetch timestamp. |
-| `transform` | Normalise units, timestamps (UTC), station/grid IDs; QC flags; load to Postgres. |
-| `models` | Feature building, training, persisted artefacts in `models/`. |
-| `evaluate` | Backtests and skill scores against observations. |
-| `reports` | Render outputs to `reports/`. |
+| `weather_engine/config.py` | Load locations and settings |
+| `weather_engine/sources/openmeteo.py` | Geocoding, model, past-run and ensemble forecasts |
+| `weather_engine/sources/observations.py` | Nearest station + observation history |
+| `weather_engine/store.py` | CSV cache and forecast log |
+| `weather_engine/calibrate.py` | Bias correction and skill-weighted blending |
+| `weather_engine/history.py` | Permanent archive of each model's past runs per place (incremental downloads) |
+| `weather_engine/regime.py` | Weather-pattern (analog) corrections: wind direction, pressure, pressure change, season |
+| `weather_engine/nowcast.py` | Nudges the next ~12 hours toward the station's latest reading |
+| `weather_engine/terrain.py` | Ground around the place: what the wind crosses (mountains, lower ground, water) |
+| `weather_engine/backtest.py` | Replays past days without peeking to measure each correction step |
+| `weather_engine/verify.py` | Scoring and baseline comparisons |
+| `weather_engine/forecast.py` | End-to-end pipeline |
+| `weather_engine/report.py` | Terminal and HTML output |
+| `weather_engine/cli.py` | `forecast`, `stations`, `verify`, `analyze`, `backfill`, `backtest`, `serve` commands |
+| `weather_engine/server.py` | JSON API + static web app |
+| `weather_engine/web/` | Web app (HTML/CSS/JS, PWA manifest, service worker) |
 
-## Principles
+## Locations
 
-- Raw data is never edited in place; transforms are reproducible from `data/raw`.
-- All timestamps stored in UTC.
-- Each source client handles its own rate limits and terms of use.
-- Postgres (via `docker-compose.yml`) is the system of record for processed data;
-  files under `data/` are cache/staging.
+Each location is defined in `config/locations.yaml` with a name, latitude,
+longitude, elevation and the observation station(s) used to verify it. Every
+location records its **distance and elevation difference to its station**,
+because a poorly matched station makes corrections worse, not better.
 
-## Open decisions
+## Modelling approach (phased)
 
-- Target variables and horizon (what is being forecast, where, how far ahead).
-- Model family (statistical post-processing of NWP vs. ML vs. ensemble blend).
-- Whether Postgres is needed at MVP or Parquet files suffice.
+| Phase | Method | Why |
+|---|---|---|
+| 0 | Raw models + Open-Meteo "best match" | Baseline to beat |
+| 1 | Per-model bias correction, equal-weight blend | Simple, robust |
+| 2 | EMOS (calibrated mean + spread), skill weights; censored/logistic model for rain | Proper probabilities |
+| 3 | Gradient boosting, pooled across locations/lead times | Only once there is enough data; per-location ML overfits |
+
+### Weather-pattern corrections (added 2026-10-28)
+
+A model's error at a place depends on the pattern: wind off a mountain range,
+storms arriving from the sea, a deep low passing. For each forecast day
+`regime.py` describes the pattern each model forecast (daily wind direction,
+sea-level pressure versus normal, 24-hour pressure change, day of year), finds
+past days where that model forecast a similar pattern, and measures how wrong
+the model was on them here (an analog method, Delle Monache et al. 2013). The
+pattern-specific error is blended with the plain 60-day bias by
+n_eff/(n_eff+k).
+
+History: every model's past runs are archived per place back to January 2024
+(the start of Open-Meteo's past-run archive for most models), growing to a
+10-year cap. Older years are not available as issued forecasts, and models
+are upgraded often enough that errors from a decade ago would describe a
+different model; the similarity weights include the season, so each year
+mainly informs the same time of year.
+
+Each past day's pattern is taken from the models' consensus at the shortest
+lead (closest to what actually happened); a forecast day's pattern is the
+models' consensus for that day.
+
+Guardrails against overfitting: it needs 90+ days of history; k is chosen per
+variable by cross-validation that holds out whole weeks (errors on nearby days
+are correlated), lets each held-out week learn only from days before it (as
+the live engine would), and compares against what the plain correction would
+have done with only the 60 days before that week; the pattern correction
+is used only if it cuts error by at least 2%. `weather-engine backtest`
+measures the true out-of-sample gain.
+
+The pressure *pattern 100 miles away* is not sampled separately: the models
+already simulate approaching highs and lows, and their effect shows up in the
+local wind direction, pressure level and pressure tendency used here. The
+terrain ring (25/80/160 km) is used to *describe* what the wind crosses.
+
+Not done yet (see reports/Weather forecast accuracy upgrades.md): pooling
+across similar locations, logistic calibration of rain chance, radar
+nowcasting, a machine-learning model trained across many stations.
+
+Models are pooled across lead times and seasons where possible. Rolling
+training windows let the engine adapt when an upstream model is upgraded.
+
+## Verification (how we know it's accurate)
+
+Every issued forecast is stored and later scored against observations:
+
+- **Temperature, wind:** MAE, bias, CRPS (for the range).
+- **Rain:** Brier score for "rain yes/no", reliability ("when we say 30%, does
+  it rain ~30% of the time?"), MAE on amounts.
+- **Baselines:** raw ECMWF, raw GFS, Open-Meteo best match, climatology,
+  persistence. The engine only earns its keep if it beats raw ECMWF and the
+  best-match blend.
+
+Scores are broken down by location, variable and lead day (day 1 … day 7).
+
+## Known risks
+
+1. **Observation quality** is the biggest one. Sparse or distant stations,
+   precipitation-gauge gaps and unreliable METAR rain totals can make the
+   engine "correct" toward noise. Mitigation: station-distance checks,
+   completeness thresholds, QC filters, and refusing to calibrate a location
+   whose observations fail QC (fall back to the raw blend).
+2. **Not enough training history.** Mitigation: backfill from archived past
+   forecasts (Open-Meteo Previous Runs / Historical Forecast APIs) on day one,
+   and archive every run going forward.
+3. **Silent upstream model upgrades** break learned biases. Mitigation: rolling
+   windows plus alerting on sudden skill changes.
+4. **Day 6–7 skill is inherently limited**, especially for rain. Forecasts at
+   that range are presented as probabilities and ranges, not single values.
+
+## Decisions
+
+- **Locations:** mostly US and chosen per forecast, so any place name or
+  lat/lon works ad hoc; saved locations are optional. Verification stations
+  come from the NWS API and history from the Iowa Environmental Mesonet (both
+  US only).
+- **Use:** personal, so the Open-Meteo free tier (non-commercial) is fine.
+- **Output:** a command-line tool plus a web app. `weather-engine serve` runs a
+  standard-library HTTP server (`server.py`) with a JSON API (`/api/forecast`,
+  `/api/stations`) and a no-build-step web page (`web/`) that can be added to a
+  phone home screen as an app (PWA). Forecasts are computed only on request;
+  nothing is scheduled. No web framework yet, because a framework's compiled
+  dependencies may lag new Python releases; revisit when deploying.
+- **Roadmap:** local web app → hosted site (needs persistent disk for the
+  cache, an access token, and a cost decision) → app-store app only if the
+  home-screen app proves insufficient.
+- **Training data:** fetched on demand (Open-Meteo Previous Runs, last 67
+  days) and cached, so a new location is calibrated on its first run instead
+  of after weeks of archiving.

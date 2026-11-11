@@ -5,16 +5,28 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "weather-engine"
 version = "0.1.0"
-description = "Weather data ingestion, modelling and reporting engine."
+description = "Calibrated multi-model 1-7 day forecasts for temperature, rain and wind"
 readme = "README.md"
-requires-python = ">=3.11"
-dependencies = []
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "PyYAML>=6.0",
+    "requests>=2.31",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+ai = ["anthropic>=2.3"]
+
+[project.scripts]
+weather-engine = "weather_engine.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+weather_engine = ["web/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

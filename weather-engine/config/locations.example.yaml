@@ -1,0 +1,11 @@
+# Copy to config/locations.yaml and edit. Saved locations can be used by name:
+#   weather-engine forecast "Home"
+# Any place can also be forecast ad hoc without saving it:
+#   weather-engine forecast "Denver, CO"
+locations:
+  - name: Home
+    latitude: 39.7392
+    longitude: -104.9903
+    elevation: 1609        # metres (optional; looked up if omitted)
+    timezone: America/Denver
+    # station: KDEN        # optional: force a verification station (ICAO id)
