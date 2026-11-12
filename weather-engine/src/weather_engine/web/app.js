@@ -39,17 +39,21 @@ function dayLabel(iso, lead) {
 
 // --- recent places ----------------------------------------------------------
 
+// Recent places: {place, lat, lon} so map pins and "Not this place?" picks reopen the exact spot
+// (older saves are plain names).
 function renderRecent() {
   const box = $("#recent");
-  box.replaceChildren(...storageGet(RECENT_KEY, []).map((p) => {
-    const b = el("button", { type: "button", class: "chip" }, p);
-    b.addEventListener("click", () => { $("#place").value = p; forecast({ place: p }); });
+  box.replaceChildren(...storageGet(RECENT_KEY, []).map((entry) => {
+    const params = typeof entry === "string" ? { place: entry } : entry;
+    const b = el("button", { type: "button", class: "chip" }, params.place);
+    b.addEventListener("click", () => { $("#place").value = params.place; forecast(params); });
     return b;
   }));
 }
-function remember(place) {
-  const list = [place, ...storageGet(RECENT_KEY, []).filter((p) => p !== place)].slice(0, 5);
-  storageSet(RECENT_KEY, list);
+function remember(params) {
+  const entry = { place: params.place, ...(params.lat && params.lon ? { lat: params.lat, lon: params.lon } : {}) };
+  const others = storageGet(RECENT_KEY, []).filter((e) => (typeof e === "string" ? e : e.place) !== entry.place);
+  storageSet(RECENT_KEY, [entry, ...others].slice(0, 5));
   renderRecent();
 }
 
@@ -335,6 +339,7 @@ function render(data) {
   $("#issued").textContent = `Updated ${issued.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}${where}`;
   renderAlternatives(data);
   renderOverride(data);
+  document.body.classList.add("has-forecast");  // switches the header photo (style.css)
   show("result");  // charts measure their container, so it must be visible first
   renderHero(data);
   renderStrip(data);
@@ -447,7 +452,7 @@ async function forecast(params) {
     render(data);
     setUpdating("");
     storeSaved(params, data);
-    if (params.place) remember(params.place);
+    if (params.place && params.place !== "My location") remember(params);
     const url = new URL(location.href);
     url.search = new URLSearchParams(params);
     history.replaceState(null, "", url);
@@ -499,6 +504,77 @@ $("#locate").addEventListener("click", () => {
     },
     { timeout: 15000 },
   );
+});
+
+// --- map picker --------------------------------------------------------------
+// Leaflet and OpenStreetMap tiles load only when the map is first opened.
+const LEAFLET = "https://unpkg.com/leaflet@1.9.4/dist/";
+let leafletReady = null, map = null, pin = null, picked = null;
+
+function loadLeaflet() {
+  leafletReady ??= new Promise((resolve, reject) => {
+    const css = el("link", { rel: "stylesheet", href: LEAFLET + "leaflet.css", crossorigin: "",
+      integrity: "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" });
+    const js = el("script", { src: LEAFLET + "leaflet.js", crossorigin: "",
+      integrity: "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" });
+    js.onload = () => resolve(window.L);
+    js.onerror = () => { leafletReady = null; reject(new Error("map library didn't load")); };
+    document.head.append(css, js);
+  });
+  return leafletReady;
+}
+
+async function openMap() {
+  $("#map-panel").hidden = false;
+  try {
+    const L = await loadLeaflet();
+    if (!map) {
+      const here = lastData?.location;
+      map = here ? L.map("map").setView([here.latitude, here.longitude], 9) : L.map("map").setView([39.5, -98.35], 4);
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 18, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      }).addTo(map);
+      map.on("click", (e) => {
+        picked = e.latlng.wrap();
+        if (pin) pin.setLatLng(picked);
+        else pin = L.circleMarker(picked, { radius: 9, color: "#fff", weight: 3, fillColor: "#0369a1", fillOpacity: 1 }).addTo(map);
+        $("#map-go").disabled = false;
+        $("#map-hint").textContent = `Chosen: ${picked.lat.toFixed(3)}, ${picked.lng.toFixed(3)}. Tap elsewhere to move it.`;
+      });
+    }
+    map.invalidateSize();  // the panel was hidden while the map was created
+    $("#map-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (err) {
+    $("#map-hint").textContent = "The map couldn't load. Check your connection, or type a place instead.";
+  }
+}
+
+// A readable name for a pin ("Map pin near Carbó, Sonora, Mexico"), or its coordinates.
+async function pinName(lat, lon) {
+  const fallback = `Map pin ${lat.toFixed(3)}, ${lon.toFixed(3)}`;
+  try {
+    const url = "https://nominatim.openstreetmap.org/reverse?" +
+      new URLSearchParams({ format: "jsonv2", lat, lon, zoom: 10, "accept-language": "en" });
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    const a = (await res.json()).address || {};
+    const local = a.city || a.town || a.village || a.hamlet || a.municipality || a.county;
+    const parts = [local, a.state, a.country_code === "us" ? null : a.country].filter(Boolean);
+    return parts.length ? `Map pin near ${parts.join(", ")}` : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+$("#map-btn").addEventListener("click", openMap);
+$("#map-close").addEventListener("click", () => { $("#map-panel").hidden = true; });
+$("#map-go").addEventListener("click", async () => {
+  if (!picked) return;
+  $("#map-go").disabled = true;
+  const name = await pinName(picked.lat, picked.lng);
+  $("#map-panel").hidden = true;
+  $("#map-go").disabled = false;
+  $("#place").value = name;
+  forecast({ place: name, lat: picked.lat.toFixed(4), lon: picked.lng.toFixed(4) });
 });
 
 $("#summary-btn").addEventListener("click", summarize);
