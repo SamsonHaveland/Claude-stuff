@@ -77,7 +77,8 @@ than the inputs change adds cost, not accuracy.
 | `weather_engine/regime.py` | Weather-pattern (analog) corrections: wind direction, pressure, pressure change, season |
 | `weather_engine/nowcast.py` | Nudges the next ~12 hours toward the station's latest reading |
 | `weather_engine/terrain.py` | Ground around the place: what the wind crosses (mountains, lower ground, water) |
-| `weather_engine/backtest.py` | Replays past days without peeking to measure each correction step |
+| `weather_engine/backtest.py` | Replays past days without peeking to measure each correction step, against raw ECMWF and (US) raw NBM |
+| `weather_engine/sources/nws.py` | Official NWS forecast, logged as a baseline for `verify` (never blended) |
 | `weather_engine/verify.py` | Scoring and baseline comparisons |
 | `weather_engine/forecast.py` | End-to-end pipeline |
 | `weather_engine/report.py` | Terminal and HTML output |

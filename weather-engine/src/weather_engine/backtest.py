@@ -6,6 +6,8 @@ exactly as the live engine would have done, and compared with what the
 station measured. Methods compared:
 
 - ``ecmwf``: the raw ECMWF forecast (the usual "best single model" benchmark)
+- ``nbm``: the raw National Blend of Models, NOAA's own calibrated blend and the
+  hardest US benchmark (blank outside the US)
 - ``mean``: plain average of all models, uncorrected
 - ``plain``: per-model bias correction + skill-weighted blend (the previous engine)
 - ``pattern``: plain + weather-pattern corrections (regime.py)
@@ -21,7 +23,8 @@ import pandas as pd
 from . import calibrate, regime
 from .config import BASELINE_MODEL
 
-METHODS = ["ecmwf", "mean", "plain", "pattern"]
+METHODS = ["ecmwf", "nbm", "mean", "plain", "pattern"]
+NBM_MODEL = "ncep_nbm_conus"
 
 
 def run(pairs: pd.DataFrame, feats: pd.DataFrame, today: date, days: int = 60, refit_every: int = 3) -> pd.DataFrame:
@@ -48,6 +51,7 @@ def run(pairs: pd.DataFrame, feats: pd.DataFrame, today: date, days: int = 60, r
         obs = todo.groupby(["date", "lead", "var"])["obs"].first()
         out = pd.DataFrame({"obs": obs})
         out["ecmwf"] = raw[raw["model"] == BASELINE_MODEL].set_index(["date", "lead", "var"])["value"]
+        out["nbm"] = raw[raw["model"] == NBM_MODEL].set_index(["date", "lead", "var"])["value"]
         out["mean"] = raw.groupby(["date", "lead", "var"])["value"].mean()
         plain = calibrate.blend(calibrate.apply(raw, stats))
         out["plain"] = plain.set_index(["date", "lead", "var"])["value"]

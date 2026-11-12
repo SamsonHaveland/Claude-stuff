@@ -286,19 +286,32 @@ def backtest_to_text(summary: pd.DataFrame) -> str:
     """Backtest table: error of each method per variable and lead band, plus the improvement."""
     if summary.empty:
         return "Not enough history to backtest yet."
-    names = {"ecmwf": "ECMWF raw", "mean": "All-model avg", "plain": "Bias-corrected", "pattern": "+ Pattern"}
+    names = {"ecmwf": "ECMWF raw", "nbm": "NOAA NBM raw", "mean": "All-model avg",
+             "plain": "Bias-corrected", "pattern": "+ Pattern"}
+    has_nbm = "nbm" in summary and summary["nbm"].notna().any()  # US places only
+    names = {m: label for m, label in names.items() if m in summary and (m != "nbm" or has_nbm)}
+
+    def gain(engine: float, baseline: float) -> str:
+        return f"{(1 - engine / baseline) * 100:>+10.0f}%" if baseline > 1e-6 else f"{'—':>11}"
+
     lines = ["Mean absolute error on replayed days (lower is better):"]
     order = [v for v in LABELS if v in set(summary["var"])]
     for var in order:
         g = summary[summary["var"] == var]
         unit = UNITS.get(var, "")
         lines.append(f"\n{LABELS.get(var, var)} ({unit})")
-        lines.append(f"  {'lead':<9}{'days':>5}" + "".join(f"{names[m]:>16}" for m in names) + f"{'vs ECMWF':>11}")
+        lines.append(f"  {'lead':<9}{'days':>5}" + "".join(f"{names[m]:>16}" for m in names)
+                     + f"{'vs ECMWF':>11}" + (f"{'vs NBM':>11}" if has_nbm else ""))
         for _, r in g.iterrows():
-            gain = f"{(1 - r['pattern'] / r['ecmwf']) * 100:>+10.0f}%" if r["ecmwf"] > 1e-6 else f"{'—':>11}"
             digits = 3 if var == "precip" else 1
-            lines.append(f"  {r['leads']:<9}{r['n']:>5}" + "".join(f"{r[m]:>16.{digits}f}" for m in names) + gain)
+            cells = "".join(f"{'—':>16}" if pd.isna(r[m]) else f"{r[m]:>16.{digits}f}" for m in names)
+            line = f"  {r['leads']:<9}{r['n']:>5}" + cells + gain(r["pattern"], r["ecmwf"])
+            if has_nbm:
+                line += f"{'—':>11}" if pd.isna(r["nbm"]) else gain(r["pattern"], r["nbm"])
+            lines.append(line)
     lines.append("\n'vs ECMWF' = how much smaller the engine's error is than the raw ECMWF model's.")
+    if has_nbm:
+        lines.append("'vs NBM' = the same against NOAA's National Blend of Models, NOAA's own calibrated forecast.")
     if (summary["pattern_days"] == 0).all():
         lines.append("Pattern corrections weren't active yet (they need about 90 days of history at this place).")
     return "\n".join(lines)

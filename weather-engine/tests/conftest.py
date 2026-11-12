@@ -212,6 +212,19 @@ def acis_stndata(sdate: str, edate: str, past_days: int) -> dict:
     return {"meta": {"uid": 4242}, "data": rows}
 
 
+def nws_gridpoints(start: date = TODAY, days: int = 8) -> dict:
+    """NWS gridpoint forecast: steady 10 C (50 F) and 16 km/h (~10 mph), 6 mm of rain on day 1 (UTC hours)."""
+    t0 = datetime(start.year, start.month, start.day)
+    hours = [(t0 + timedelta(hours=h)).strftime("%Y-%m-%dT%H:00:00+00:00") for h in range(24 * days)]
+    return {"properties": {
+        "updateTime": f"{start.isoformat()}T05:00:00+00:00",
+        "temperature": {"uom": "wmoUnit:degC", "values": [{"validTime": f"{t}/PT1H", "value": 10.0} for t in hours]},
+        "windSpeed": {"uom": "wmoUnit:km_h-1", "values": [{"validTime": f"{t}/PT1H", "value": 16.09344} for t in hours]},
+        "quantitativePrecipitation": {"uom": "wmoUnit:mm", "values": [
+            {"validTime": f"{t}/PT6H", "value": 1.5 if 30 <= i * 6 < 54 else 0.0} for i, t in enumerate(hours[::6])]},
+    }}
+
+
 @pytest.fixture
 def fake_api(monkeypatch, tmp_path):
     """Route all HTTP calls to synthetic payloads; isolate data dirs."""
@@ -262,14 +275,15 @@ def fake_api(monkeypatch, tmp_path):
                                  "timezone": "America/Denver"}]}
         if "weather.gov/points" in url:
             assert params == {}, "NWS rejects unknown query parameters"
-            return {"properties": {"observationStations": "https://api.weather.gov/gridpoints/BOU/62,60/stations"}}
+            return {"properties": {"observationStations": "https://api.weather.gov/gridpoints/BOU/62,60/stations",
+                                   "forecastGridData": "https://api.weather.gov/gridpoints/BOU/62,60"}}
         if "weather.gov/stations/" in url and url.endswith("/observations/latest"):
             return {"properties": {"timestamp": "2026-10-27T18:00:00+00:00",
                                    "temperature": {"unitCode": "wmoUnit:degC", "value": 20.0},
                                    "windSpeed": {"unitCode": "wmoUnit:km_h-1", "value": 16.09344}}}
         if "weather.gov/gridpoints" in url:
             assert params == {}
-            return NWS_STATIONS
+            return NWS_STATIONS if url.endswith("/stations") else nws_gridpoints()
         if url.endswith("/v1/elevation"):  # a valley: 1609 m here, 2000 m peaks to the W, plains to the E
             lons = [float(x) for x in params["longitude"].split(",")]
             return {"elevation": [1609.0 if abs(x + 104.99) < 1e-6 else 2400.0 if x < -104.99 else 1300.0
