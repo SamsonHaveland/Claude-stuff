@@ -175,6 +175,8 @@ weather-engine backtest "Primm, NV"     # replay the last 60 days: error of raw 
 
 The backtest corrects each past forecast using only what was known when it
 was issued, so its numbers are an honest estimate of real accuracy at that place.
+For US places it also scores the raw National Blend of Models (NBM), NOAA's own
+calibrated forecast and the hardest benchmark there, and shows a "vs NBM" column.
 
 ### Accuracy check
 
@@ -183,6 +185,11 @@ verify` compares the logged forecasts with what the station actually
 recorded, broken down by how many days ahead they were made, for both the
 blend and each raw model. That's how you can tell whether the engine beats
 plain ECMWF.
+
+For US places, each forecast also logs the official National Weather Service
+forecast for the same days (source `nws`), so `verify` shows engine vs NWS
+side by side. It is never blended in. NWS keeps no public archive of its past
+forecasts, so this column only fills in for days forecast after this was added.
 
 ## Tests
 

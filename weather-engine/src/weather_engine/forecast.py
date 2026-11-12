@@ -24,7 +24,7 @@ from .config import (
     VAR_GROUPS,
     Location,
 )
-from .sources import observations, openmeteo, stations
+from .sources import nws, observations, openmeteo, stations
 
 log = logging.getLogger(__name__)
 
@@ -50,6 +50,7 @@ class ForecastResult:
     nowcast: list[dict] = field(default_factory=list)  # latest station readings used to nudge the next hours
     terrain: pd.DataFrame | None = None  # elevation around the place (terrain.py)
     history: dict = field(default_factory=dict)  # stored vs wanted days of model history (history.coverage)
+    nws: pd.DataFrame | None = None  # official NWS forecast (date, lead, var, value), logged as a baseline
 
 
 def _fetch_raw(loc: Location, models: list[str], notes: list[str]) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -232,6 +233,7 @@ def run_forecast(loc: Location, models: list[str] = MODELS, use_calibration: boo
     raw, per_model_hourly, sun = _fetch_raw(loc, models, notes)
     today = raw.loc[raw["lead"] == 0, "date"].min()
     timings["models"] = time.perf_counter() - t0
+    nws_future = background.submit(nws.fetch, loc, today) if loc.timezone else None
 
     station, stats, rejected, chosen, end_hours = None, None, False, {}, {}
     pattern, p_mean, hist = None, None, {}
@@ -283,10 +285,16 @@ def run_forecast(loc: Location, models: list[str] = MODELS, use_calibration: boo
         if hourly is not None and latest:
             now = issued_at.astimezone(ZoneInfo(loc.timezone)).replace(tzinfo=None)
             hourly, nowcast_used = nowcast.apply(hourly, latest, now)
+    official = None
+    if nws_future is not None:
+        try:
+            official = nws_future.result()
+        except Exception as e:  # outside the US, or NWS unavailable: the forecast doesn't depend on it
+            log.info("NWS forecast unavailable: %s", e)
     background.shutdown()
     result = ForecastResult(loc, issued_at, blended, raw, rain_daily, stats, station, notes,
                             rejected, chosen, end_hours, hourly, sun, pattern=pattern, patterns=patterns,
-                            nowcast=nowcast_used, terrain=ground, history=hist)
+                            nowcast=nowcast_used, terrain=ground, history=hist, nws=official)
     _log(result)
     timings["total"] = time.perf_counter() - t0
     result.timings = timings
@@ -328,7 +336,10 @@ def _patterns(feats: pd.DataFrame, p_mean: float | None, plain: pd.DataFrame, bl
 def _log(result: ForecastResult) -> None:
     blend = result.blend[["date", "lead", "var", "value"]].assign(source="blend")
     raw = result.raw[["date", "lead", "var", "value", "model"]].rename(columns={"model": "source"})
-    rows = pd.concat([blend, raw], ignore_index=True)
+    frames = [blend, raw]
+    if result.nws is not None and not result.nws.empty:
+        frames.append(result.nws.assign(source=nws.SOURCE))
+    rows = pd.concat(frames, ignore_index=True)
     rows.insert(0, "issued_at", result.issued_at.isoformat(timespec="seconds"))
     rows.insert(1, "location", result.location.name)
     rows.insert(2, "station", encode_stations(result.stations, result.end_hours))

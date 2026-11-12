@@ -19,6 +19,12 @@ commercial use.
 handling. Keep an ingestion interface so we can switch to direct ECMWF/NOAA
 feeds if usage becomes commercial or call limits bind.
 
+## Baseline to beat (logged, never blended)
+
+| Source | What | Access | Licence / cost |
+|---|---|---|---|
+| NWS API `points/{lat},{lon}` then `gridpoints/{office}/{x},{y}` | The official NWS forecast, turned into the same calendar-day high/low/rain/wind/gust as the engine (local time; multi-hour rain totals spread evenly over their hours) | JSON, no key (User-Agent required). US only | Public domain. No public archive, so it is scored only from the day logging starts |
+
 ## Live readings (next-hours correction)
 
 | Source | What | Access | Licence / cost |

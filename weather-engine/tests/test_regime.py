@@ -126,6 +126,21 @@ def test_backtest_replays_without_peeking(fake_api):
     assert "Bias-corrected" in text
 
 
+def test_backtest_compares_against_nbm(fake_api):
+    from weather_engine import backtest, report
+    from weather_engine.config import MODELS, Location
+    from weather_engine.forecast import training_data
+
+    loc = Location("Denver, Colorado", 39.74, -104.99, elevation=1609, timezone="America/Denver")
+    today = date(2026, 10, 27)
+    models = MODELS[:4] + [backtest.NBM_MODEL]
+    td = training_data(loc, models, today, [], backfill_chunks=10)
+    summary = backtest.summarize(backtest.run(td.pairs, td.feats, today, days=20, refit_every=5))
+    assert summary["nbm"].notna().any()
+    text = report.backtest_to_text(summary)
+    assert "NOAA NBM raw" in text and "vs NBM" in text
+
+
 def test_slow_drift_is_not_mistaken_for_a_pattern():
     """Bias that drifts with time (not weather): cross-validation must not peek at later weeks.
 
