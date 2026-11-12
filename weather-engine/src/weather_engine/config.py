@@ -119,6 +119,28 @@ def load_locations(path: Path) -> dict[str, Location]:
     }
 
 
+def resolve_candidates(
+    place: str | None,
+    lat: float | None = None,
+    lon: float | None = None,
+    locations_path: Path = DEFAULT_LOCATIONS,
+) -> list[Location]:
+    """Coordinates, a saved location name, or a place to geocode ("Denver, CO"):
+    the best match first, then other places with that name (geocoded searches only)."""
+    if lat is not None and lon is not None:
+        return [Location(name=place or f"{lat:.3f},{lon:.3f}", latitude=lat, longitude=lon)]
+    if not place or not place.strip():
+        raise ValueError('Give a place ("Denver, CO"), a saved location name, or coordinates.')
+    place = place.strip()
+    if Path(locations_path).exists():
+        saved = load_locations(Path(locations_path))
+        if place in saved:
+            return [saved[place]]
+    from .sources import openmeteo
+
+    return openmeteo.search(place)
+
+
 def resolve_location(
     place: str | None,
     lat: float | None = None,
@@ -126,15 +148,4 @@ def resolve_location(
     locations_path: Path = DEFAULT_LOCATIONS,
 ) -> Location:
     """Coordinates, a saved location name, or a place to geocode ("Denver, CO")."""
-    if lat is not None and lon is not None:
-        return Location(name=place or f"{lat:.3f},{lon:.3f}", latitude=lat, longitude=lon)
-    if not place or not place.strip():
-        raise ValueError('Give a place ("Denver, CO"), a saved location name, or coordinates.')
-    place = place.strip()
-    if Path(locations_path).exists():
-        saved = load_locations(Path(locations_path))
-        if place in saved:
-            return saved[place]
-    from .sources import openmeteo
-
-    return openmeteo.geocode(place)
+    return resolve_candidates(place, lat, lon, locations_path)[0]

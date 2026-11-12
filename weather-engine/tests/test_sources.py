@@ -21,9 +21,82 @@ def test_pick_geocode_result_prefers_state_match():
     assert openmeteo.pick_geocode_result([], "ME") is None
 
 
-def test_pick_geocode_result_prefers_us_without_hint():
+def test_pick_geocode_result_prefers_us_on_a_tie():
     results = [{"name": "Paris", "country_code": "FR"}, {"name": "Paris", "admin1": "Texas", "country_code": "US"}]
     assert openmeteo.pick_geocode_result(results, None)["country_code"] == "US"
+
+
+# Trimmed from real geocoder answers (2026-11-12): the cases that used to land in the wrong place.
+CARBO = [
+    {"name": "Carbon", "admin1": "Indiana", "country_code": "US", "country": "United States", "population": 397, "feature_code": "PPL"},
+    {"name": "Carbó", "admin1": "Sonora", "country_code": "MX", "country": "Mexico", "population": 4516, "feature_code": "PPLA2"},
+    {"name": "Carbo", "admin1": "Virginia", "country_code": "US", "country": "United States", "feature_code": "PPL"},
+    {"name": "Carbón", "admin1": "Jalisco", "country_code": "MX", "country": "Mexico", "population": 17, "feature_code": "PPL"},
+]
+PARIS = [
+    {"name": "Paris", "admin1": "Île-de-France Region", "country_code": "FR", "country": "France", "population": 2138551, "feature_code": "PPLC"},
+    {"name": "Paris", "admin1": "Texas", "country_code": "US", "country": "United States", "population": 25171, "feature_code": "PPLA2"},
+]
+TORONTO = [
+    {"name": "Toronto", "admin1": "Ontario", "country_code": "CA", "country": "Canada", "population": 2600000, "feature_code": "PPLA"},
+    {"name": "Toronto", "admin1": "Ohio", "country_code": "US", "country": "United States", "population": 5000, "feature_code": "PPL"},
+    {"name": "Toronto State Park", "admin1": "Kansas", "country_code": "US", "feature_code": "PRK"},
+]
+
+
+def _best(results, query):
+    return openmeteo.pick_geocode_results(results, query)[0]
+
+
+def test_exact_name_beats_us_preference_and_accents_dont_matter():
+    assert _best(CARBO, "Carbo")["admin1"] == "Sonora"
+    assert _best(CARBO, "Carbó")["admin1"] == "Sonora"
+
+
+def test_country_and_state_hints():
+    assert _best(CARBO, "Carbo, Mexico")["admin1"] == "Sonora"
+    assert _best(CARBO, "Carbo, MX")["admin1"] == "Sonora"
+    assert _best(CARBO, "Carbo, VA")["admin1"] == "Virginia"
+    assert _best(PARIS, "Paris, France")["country_code"] == "FR"
+    assert _best(PARIS, "Paris, TX")["admin1"] == "Texas"
+    assert _best(TORONTO, "Toronto, Canada")["admin1"] == "Ontario"
+    assert _best(TORONTO, "Toronto, USA")["admin1"] == "Ohio"
+
+
+def test_a_much_bigger_place_wins_without_a_hint():
+    assert _best(PARIS, "Paris")["country_code"] == "FR"
+    assert _best(TORONTO, "Toronto")["admin1"] == "Ontario"
+
+
+def test_hint_never_matches_a_missing_field():
+    # The park has no admin2/country: an unknown hint must not match its empty fields.
+    assert openmeteo.pick_geocode_results(TORONTO, "Toronto, Canadaa") == []
+
+
+def test_search_nicknames_alternatives_and_names(monkeypatch):
+    cabo = [
+        {"name": "Cabo San Lucas", "admin1": "Baja California Sur", "country_code": "MX", "country": "Mexico",
+         "population": 202694, "feature_code": "PPLA2", "latitude": 22.89, "longitude": -109.91},
+        {"name": "Cabo San Lucas International Airport", "admin1": "Baja California Sur", "country_code": "MX",
+         "country": "Mexico", "feature_code": "AIRP", "latitude": 22.9, "longitude": -109.9},
+    ]
+    asked = []
+
+    def fake(url, params):
+        asked.append(params["name"])
+        if params["name"] == "Cabo San Lucas":
+            return {"results": cabo}
+        return {"results": [dict(r, latitude=1.0, longitude=2.0) for r in TORONTO]}
+    monkeypatch.setattr(openmeteo.http, "get_json", fake)
+
+    found = openmeteo.search("cabo, Mexico")
+    assert asked == ["Cabo San Lucas"]  # nickname expanded before asking the geocoder
+    assert [loc.name for loc in found] == ["Cabo San Lucas, Baja California Sur, Mexico"]  # no airport offered
+
+    found = openmeteo.search("Toronto")
+    assert [loc.name for loc in found] == ["Toronto, Ontario, Canada", "Toronto, Ohio"]  # US names unchanged
+    with pytest.raises(ValueError, match="Did you mean: Toronto, Ontario, Canada"):
+        openmeteo.search("Toronto, Canadaa")
 
 
 def test_parse_daily():

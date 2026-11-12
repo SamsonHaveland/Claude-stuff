@@ -272,7 +272,10 @@ def fake_api(monkeypatch, tmp_path):
         if "geocoding" in url:
             return {"results": [{"name": "Denver", "admin1": "Colorado", "country_code": "US",
                                  "latitude": 39.74, "longitude": -104.99, "elevation": 1609,
-                                 "timezone": "America/Denver"}]}
+                                 "timezone": "America/Denver", "population": 715522, "feature_code": "PPLA"},
+                                {"name": "Denver", "admin1": "Iowa", "country_code": "US",
+                                 "latitude": 42.67, "longitude": -92.34, "elevation": 300,
+                                 "timezone": "America/Chicago", "population": 1919, "feature_code": "PPL"}]}
         if "weather.gov/points" in url:
             assert params == {}, "NWS rejects unknown query parameters"
             return {"properties": {"observationStations": "https://api.weather.gov/gridpoints/BOU/62,60/stations",

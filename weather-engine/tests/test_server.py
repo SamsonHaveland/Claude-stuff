@@ -33,6 +33,7 @@ def test_forecast_api(server):
     assert status == 200 and ctype == "application/json"
     data = json.loads(body)
     assert data["location"]["name"] == "Denver, Colorado"
+    assert data["location"]["alternatives"] == []  # "CO" rules out Denver, Iowa
     assert data["calibrated"] is True and data["station"]["id"] == "KBKF"
     assert len(data["days"]) == 8
     day = data["days"][1]
@@ -40,10 +41,18 @@ def test_forecast_api(server):
     assert {r["var"] for r in data["calibration"]} >= {"tmax", "tmin", "wind"}
 
 
+def test_forecast_api_offers_other_places_with_the_name(server):
+    status, _, body = get(server + "/api/forecast?place=Denver")
+    loc = json.loads(body)["location"]
+    assert status == 200 and loc["name"] == "Denver, Colorado"
+    assert loc["alternatives"] == [{"name": "Denver, Iowa", "latitude": 42.67, "longitude": -92.34}]
+
+
 def test_forecast_api_by_coordinates(server):
     status, _, body = get(server + "/api/forecast?lat=39.74&lon=-104.99&place=My%20location")
     assert status == 200
     assert json.loads(body)["location"]["name"] == "My location"
+    assert json.loads(body)["location"]["alternatives"] == []
 
 
 def test_forecast_api_errors_are_json(server):

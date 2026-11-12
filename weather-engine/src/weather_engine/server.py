@@ -20,9 +20,10 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import ai, auth, report
-from .config import resolve_location
+from .config import resolve_candidates
 from .forecast import run_forecast
 from .sources import observations
+from .sources.openmeteo import MAX_ALTERNATIVES
 
 log = logging.getLogger(__name__)
 
@@ -33,6 +34,11 @@ mimetypes.add_type("text/javascript", ".js")
 
 
 def _location_from_query(q: dict[str, list[str]]):
+    return _candidates_from_query(q)[0]
+
+
+def _candidates_from_query(q: dict[str, list[str]]):
+    """[best match, other places with that name...] for a request's place/lat/lon/station."""
     def one(key: str) -> str | None:
         v = q.get(key, [""])[0].strip()
         return v or None
@@ -43,13 +49,13 @@ def _location_from_query(q: dict[str, list[str]]):
         lon_f = float(lon) if lon else None
     except ValueError:
         raise ValueError("lat and lon must be numbers") from None
-    loc = resolve_location(one("place"), lat_f, lon_f)
+    found = resolve_candidates(one("place"), lat_f, lon_f)
     station = one("station")
     if station:
         if not re.fullmatch(r"[A-Za-z0-9]{3,5}", station):
             raise ValueError("station must be an ICAO id like KDEN")
-        loc.station = station.upper()
-    return loc
+        found[0].station = station.upper()
+    return found
 
 
 # Recent forecasts are reused for a while: the models only update every few hours,
@@ -74,12 +80,15 @@ def api_forecast(q: dict[str, list[str]]) -> dict:
             hit = _recent.get(key)
         if hit and time.time() - hit[0] < FORECAST_TTL_S:
             return hit[1]
-    loc = _location_from_query(q)
+    loc, *others = _candidates_from_query(q)
     result = run_forecast(loc, use_calibration=q.get("raw", ["0"])[0] != "1")
     t = result.timings
     print(f"forecast {loc.name!r}: {t.get('total', 0):.1f}s (" +
           ", ".join(f"{k} {v:.1f}" for k, v in t.items() if k != "total") + ")", flush=True)
     payload = report.to_dict(result)
+    # Other places with the same name, so a wrong guess is one tap to fix in the app.
+    payload["location"]["alternatives"] = [
+        {"name": o.name, "latitude": o.latitude, "longitude": o.longitude} for o in others[:MAX_ALTERNATIVES]]
     with _recent_lock:
         _recent[key] = (time.time(), payload)
         for old in [k for k, (ts, _) in _recent.items() if time.time() - ts > FORECAST_TTL_S]:
