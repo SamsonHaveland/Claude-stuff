@@ -252,6 +252,27 @@ async function buildHistory(params) {
   if (historyKey === key) historyKey = null;
 }
 
+// Other places with the same name: the geocoder's best guess can be the wrong town.
+function renderAlternatives(data) {
+  const box = $("#alternatives");
+  const alts = data.location.alternatives || [];
+  box.hidden = !alts.length;
+  box.replaceChildren();
+  if (box.hidden) return;
+  box.append("Not this place? ");
+  alts.forEach((a, i) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "link";
+    btn.textContent = a.name;
+    btn.onclick = () => {
+      $("#place").value = a.name;
+      forecast({ place: a.name, lat: a.latitude.toFixed(4), lon: a.longitude.toFixed(4) });
+    };
+    box.append(...(i ? [" · ", btn] : [btn]));
+  });
+}
+
 function renderOverride(data) {
   const box = $("#override");
   box.hidden = !(data.station_rejected && data.station);
@@ -312,6 +333,7 @@ function render(data) {
     ? " · checked against " + [...byStation].map(([k, labels]) => `${k} for ${labels.join(" & ")}`).join("; ")
     : "";
   $("#issued").textContent = `Updated ${issued.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}${where}`;
+  renderAlternatives(data);
   renderOverride(data);
   show("result");  // charts measure their container, so it must be visible first
   renderHero(data);

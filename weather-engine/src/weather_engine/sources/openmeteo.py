@@ -6,6 +6,8 @@ with model names, which keeps parsing simple and robust.
 
 from __future__ import annotations
 
+import unicodedata
+
 import pandas as pd
 
 from .. import http
@@ -42,34 +44,121 @@ US_STATES = {
 
 # --- geocoding -------------------------------------------------------------
 
+# Everyday names the geocoder doesn't know as places (it only matches official names).
+NICKNAMES = {
+    "cabo": "Cabo San Lucas, Baja California Sur, Mexico",
+    "los cabos": "San José del Cabo, Baja California Sur, Mexico",
+    "vegas": "Las Vegas, Nevada",
+    "nyc": "New York, New York",
+    "la": "Los Angeles, California",
+    "sf": "San Francisco, California",
+    "dc": "Washington, District of Columbia",
+    "philly": "Philadelphia, Pennsylvania",
+    "nola": "New Orleans, Louisiana",
+    "cdmx": "Mexico City, Mexico",
+}
+# Other ways people write a country after the comma -> ISO country code.
+COUNTRY_ALIASES = {
+    "usa": "US", "us": "US", "united states": "US", "united states of america": "US", "america": "US",
+    "uk": "GB", "england": "GB", "scotland": "GB", "wales": "GB", "britain": "GB", "great britain": "GB",
+    "mexico": "MX", "canada": "CA",
+}
+US_BOOST = 10  # a US place wins unless the other is over 10x bigger ("Paris" is France, "Portland" Oregon)
+MAX_ALTERNATIVES = 5
+
+
+def _norm(text: str | None) -> str:
+    """Lower case without accents: "Carbó" -> "carbo"."""
+    decomposed = unicodedata.normalize("NFKD", text or "")
+    return "".join(c for c in decomposed if not unicodedata.combining(c)).lower().strip()
+
+
+def _matches_hint(r: dict, hint: str) -> bool:
+    """Does one comma part ("CO", "Sonora", "Mexico", "MX") describe this result?"""
+    h = _norm(hint)
+    names = {_norm(r.get(k)) for k in ("admin1", "admin2", "admin3", "country")} - {""}
+    if h in names:
+        return True
+    code = (r.get("country_code") or "").upper()
+    if r.get("country_code") == "US" and _norm(US_STATES.get(hint.strip().upper())) in names:
+        return True
+    return COUNTRY_ALIASES.get(h, h.upper() if len(h) == 2 else None) == code
+
+
+def _is_place(r: dict) -> bool:
+    return (r.get("feature_code") or "PPL").startswith("PPL")  # towns, not peaks, parks or airports
+
+
+def _rank(r: dict, name: str) -> tuple:
+    n = _norm(r.get("name"))
+    match = 0 if n == name else 1 if n.startswith(name) else 2
+    is_place = _is_place(r)
+    us = r.get("country_code") == "US"
+    size = (r.get("population") or 0) * (US_BOOST if us else 1)
+    return (match, not is_place, -size, not us)
+
+
+def pick_geocode_results(results: list[dict], query: str) -> list[dict]:
+    """Geocoder results that fit the query, best first.
+
+    The first comma part is the place name; any further parts ("Sonora",
+    "Mexico", "CO") must each match the result's state/region or country.
+    """
+    name, *hints = [p.strip() for p in query.split(",") if p.strip()]
+    fitting = [r for r in results if all(_matches_hint(r, h) for h in hints)]
+    return sorted(fitting, key=lambda r: _rank(r, _norm(name)))
+
+
 def pick_geocode_result(results: list[dict], region: str | None) -> dict | None:
-    """Choose the result matching a state/region hint ("CO" or "Colorado")."""
-    if not results:
-        return None
-    if region:
-        wanted = US_STATES.get(region.strip().upper(), region.strip()).lower()
-        for r in results:
-            if (r.get("admin1") or "").lower() == wanted:
-                return r
-    us = [r for r in results if r.get("country_code") == "US"]
-    return (us or results)[0]
+    """Best result for a name with an optional region hint ("CO" or "Colorado")."""
+    name = results[0].get("name", "") if results else ""
+    ranked = pick_geocode_results(results, f"{name}, {region}" if region else name)
+    return ranked[0] if ranked else None
+
+
+def display_name(r: dict) -> str:
+    """ "Denver, Colorado" in the US (unchanged, so saved history still matches);
+    "Carbó, Sonora, Mexico" elsewhere."""
+    parts = [r["name"], r.get("admin1")]
+    if r.get("country_code") != "US":
+        parts.append(r.get("country"))
+    return ", ".join(dict.fromkeys(p for p in parts if p))
+
+
+def _to_location(r: dict) -> Location:
+    return Location(name=display_name(r), latitude=r["latitude"], longitude=r["longitude"],
+                    elevation=r.get("elevation"), timezone=r.get("timezone"))
+
+
+def search(query: str) -> list[Location]:
+    """Places matching "Denver, CO", "Carbo, Mexico", "Cabo", ..., best first."""
+    first, *rest = query.split(",")
+    if _norm(first) in NICKNAMES:
+        query = ", ".join([NICKNAMES[_norm(first)], *rest])
+    name = query.split(",")[0].strip()
+    payload = http.get_json(GEOCODE_URL, {"name": name, "count": 25, "language": "en"})
+    results = payload.get("results") or []
+    ranked = pick_geocode_results(results, query)
+    if not ranked:
+        if results and "," in query:
+            others = "; ".join(display_name(r) for r in pick_geocode_results(results, name)[:MAX_ALTERNATIVES])
+            raise ValueError(f"No {name!r} found in {query.split(',', 1)[1].strip()!r}. Did you mean: {others}?")
+        raise ValueError(f"No place found for {query!r}")
+    best_is_place = _is_place(ranked[0])
+    out, seen = [], set()
+    for r in ranked:
+        if out and best_is_place and not _is_place(r):
+            continue  # don't offer airports or capes as "did you mean"
+        loc = _to_location(r)
+        if loc.name not in seen:  # the geocoder sometimes lists the same town twice
+            seen.add(loc.name)
+            out.append(loc)
+    return out
 
 
 def geocode(query: str) -> Location:
-    """Resolve "Denver, CO" or "Boulder" to a Location (US results preferred)."""
-    city, _, region = (p.strip() for p in query.partition(","))
-    payload = http.get_json(GEOCODE_URL, {"name": city, "count": 10, "language": "en"})
-    hit = pick_geocode_result(payload.get("results") or [], region or None)
-    if hit is None:
-        raise ValueError(f"No place found for {query!r}")
-    name = ", ".join(x for x in (hit["name"], hit.get("admin1")) if x)
-    return Location(
-        name=name,
-        latitude=hit["latitude"],
-        longitude=hit["longitude"],
-        elevation=hit.get("elevation"),
-        timezone=hit.get("timezone"),
-    )
+    """Resolve "Denver, CO", "Carbó, Sonora, Mexico" or "Cabo" to the best-matching Location."""
+    return search(query)[0]
 
 
 # --- live forecasts --------------------------------------------------------
