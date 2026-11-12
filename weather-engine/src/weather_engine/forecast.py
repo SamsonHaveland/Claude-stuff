@@ -28,6 +28,8 @@ from .sources import nws, observations, openmeteo, stations
 
 log = logging.getLogger(__name__)
 
+NWS_WAIT_SECONDS = 5.0  # how long a forecast waits for the NWS baseline before going without it
+
 
 @dataclass
 class ForecastResult:
@@ -288,10 +290,11 @@ def run_forecast(loc: Location, models: list[str] = MODELS, use_calibration: boo
     official = None
     if nws_future is not None:
         try:
-            official = nws_future.result()
-        except Exception as e:  # outside the US, or NWS unavailable: the forecast doesn't depend on it
+            # Only a baseline for `verify`: never hold up the forecast waiting for NWS.
+            official = nws_future.result(timeout=NWS_WAIT_SECONDS)
+        except Exception as e:  # outside the US, NWS slow or unavailable
             log.info("NWS forecast unavailable: %s", e)
-    background.shutdown()
+    background.shutdown(wait=False)  # a slow NWS request finishes (or times out) on its own
     result = ForecastResult(loc, issued_at, blended, raw, rain_daily, stats, station, notes,
                             rejected, chosen, end_hours, hourly, sun, pattern=pattern, patterns=patterns,
                             nowcast=nowcast_used, terrain=ground, history=hist, nws=official)

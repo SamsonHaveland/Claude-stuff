@@ -1,6 +1,5 @@
 from datetime import date
 
-import pandas as pd
 import pytest
 
 from weather_engine import store, verify
@@ -56,3 +55,24 @@ def test_forecast_still_works_without_nws(fake_api, monkeypatch):
     monkeypatch.setattr(nws, "fetch", unavailable)
     result = run_forecast(Location("Denver", 39.74, -104.99))
     assert result.nws is None and not result.blend.empty
+
+
+def test_slow_nws_does_not_delay_the_forecast(fake_api, monkeypatch):
+    import threading
+    import time
+
+    from weather_engine import forecast
+
+    release = threading.Event()
+
+    def hangs(*args, **kwargs):
+        release.wait(10)
+        raise RuntimeError("timed out")
+    monkeypatch.setattr(nws, "fetch", hangs)
+    monkeypatch.setattr(forecast, "NWS_WAIT_SECONDS", 0.2)
+    t0 = time.perf_counter()
+    result = run_forecast(Location("Denver", 39.74, -104.99))
+    elapsed = time.perf_counter() - t0
+    release.set()
+    assert result.nws is None and not result.blend.empty
+    assert elapsed < 8, elapsed
