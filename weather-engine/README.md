@@ -204,3 +204,8 @@ run offline.
 
 Weather data by [Open-Meteo.com](https://open-meteo.com/) (CC BY 4.0).
 Observations via NWS and the Iowa Environmental Mesonet.
+Map © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, drawn with
+[Leaflet](https://leafletjs.com/); map-pin names from OpenStreetMap's Nominatim (one lookup per pin).
+Header photos from Pexels under the [Pexels License](https://www.pexels.com/license/) (free use,
+credit optional): [canola field under storm clouds](https://www.pexels.com/photo/yellow-flower-field-under-gray-clouds-8045059/)
+and [wheat field under a stormy sky](https://www.pexels.com/photo/a-wheat-field-under-a-stormy-sky-5845421/).

@@ -1,7 +1,8 @@
 // Caches only the app shell so it opens instantly from the home screen.
 // Forecasts are always fetched fresh — never served from cache.
-const CACHE = "weather-engine-shell-v5";
-const SHELL = ["./", "index.html", "style.css", "views.js", "app.js", "manifest.webmanifest", "icon.svg"];
+const CACHE = "weather-engine-shell-v6";
+const SHELL = ["./", "index.html", "style.css", "views.js", "app.js", "manifest.webmanifest", "icon.svg",
+  "photo-start.jpg", "photo-forecast.jpg"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -17,7 +18,8 @@ self.addEventListener("activate", (e) => {
 
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
-  if (e.request.method !== "GET" || url.pathname.includes("/api/")) return;
+  // Only the app's own files: map tiles and other sites' responses are never stored.
+  if (e.request.method !== "GET" || url.origin !== self.location.origin || url.pathname.includes("/api/")) return;
   // Network first so updates show up; fall back to the cached shell offline.
   e.respondWith(
     fetch(e.request)

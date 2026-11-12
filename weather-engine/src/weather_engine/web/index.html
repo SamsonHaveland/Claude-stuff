@@ -16,7 +16,7 @@
 </head>
 <body>
   <main>
-    <header>
+    <header class="hero">
       <h1>Weather Engine</h1>
       <form id="search" autocomplete="off">
         <label class="visually-hidden" for="place">Place</label>
@@ -25,9 +25,19 @@
       </form>
       <div class="row">
         <button id="locate" type="button" class="link">Use my location</button>
+        <button id="map-btn" type="button" class="link">Pick on map</button>
         <div id="recent" class="chips" aria-label="Recent places"></div>
       </div>
     </header>
+
+    <section id="map-panel" class="card" hidden>
+      <p id="map-hint" class="muted small">Tap the map where you want a forecast.</p>
+      <div id="map" aria-label="Map: tap a spot to choose it"></div>
+      <div class="map-actions">
+        <button id="map-go" type="button" disabled>Forecast here</button>
+        <button id="map-close" type="button" class="link">Close</button>
+      </div>
+    </section>
 
     <section id="login" class="card" hidden>
       <form id="login-form">
